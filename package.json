@@ -1,0 +1,28 @@
+{
+  "name": "foundry-hosted-agents-deliverables",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Build scripts for the Air Canada Foundry Hosted Agents decision deliverables",
+  "type": "module",
+  "scripts": {
+    "build-deck": "node scripts/build-deck.js"
+  },
+  "dependencies": {
+    "pptxgenjs": "file:./vendor-tarballs/pptxgenjs-4.0.1.tgz"
+  },
+  "overrides": {
+    "util-deprecate": "file:./vendor/util-deprecate",
+    "readable-stream": "file:./vendor/readable-stream",
+    "inherits": "file:./vendor/inherits",
+    "immediate": "file:./vendor/immediate",
+    "setimmediate": "file:./vendor/setimmediate",
+    "pako": "file:./vendor/pako",
+    "lie": "file:./vendor/lie",
+    "queue": "file:./vendor/queue",
+    "undici-types": "file:./vendor/undici-types",
+    "jszip": "file:./vendor-tarballs/jszip-3.10.1.tgz",
+    "image-size": "file:./vendor-tarballs/image-size-2.0.2.tgz",
+    "@types/node": "file:./vendor-tarballs/types-node-26.4.0.tgz",
+    "https": "file:./vendor-tarballs/https-1.0.0.tgz"
+  }
+}

@@ -1,0 +1,7 @@
+{
+  "name": "lie",
+  "version": "3.3.0",
+  "description": "Local vendor stand-in for lie (avoids corporate npm feed EALLOWREMOTE block on a never-cached transitive dependency of jszip). lie is a Promise/A+ polyfill used only when native Promise is unavailable; jszip's own code already prefers native Promise when present (always true in Node), so this stand-in just re-exports the global Promise constructor.",
+  "main": "index.js",
+  "license": "MIT"
+}

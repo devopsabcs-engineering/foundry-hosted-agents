@@ -1,0 +1,7 @@
+{
+  "name": "readable-stream",
+  "version": "3.6.2",
+  "description": "Local vendor stand-in for readable-stream (avoids corporate npm feed EALLOWREMOTE block on never-cached transitive deps). Delegates to Node's built-in 'stream' module, which provides the same Readable/Writable/Duplex/Transform/PassThrough API this package normally polyfills for older Node/browser targets.",
+  "main": "index.js",
+  "license": "MIT"
+}

@@ -1,0 +1,59 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/Azure/azure-dev/main/schemas/v1.0/azure.yaml.json
+
+name: air-canada-threat-assessment
+services:
+    ai-project:
+        host: azure.ai.project
+        deployments:
+            - name: gpt-4o-mini
+              model:
+                  name: gpt-4o-mini
+                  format: OpenAI
+                  version: "2024-07-18"
+              sku:
+                  name: GlobalStandard
+                  capacity: 10
+    anomaly-conn:
+        host: azure.ai.connection
+        endpoint: ${ANOMALY_MCP_URL}
+        type: custom
+    defender-conn:
+        host: azure.ai.connection
+        endpoint: ${DEFENDER_MCP_URL}
+        type: custom
+    security-tools:
+        host: azure.ai.toolbox
+        uses:
+            - ai-project
+            - defender-conn
+            - anomaly-conn
+        tools:
+            - connection: defender-conn
+              type: mcp
+            - connection: anomaly-conn
+              type: mcp
+    threat-assessment-agent:
+        project: ./src/threat-assessment-agent
+        host: azure.ai.agent
+        language: python
+        uses:
+            - ai-project
+            - security-tools
+        codeConfiguration:
+            dependencyResolution: remote_build
+            entryPoint: main.py
+            runtime: python_3_13
+        container:
+            resources:
+                cpu: "0.5"
+                memory: 1Gi
+        kind: hosted
+        name: threat-assessment-agent
+        protocols:
+            - protocol: responses
+              version: 2.0.0
+        environmentVariables:
+            - name: AZURE_AI_MODEL_DEPLOYMENT_NAME
+              value: gpt-4o-mini
+        toolboxes:
+            - security-tools

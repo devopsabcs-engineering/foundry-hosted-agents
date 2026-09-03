@@ -1,0 +1,18 @@
+# Threat-assessment hosted-agent runtime dependencies (Increment 1 baseline).
+# Pre-release/hosting SDK packages are pinned loosely since exact stable
+# versions are not yet published; see the Phase 2 validation report for any
+# install failures encountered in this environment.
+#
+# langgraph is intentionally NOT pinned to <0.4: azure-ai-agentserver-langgraph
+# (currently 1.0.0b17) transitively requires langchain>=1.0.3, which requires
+# langgraph>=1.2.11,<1.3.0. A direct langgraph<0.4 pin makes the dependency
+# set unsatisfiable (verified: `pip install -r requirements.txt` fails with a
+# resolution conflict). graph.py only uses the stable StateGraph/START/END
+# API, which is unaffected by this range.
+
+langgraph>=1.2.11,<2.0
+langchain-azure-ai>=0.1.0
+azure-ai-agentserver-langgraph
+openai>=1.40.0
+azure-identity>=1.17.0
+typing-extensions>=4.12.0

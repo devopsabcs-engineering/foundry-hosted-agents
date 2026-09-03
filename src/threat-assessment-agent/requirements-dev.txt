@@ -1,0 +1,2 @@
+# Test-only tooling; not part of the deployed runtime image.
+pytest>=8.0.0

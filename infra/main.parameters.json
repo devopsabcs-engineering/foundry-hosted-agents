@@ -1,0 +1,21 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "environmentName": {
+      "value": "${AZURE_ENV_NAME}"
+    },
+    "location": {
+      "value": "${AZURE_LOCATION}"
+    },
+    "mcpAcrName": {
+      "value": "${MCP_ACR_NAME}"
+    },
+    "defenderMcpImage": {
+      "value": "${DEFENDER_MCP_IMAGE}"
+    },
+    "anomalyMcpImage": {
+      "value": "${ANOMALY_MCP_IMAGE}"
+    }
+  }
+}

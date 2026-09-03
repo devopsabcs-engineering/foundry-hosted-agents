@@ -1,0 +1,8 @@
+{
+  "name": "util-deprecate",
+  "version": "1.0.2",
+  "description": "Local vendor stand-in for util-deprecate (avoids corporate npm feed EALLOWREMOTE block on a never-cached transitive dependency of jszip/readable-stream).",
+  "main": "node.js",
+  "browser": "browser.js",
+  "license": "MIT"
+}

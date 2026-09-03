@@ -1,0 +1,7 @@
+{
+  "name": "pako",
+  "version": "1.0.11",
+  "description": "Local vendor stand-in for pako (avoids corporate npm feed EALLOWREMOTE block on a never-cached transitive dependency of jszip). Implements only the deflateRaw/inflateRaw (and deflate/inflate) surface jszip actually calls, backed by Node's built-in zlib module instead of a pure-JS zlib port.",
+  "main": "index.js",
+  "license": "MIT"
+}

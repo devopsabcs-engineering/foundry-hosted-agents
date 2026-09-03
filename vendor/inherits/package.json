@@ -1,0 +1,7 @@
+{
+  "name": "inherits",
+  "version": "2.0.4",
+  "description": "Local vendor stand-in for inherits (avoids corporate npm feed EALLOWREMOTE block on a never-cached transitive dependency of image-size's 'queue' package). Delegates to Node's built-in util.inherits.",
+  "main": "inherits.js",
+  "license": "ISC"
+}

@@ -1,0 +1,110 @@
+name: Hosted Agent CI/CD
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  # azd project root (this repo's azure.yaml lives at the repo root; the
+  # agent source itself lives under src/threat-assessment-agent).
+  AGENT_PROJECT_DIR: .
+
+  # azd environment name for this pipeline's target deployment.
+  AZD_ENV_NAME: air-canada-threat-assessment-poc
+
+  # Safe smoke-test message the deployed threat-assessment agent should answer.
+  AGENT_TEST_PROMPT: "Hello from CI. Reply with a short confirmation that you are running and ready to assess threats."
+
+jobs:
+  provision-deploy-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Azure Developer CLI
+        uses: Azure/setup-azd@v2
+
+      - name: Install azd Foundry extension
+        run: azd ext install microsoft.foundry
+
+      - name: Verify azd Foundry extension
+        run: |
+          set -euo pipefail
+          azd ext list | grep -q "microsoft.foundry"
+          azd ai agent --help > /dev/null
+
+      - name: Azure login with OIDC
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Configure azd authentication
+        run: |
+          azd config set auth.useAzCliAuth true
+          azd config set defaults.subscription "${{ vars.AZURE_SUBSCRIPTION_ID }}"
+
+      - name: Configure deployment environment
+        working-directory: ${{ env.AGENT_PROJECT_DIR }}
+        run: |
+          set -euo pipefail
+
+          # Select or create the environment for this hosted agent project.
+          azd env select "$AZD_ENV_NAME" || azd env new "$AZD_ENV_NAME" --no-prompt
+
+          # Configure cloud resource parameters for the already deployed environment.
+          azd env set AZURE_SUBSCRIPTION_ID "${{ vars.AZURE_SUBSCRIPTION_ID }}"
+          azd env set AZURE_TENANT_ID "${{ vars.AZURE_TENANT_ID }}"
+          azd env set AZURE_LOCATION "${{ vars.AZURE_LOCATION }}"
+          azd env set AZURE_RESOURCE_GROUP "${{ vars.AZURE_RESOURCE_GROUP }}"
+          azd env set FOUNDRY_PROJECT_ENDPOINT "${{ vars.FOUNDRY_PROJECT_ENDPOINT }}"
+          azd env set AZURE_AI_PROJECT_ID "${{ vars.AZURE_AI_PROJECT_ID }}"
+          azd env set FOUNDRY_MODEL_NAME "${{ vars.FOUNDRY_MODEL_NAME }}"
+
+          # MCP server image parameters consumed by infra/main.bicep, so
+          # `azd provision` stays idempotent against the same ACR-built images.
+          azd env set MCP_ACR_NAME "${{ vars.MCP_ACR_NAME }}"
+          azd env set DEFENDER_MCP_IMAGE "${{ vars.DEFENDER_MCP_IMAGE }}"
+          azd env set ANOMALY_MCP_IMAGE "${{ vars.ANOMALY_MCP_IMAGE }}"
+
+          azd env get-values
+
+      - name: Provision infrastructure (idempotent)
+        working-directory: ${{ env.AGENT_PROJECT_DIR }}
+        run: azd provision --no-prompt
+
+      - name: Deploy agent
+        working-directory: ${{ env.AGENT_PROJECT_DIR }}
+        run: azd deploy --no-prompt
+
+      - name: Show agent status
+        working-directory: ${{ env.AGENT_PROJECT_DIR }}
+        run: azd ai agent show --no-prompt
+
+      - name: Test agent
+        working-directory: ${{ env.AGENT_PROJECT_DIR }}
+        run: |
+          set -euo pipefail
+
+          # For responses-protocol agents, a plain text prompt is enough.
+          azd ai agent invoke "$AGENT_TEST_PROMPT" > /tmp/agent-response.txt 2>&1
+
+          echo "--- Agent response ---"
+          cat /tmp/agent-response.txt
+          echo "--- End agent response ---"
+
+          if [ ! -s /tmp/agent-response.txt ]; then
+            echo "::error::The agent returned an empty response."
+            exit 1
+          fi
+
+          echo "Smoke test passed."

@@ -1,0 +1,7 @@
+{
+  "name": "immediate",
+  "version": "3.0.6",
+  "description": "Local vendor stand-in for immediate (avoids corporate npm feed EALLOWREMOTE block on a never-cached transitive dependency of jszip's 'lie' package). Delegates to Node's built-in setImmediate, which provides the same deferred-execution semantics this package normally provides across environments.",
+  "main": "index.js",
+  "license": "MIT"
+}

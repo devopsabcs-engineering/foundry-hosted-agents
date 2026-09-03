@@ -1,0 +1,7 @@
+{
+  "name": "queue",
+  "version": "6.0.2",
+  "description": "Local vendor stand-in for queue (avoids corporate npm feed EALLOWREMOTE block on a never-cached transitive dependency of image-size). Minimal EventEmitter-based task queue supporting push/start/concurrency/autostart, matching the jessetane/queue API surface image-size relies on. This dependency is never actually exercised by scripts/build-deck.js (no raster images are embedded), but must still load without error.",
+  "main": "index.js",
+  "license": "MIT"
+}

@@ -1,0 +1,7 @@
+{
+  "name": "setimmediate",
+  "version": "1.0.5",
+  "description": "Local vendor stand-in for setimmediate (avoids corporate npm feed EALLOWREMOTE block on a never-cached transitive dependency of jszip). Node already provides native global setImmediate/clearImmediate, so this stand-in just re-exports them.",
+  "main": "setImmediate.js",
+  "license": "MIT"
+}

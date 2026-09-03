@@ -1,0 +1,7 @@
+{
+  "name": "undici-types",
+  "version": "5.26.5",
+  "description": "Local vendor stand-in for undici-types (avoids corporate npm feed EALLOWREMOTE block on a never-cached transitive dependency of @types/node). Types-only package with no runtime code; scripts/build-deck.js is plain JavaScript and never requires this package at runtime.",
+  "types": "index.d.ts",
+  "license": "MIT"
+}
