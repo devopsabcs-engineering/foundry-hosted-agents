@@ -188,8 +188,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: azd-env-staging
-          path: .azure/
+          path: ${{ github.workspace }}/.azure/
           retention-days: 1
+          if-no-files-found: error
 
   # ---------------------------------------------------------------------
   # Stage 4: Smoke, contract, and streaming tests against staging
@@ -220,7 +221,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: azd-env-staging
-          path: .azure/
+          path: ${{ github.workspace }}/.azure/
 
       - name: Configure azd authentication and select staging environment
         working-directory: ${{ env.AGENT_PROJECT_DIR }}
@@ -398,8 +399,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: azd-env-production
-          path: .azure/
+          path: ${{ github.workspace }}/.azure/
           retention-days: 1
+          if-no-files-found: error
 
   # ---------------------------------------------------------------------
   # Stage 7: Post-deploy monitoring check
@@ -427,7 +429,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: azd-env-production
-          path: .azure/
+          path: ${{ github.workspace }}/.azure/
 
       - name: Configure azd authentication and select production environment
         working-directory: ${{ env.AGENT_PROJECT_DIR }}
@@ -500,7 +502,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: azd-env-production
-          path: .azure/
+          path: ${{ github.workspace }}/.azure/
 
       - name: Configure azd authentication and select production environment
         working-directory: ${{ env.AGENT_PROJECT_DIR }}
