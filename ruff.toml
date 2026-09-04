@@ -1,0 +1,22 @@
+# Ruff configuration for the CI "lint" stage in
+# .github/workflows/deploy-and-evaluate.yml. Scoped intentionally to a
+# conservative, high-signal rule set (errors, pyflakes, import sort) rather
+# than the full default+extended rule catalog, since this repo's Phase
+# 2/3/5 Python code (src/threat-assessment-agent/, mcp/) was authored
+# before this Phase 6 lint gate existed and is out of scope to rewrite here
+# (see Phase 6 implementation constraints). The CI lint job itself only
+# runs `ruff check eval` (the code this phase owns); this config still
+# applies repo-wide so `ruff check .` behaves consistently if run manually.
+
+target-version = "py311"
+line-length = 110
+extend-exclude = [
+    "vendor",
+    "vendor-tarballs",
+    "node_modules",
+    ".venv",
+    "src/threat-assessment-agent/.venv-validate",
+]
+
+[lint]
+select = ["E", "F", "I"]

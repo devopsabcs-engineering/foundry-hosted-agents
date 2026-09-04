@@ -9,10 +9,20 @@
 # set unsatisfiable (verified: `pip install -r requirements.txt` fails with a
 # resolution conflict). graph.py only uses the stable StateGraph/START/END
 # API, which is unaffected by this range.
+#
+# langchain and langchain-openai are declared explicitly (Phase 5) because
+# graph.py now imports `langchain.agents.create_agent` and
+# `langchain_openai.AzureChatOpenAI` directly to bind specialist nodes to
+# Foundry Toolbox MCP tools via `use_foundry_tools`. Both ranges match the
+# transitive constraints already required by azure-ai-agentserver-langgraph
+# and langchain-azure-ai, so this does not change dependency resolution.
 
 langgraph>=1.2.11,<2.0
 langchain-azure-ai>=0.1.0
+langchain>=1.0.3,<2.0.0
+langchain-openai>=1.0.3,<2.0.0
 azure-ai-agentserver-langgraph
 openai>=1.40.0
 azure-identity>=1.17.0
 typing-extensions>=4.12.0
+

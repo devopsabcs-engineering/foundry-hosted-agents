@@ -1,0 +1,31 @@
+{
+  "licensing_check": {
+    "endpoint": "GET https://graph.microsoft.com/v1.0/subscribedSkus",
+    "subscribed_skus": ["FLOW_FREE", "CCIBOTS_PRIVPREV_VIRAL", "POWERAPPS_VIRAL", "Microsoft_365_E5_(no_Teams)", "POWERAPPS_DEV"],
+    "agent365_or_addon_sku_found": false,
+    "conclusion": "Tenant has M365 E5 (no Teams) but not the Agent 365 add-on (nor E7, nor Defender+Purview Suite). Agent 365 is not licensed in this tenant."
+  },
+  "identity_evidence": {
+    "instance_identity": {
+      "object_id": "59a21b26-5c3a-42aa-ad7f-05fe701fb25f",
+      "displayName": "aif-air-canada-threat-assessment-poc-proj-air-canada-threat-assessment-poc-threat-assessment-agent-AgentIdentity",
+      "servicePrincipalType": "ServiceIdentity",
+      "tags": ["region:eastus2", "agentGuid:5e44808f-0deb-4241-a915-1ed6f9170bef", "virtualWorkspaceId:18e5926b-db0d-4dda-bfc1-693edc51881e", "projectId:aif-air-canada-threat-assessment-poc@proj-air-canada-threat-assessment-poc@AML"]
+    },
+    "blueprint_identity": {
+      "object_id": "e227baaa-48b3-4505-a19f-d840bfa2400d",
+      "app_id": "809d5ac4-8b64-4d0c-895a-c33f3e404b93",
+      "displayName": "aif-air-canada-threat-assessment-poc-proj-air-canada-threat-assessment-poc-threat-assessment-agent-5e448-AgentIdentityBlueprint",
+      "servicePrincipalType": "Application",
+      "tags": ["projectId:aif-air-canada-threat-assessment-poc@proj-air-canada-threat-assessment-poc@AML", "virtualWorkspaceId:18e5926b-db0d-4dda-bfc1-693edc51881e", "region:eastus2", "agentGuid:5e44808f-0deb-4241-a915-1ed6f9170bef"]
+    },
+    "observation": "Naming (AgentIdentity / AgentIdentityBlueprint) and the distinct ServiceIdentity SP type match Entra Agent ID terminology exactly. Azure AI Foundry appears to already create native Agent-ID-shaped identities for hosted agents, not conventional app-registration/service-principal pairs. This is an inference from object metadata, not a confirmed Microsoft statement -- flagged as a promising lead in report.md, not a settled fact."
+  },
+  "registry_probe": {
+    "attempts": [
+      {"url": "GET https://graph.microsoft.com/beta/directory/agentIdentities", "result": "400 Bad Request: Resource not found for the segment 'agentIdentities'"},
+      {"url": "GET https://graph.microsoft.com/beta/agentApplications", "result": "400 Bad Request: Resource not found for the segment 'agentApplications'"}
+    ],
+    "conclusion": "Inconclusive -- could be wrong guessed path names or a genuinely unavailable/unlicensed surface. Not pursued further per the instruction not to keep guessing blind endpoint variations."
+  }
+}

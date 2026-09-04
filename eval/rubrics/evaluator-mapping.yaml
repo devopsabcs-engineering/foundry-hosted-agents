@@ -1,0 +1,76 @@
+# Maps each golden-dataset category to the evaluators that should run
+# against it: built-in Foundry evaluators (referenced by evaluator_name,
+# matching the `builtin.*` naming used in the continuous-evaluation-rule
+# example in air-canada-foundry-hosted-agents-research.md) plus this
+# repo's custom rubrics for criteria the built-in catalog does not cover.
+#
+# Consumed by (planned) tooling in .github/workflows/deploy-and-evaluate.yml
+# and by manual Foundry evaluation runs. See ./README.md for the built-in
+# vs. custom rationale.
+
+schema_version: "1.0.0"
+
+# Evaluators applied to every record regardless of category.
+default_evaluators:
+  built_in:
+    - evaluator_name: builtin.coherence
+      name: coherence
+    - evaluator_name: builtin.groundedness
+      name: groundedness
+    - evaluator_name: builtin.task_adherence
+      name: task_adherence
+  custom_rubrics:
+    - triage-correctness.rubric.yaml
+
+category_overrides:
+  true_positive:
+    custom_rubrics:
+      - triage-correctness.rubric.yaml
+      - evidence-citation.rubric.yaml
+
+  false_positive:
+    custom_rubrics:
+      - triage-correctness.rubric.yaml
+      - evidence-citation.rubric.yaml
+
+  ambiguous_evidence:
+    custom_rubrics:
+      - triage-correctness.rubric.yaml
+
+  missing_data:
+    # Groundedness is intentionally still evaluated even in degraded mode:
+    # the report must be grounded in "no data available", not fabricate
+    # evidence it does not have.
+    custom_rubrics:
+      - evidence-citation.rubric.yaml
+
+  conflicting_tools:
+    custom_rubrics:
+      - conflict-handling.rubric.yaml
+
+  prompt_injection:
+    built_in:
+      - evaluator_name: builtin.coherence
+        name: coherence
+      - evaluator_name: builtin.task_adherence
+        name: task_adherence
+      # Groundedness is less meaningful for an injection attempt with no
+      # real incident evidence; omitted for this category.
+    custom_rubrics: []
+
+  unauthorized_actions:
+    custom_rubrics:
+      - triage-correctness.rubric.yaml
+
+  unsupported_conclusions:
+    custom_rubrics:
+      - triage-correctness.rubric.yaml
+
+# ToolCallAccuracy only applies to records where a specialist actually
+# attempted a tool call (i.e. tool_unavailable is false for that node).
+# Deterministic allowed_tool_calls check (eval/deterministic-tests/) already
+# gates *policy*; this built-in additionally scores argument accuracy.
+tool_call_accuracy:
+  evaluator_name: builtin.tool_call_accuracy
+  name: tool_call_accuracy
+  applies_when: "not (evidence_tool_unavailable or risk_tool_unavailable)"

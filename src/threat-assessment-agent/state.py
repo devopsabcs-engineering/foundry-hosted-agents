@@ -32,6 +32,11 @@ class ThreatAssessmentState(TypedDict):
     evidence_complete: bool
     risk_complete: bool
     report_complete: bool
+    # Set True when the corresponding specialist could not reach its Foundry
+    # Toolbox MCP tool (tool-resolution API unavailable) and fell back to a
+    # plain-LLM analysis. See graph.py's ResourceNotFoundError handling.
+    evidence_tool_unavailable: bool
+    risk_tool_unavailable: bool
 
 
 def get_checkpointer() -> Optional[Any]:
@@ -41,19 +46,27 @@ def get_checkpointer() -> Optional[Any]:
     compiled in this phase. Set ENABLE_COSMOS_CHECKPOINTER=true plus the
     COSMOS_* environment variables below to opt in.
 
-    NOTE: the Cosmos DB + Foundry Hosted Agent sandbox pairing is unverified
-    (see planning log DR-04) and must be validated in Phase 7 before use;
-    this function only defines the isolated extension point.
+    NOTE: validated in Phase 7 (experiments/cosmos-checkpointer/) -- the
+    original implementation called CosmosDBSaver(endpoint=..., credential=...,
+    database_name=..., container_name=...) directly, but CosmosDBSaver's
+    constructor only accepts a pre-built container proxy (those kwargs
+    belong to the async-context-manager `from_conn_info` classmethod, not
+    `__init__`); this raised TypeError as soon as the flag was enabled, in
+    any environment. Fixed to build the container proxy via the
+    (synchronous, non-network-calling) client/database/container accessors
+    instead, matching the pattern CosmosDBSaver.from_conn_info uses
+    internally. The Cosmos account/database/container must already exist
+    (see infra/modules/cosmos-db.bicep); this function does not create them.
     """
     if os.environ.get("ENABLE_COSMOS_CHECKPOINTER", "").lower() not in ("1", "true", "yes"):
         return None
 
-    from azure.identity import DefaultAzureCredential  # noqa: PLC0415
+    from azure.cosmos.aio import CosmosClient  # noqa: PLC0415
+    from azure.identity.aio import DefaultAzureCredential  # noqa: PLC0415
     from langchain_azure_cosmosdb import CosmosDBSaver  # noqa: PLC0415
 
-    return CosmosDBSaver(
-        endpoint=os.environ["COSMOS_ENDPOINT"],
-        credential=DefaultAzureCredential(),
-        database_name=os.environ.get("COSMOS_DATABASE_NAME", "threat-assessment-agent"),
-        container_name=os.environ.get("COSMOS_CONTAINER_NAME", "checkpoints"),
-    )
+    client = CosmosClient(os.environ["COSMOS_ENDPOINT"], credential=DefaultAzureCredential())
+    database = client.get_database_client(os.environ.get("COSMOS_DATABASE_NAME", "threat-assessment-agent"))
+    container = database.get_container_client(os.environ.get("COSMOS_CONTAINER_NAME", "checkpoints"))
+    return CosmosDBSaver(container)
+

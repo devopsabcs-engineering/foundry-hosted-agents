@@ -1,0 +1,53 @@
+{
+  "mode": "same-thread-turns",
+  "requested_count": 4,
+  "wall_clock_seconds": 41.5,
+  "success_count": 5,
+  "error_count": 0,
+  "latency_p50_seconds": 19.298,
+  "latency_p95_seconds": 20.816,
+  "latency_min_seconds": 15.834,
+  "latency_max_seconds": 20.816,
+  "results": [
+    {
+      "conversation_id": null,
+      "error": null,
+      "status": 200,
+      "event_count": 9,
+      "response_conversation_id": null,
+      "latency_seconds": 20.816
+    },
+    {
+      "conversation_id": null,
+      "error": null,
+      "status": 200,
+      "event_count": 9,
+      "response_conversation_id": null,
+      "latency_seconds": 15.834
+    },
+    {
+      "conversation_id": null,
+      "error": null,
+      "status": 200,
+      "event_count": 9,
+      "response_conversation_id": null,
+      "latency_seconds": 20.317
+    },
+    {
+      "conversation_id": null,
+      "error": null,
+      "status": 200,
+      "event_count": 9,
+      "response_conversation_id": null,
+      "latency_seconds": 19.044
+    },
+    {
+      "conversation_id": null,
+      "error": null,
+      "status": 200,
+      "event_count": 9,
+      "response_conversation_id": null,
+      "latency_seconds": 19.298
+    }
+  ]
+}

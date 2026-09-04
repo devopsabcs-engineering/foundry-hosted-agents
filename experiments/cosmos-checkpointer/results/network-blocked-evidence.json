@@ -1,0 +1,39 @@
+{
+  "provisioning": {
+    "status": "Succeeded",
+    "resource_group": "rg-air-canada-threat-assessment-poc",
+    "account_name": "cosmos-air-canada-threat-assessment-poc",
+    "account_endpoint": "https://cosmos-air-canada-threat-assessment-poc.documents.azure.com:443/",
+    "database_name": "threat-assessment-agent",
+    "container_name": "checkpoints",
+    "capability_mode": "EnableServerless",
+    "data_plane_rbac": "Cosmos DB Built-in Data Contributor granted to the operator's Entra object ID via infra/modules/cosmos-db.bicep dataPlanePrincipalIds"
+  },
+  "publicNetworkAccess_override_attempt": {
+    "requested": "Enabled",
+    "deployment_result": "Succeeded (ARM accepted the template, no policy-denial error returned)",
+    "actual_property_after_redeploy": "Disabled",
+    "interpretation": "An out-of-band governance control (not identified within this session's time budget via `az policy assignment list`) reverts/ignores the publicNetworkAccess override, meaning this tenant/subscription enforces private-only networking for Cosmos DB accounts. This is a genuine platform/tenant constraint, not a Bicep authoring mistake -- confirmed by the ARM deployment succeeding while the property silently stayed Disabled."
+  },
+  "code_bug_found_and_fixed": {
+    "file": "src/threat-assessment-agent/state.py",
+    "function": "get_checkpointer",
+    "bug": "Called CosmosDBSaver(endpoint=..., credential=..., database_name=..., container_name=...) directly. CosmosDBSaver.__init__ only accepts a pre-built container proxy; those four kwargs belong to the async-context-manager classmethod from_conn_info, not __init__. Result: TypeError as soon as ENABLE_COSMOS_CHECKPOINTER=true was set, in ANY environment, independent of network access.",
+    "fix": "Build the container proxy via azure.cosmos.aio.CosmosClient(...).get_database_client(...).get_container_client(...) (both accessors are synchronous, non-network-calling proxy constructors) and pass that container into CosmosDBSaver(container) directly -- the same pattern from_conn_info uses internally, minus the create_database_if_not_exists/create_container_if_not_exists calls (unnecessary since infra/modules/cosmos-db.bicep already declares both).",
+    "verification": "Reproduced the original TypeError before the fix; confirmed after the fix that get_checkpointer() constructs successfully and compiles into a real StateGraph without error, failing only at the actual network call with CosmosHttpResponseError (Forbidden, public-network-blocked) -- i.e., the fix is correct and the remaining blocker is purely the tenant's network policy, not the code.",
+    "regression_check": "Full existing pytest suite (18 tests) still passes after the fix; baseline behavior (ENABLE_COSMOS_CHECKPOINTER unset -> None -> no checkpointer) is completely unchanged."
+  },
+  "observed_error_after_fix": {
+    "exception_type": "azure.cosmos.exceptions.CosmosHttpResponseError",
+    "http_status": "Forbidden",
+    "message": "Request originated from IP <redacted, differs per attempt> through public internet. This is blocked by your Cosmos DB account firewall settings. More info: https://aka.ms/cosmosdb-tsg-forbidden"
+  },
+  "benchmarks_not_obtained": {
+    "reason": "Both the direct Cosmos read/write RU-charge benchmark and the LangGraph CosmosDBSaver integration benchmark (experiments/cosmos-checkpointer/benchmark.py) require reaching the Cosmos data-plane endpoint from wherever the script runs. This session's operator machine (and, by the same network-policy logic, any non-VNet-injected compute) is on the public internet and is blocked. No latency, RU-cost, or checkpoint-size numbers were obtained.",
+    "what_a_real_benchmark_would_require": [
+      "A private endpoint for the Cosmos account plus a VNet with private DNS zone integration.",
+      "A compute location genuinely inside that VNet to run the benchmark script from (e.g. a Container App/Container Instance/VM in the same VNet, or a self-hosted GitHub Actions runner joined to the VNet).",
+      "Separately and NOT established in this session: confirmation of whether a Foundry Hosted Agent's own per-session sandbox can be VNet-injected/peered to reach a private endpoint at all. No documented mechanism for this was found in the research materials (research.md lines 216-227 explicitly flags 'private connectivity ... untested'). This is a genuine open platform question independent of the Cosmos-side networking, and this session could not resolve it."
+    ]
+  }
+}

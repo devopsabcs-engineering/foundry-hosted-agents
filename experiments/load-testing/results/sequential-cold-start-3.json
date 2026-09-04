@@ -1,0 +1,37 @@
+{
+  "mode": "sequential-cold-start",
+  "requested_count": 3,
+  "wall_clock_seconds": 56.618,
+  "success_count": 3,
+  "error_count": 0,
+  "latency_p50_seconds": 18.41,
+  "latency_p95_seconds": 19.643,
+  "latency_min_seconds": 18.236,
+  "latency_max_seconds": 19.643,
+  "results": [
+    {
+      "conversation_id": null,
+      "error": null,
+      "status": 200,
+      "event_count": 9,
+      "response_conversation_id": null,
+      "latency_seconds": 18.236
+    },
+    {
+      "conversation_id": null,
+      "error": null,
+      "status": 200,
+      "event_count": 9,
+      "response_conversation_id": null,
+      "latency_seconds": 18.41
+    },
+    {
+      "conversation_id": null,
+      "error": null,
+      "status": 200,
+      "event_count": 9,
+      "response_conversation_id": null,
+      "latency_seconds": 19.643
+    }
+  ]
+}

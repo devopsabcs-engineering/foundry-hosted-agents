@@ -1,0 +1,12 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "environmentName": {
+      "value": "air-canada-threat-assessment-poc"
+    },
+    "dataPlanePrincipalIds": {
+      "value": ["b785230a-4af4-418a-acd9-aea99894d37a"]
+    }
+  }
+}

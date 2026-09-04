@@ -1,0 +1,9 @@
+{
+  "project_endpoint": "https://aif-air-canada-threat-assessment-poc.services.ai.azure.com/api/projects/proj-air-canada-threat-assessment-poc",
+  "agent_name": "threat-assessment-agent",
+  "rule_id": "threat-assessment-continuous-eval-rule",
+  "eval_object_id": "eval_2dc36b83a031455dacc06fe8f49f7afe",
+  "eval_create_status": "succeeded",
+  "rule_create_status": "failed",
+  "rule_create_error": "HttpResponseError: (UserError) The project managed identity could not access the project. Grant the project managed identity the Foundry User role on the project and try again. Reason: The principal `7e9de957-4dfe-412e-9894-fc33ac9c9b57` lacks the required data action `Microsoft.CognitiveServices/accounts/AIServices/assets/read` to perform `GET /api/projects/{projectName}/datasets` operation. For instructions on granting the necessary permissions, see https://aka.ms/FoundryPermissions..\nCode: UserError\nMessage: The project managed identity could not access the project. Grant the project managed identity the Foundry User role on the project and try again. Reason: The principal `7e9de957-4dfe-412e-9894-fc33ac9c9b57` lacks the required data action `Microsoft.CognitiveServices/accounts/AIServices/assets/read` to perform `GET /api/projects/{projectName}/datasets` operation. For instructions on granting the necessary permissions, see https://aka.ms/FoundryPermissions.."
+}

@@ -1,0 +1,43 @@
+# Custom rubric: conflicting-signal handling.
+#
+# Applies only to golden-dataset records where `expected.must_acknowledge_conflict`
+# is true (currently: conflicting_tools category). The deterministic
+# conflict_acknowledgement check only tests for a keyword match; this rubric
+# judges whether the report's handling of the conflict is actually sound
+# (not just present).
+
+name: conflict_handling_quality
+schema_version: "1.0.0"
+applies_to: final_report
+judge_model: gpt-4o-mini
+
+scoring_scale:
+  min: 1
+  max: 5
+  passing_threshold: 4
+
+criteria: |
+  Given evidence_report and risk_report that disagree (one benign signal,
+  one high-risk signal, or similar), score how well final_report handles
+  the disagreement:
+
+  5 - Explicitly names both conflicting signals, does not silently pick
+      one over the other, and recommends a specific follow-up action to
+      resolve the discrepancy.
+  4 - Names the conflict and recommends follow-up, but the description of
+      one side of the conflict is thin.
+  3 - Acknowledges "there is some uncertainty" without clearly naming both
+      conflicting signals.
+  2 - Silently resolves the conflict by favoring one signal without
+      justification, and without flagging the disagreement to the reader.
+  1 - Does not address the conflict at all; treats the incident as if only
+      one signal existed.
+
+inputs:
+  - evidence_report
+  - risk_report
+  - final_report
+
+output:
+  score: integer 1-5
+  rationale: string

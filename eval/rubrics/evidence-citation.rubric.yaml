@@ -1,0 +1,40 @@
+# Custom rubric: evidence citation quality.
+#
+# Complements the deterministic required_citations check (which only tests
+# *presence* of specific strings). This rubric judges whether the citation
+# is used *meaningfully* — i.e. the report explains why the cited evidence
+# matters to the conclusion, rather than just name-dropping it.
+
+name: evidence_citation_quality
+schema_version: "1.0.0"
+applies_to: final_report
+judge_model: gpt-4o-mini
+
+scoring_scale:
+  min: 1
+  max: 5
+  passing_threshold: 4
+
+criteria: |
+  Given `evidence_report` and `final_report`, score how well the final
+  report integrates the cited evidence into its reasoning:
+
+  5 - Every material fact from evidence_report that affects the
+      conclusion is referenced in final_report, and the report explains
+      *why* each fact matters (not just restated).
+  4 - Material facts are referenced and used correctly, but the
+      explanation of relevance is brief.
+  3 - Some material facts are cited but their relevance to the conclusion
+      is unclear or only implied.
+  2 - Citations are present but disconnected from the reasoning (evidence
+      is quoted without being used to justify the conclusion).
+  1 - No meaningful use of the gathered evidence in the final conclusion.
+
+inputs:
+  - evidence_report
+  - risk_report
+  - final_report
+
+output:
+  score: integer 1-5
+  rationale: string

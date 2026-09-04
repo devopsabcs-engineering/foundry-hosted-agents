@@ -1,0 +1,173 @@
+{
+  "mode": "concurrent-sessions",
+  "requested_count": 20,
+  "wall_clock_seconds": 34.433,
+  "success_count": 20,
+  "error_count": 0,
+  "latency_p50_seconds": 23.371,
+  "latency_p95_seconds": 28.678,
+  "latency_min_seconds": 18.843,
+  "latency_max_seconds": 34.094,
+  "results": [
+    {
+      "conversation_id": null,
+      "error": null,
+      "status": 200,
+      "event_count": 9,
+      "response_conversation_id": null,
+      "latency_seconds": 34.094
+    },
+    {
+      "conversation_id": null,
+      "error": null,
+      "status": 200,
+      "event_count": 1,
+      "response_conversation_id": null,
+      "latency_seconds": 19.399
+    },
+    {
+      "conversation_id": null,
+      "error": null,
+      "status": 200,
+      "event_count": 1,
+      "response_conversation_id": null,
+      "latency_seconds": 19.4
+    },
+    {
+      "conversation_id": null,
+      "error": null,
+      "status": 200,
+      "event_count": 9,
+      "response_conversation_id": null,
+      "latency_seconds": 20.718
+    },
+    {
+      "conversation_id": null,
+      "error": null,
+      "status": 200,
+      "event_count": 9,
+      "response_conversation_id": null,
+      "latency_seconds": 19.749
+    },
+    {
+      "conversation_id": null,
+      "error": null,
+      "status": 200,
+      "event_count": 9,
+      "response_conversation_id": null,
+      "latency_seconds": 28.678
+    },
+    {
+      "conversation_id": null,
+      "error": null,
+      "status": 200,
+      "event_count": 1,
+      "response_conversation_id": null,
+      "latency_seconds": 23.371
+    },
+    {
+      "conversation_id": null,
+      "error": null,
+      "status": 200,
+      "event_count": 9,
+      "response_conversation_id": null,
+      "latency_seconds": 19.691
+    },
+    {
+      "conversation_id": null,
+      "error": null,
+      "status": 200,
+      "event_count": 1,
+      "response_conversation_id": null,
+      "latency_seconds": 23.53
+    },
+    {
+      "conversation_id": null,
+      "error": null,
+      "status": 200,
+      "event_count": 1,
+      "response_conversation_id": null,
+      "latency_seconds": 19.348
+    },
+    {
+      "conversation_id": null,
+      "error": null,
+      "status": 200,
+      "event_count": 9,
+      "response_conversation_id": null,
+      "latency_seconds": 18.843
+    },
+    {
+      "conversation_id": null,
+      "error": null,
+      "status": 200,
+      "event_count": 1,
+      "response_conversation_id": null,
+      "latency_seconds": 27.571
+    },
+    {
+      "conversation_id": null,
+      "error": null,
+      "status": 200,
+      "event_count": 9,
+      "response_conversation_id": null,
+      "latency_seconds": 20.476
+    },
+    {
+      "conversation_id": null,
+      "error": null,
+      "status": 200,
+      "event_count": 1,
+      "response_conversation_id": null,
+      "latency_seconds": 23.511
+    },
+    {
+      "conversation_id": null,
+      "error": null,
+      "status": 200,
+      "event_count": 1,
+      "response_conversation_id": null,
+      "latency_seconds": 23.418
+    },
+    {
+      "conversation_id": null,
+      "error": null,
+      "status": 200,
+      "event_count": 1,
+      "response_conversation_id": null,
+      "latency_seconds": 23.37
+    },
+    {
+      "conversation_id": null,
+      "error": null,
+      "status": 200,
+      "event_count": 9,
+      "response_conversation_id": null,
+      "latency_seconds": 19.761
+    },
+    {
+      "conversation_id": null,
+      "error": null,
+      "status": 200,
+      "event_count": 1,
+      "response_conversation_id": null,
+      "latency_seconds": 23.551
+    },
+    {
+      "conversation_id": null,
+      "error": null,
+      "status": 200,
+      "event_count": 1,
+      "response_conversation_id": null,
+      "latency_seconds": 27.784
+    },
+    {
+      "conversation_id": null,
+      "error": null,
+      "status": 200,
+      "event_count": 9,
+      "response_conversation_id": null,
+      "latency_seconds": 25.076
+    }
+  ]
+}

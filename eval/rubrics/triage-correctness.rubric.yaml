@@ -1,0 +1,49 @@
+# Custom rubric: triage correctness.
+#
+# Not covered by the built-in evaluator catalog (research lines 315-323) —
+# those score fluency/groundedness/task-adherence/tool-use, not whether the
+# domain-specific security triage conclusion itself was correct. Scored by
+# an LLM judge against each golden-dataset record's `expected.triage_label`
+# and `expected.min_risk_level`.
+
+name: triage_correctness
+schema_version: "1.0.0"
+applies_to: final_report
+judge_model: gpt-4o-mini # match the deployed agent's model per azure.yaml; override per Foundry project as needed
+
+scoring_scale:
+  min: 1
+  max: 5
+  passing_threshold: 4
+
+criteria: |
+  Given the incident description (input) and this record's expected triage
+  label and minimum risk level, score how well `final_report` reaches the
+  correct conclusion:
+
+  5 - Report states a triage label consistent with `expected.triage_label`
+      (or, for "ambiguous"/"insufficient_data" expectations, explicitly
+      declines to over-commit) and a risk level at or above
+      `expected.min_risk_level` where applicable, with reasoning that
+      traces back to the evidence actually gathered.
+  4 - Correct triage label and risk level, but reasoning is thin or leaves
+      out a minor supporting detail.
+  3 - Triage label is defensible but not clearly the best label supported
+      by the evidence (e.g. treats an ambiguous case as more certain than
+      warranted, or vice versa).
+  2 - Triage label contradicts the evidence gathered (e.g. calls a clear
+      true-positive pattern benign, or escalates a clearly benign case).
+  1 - No usable triage conclusion, or the conclusion is unrelated to the
+      evidence presented.
+
+inputs:
+  - incident_description # from the golden-dataset record's input.messages
+  - evidence_report
+  - risk_report
+  - final_report
+  - expected_triage_label # golden-dataset record's expected.triage_label
+  - expected_min_risk_level # golden-dataset record's expected.min_risk_level
+
+output:
+  score: integer 1-5
+  rationale: string

@@ -1,0 +1,26 @@
+{
+  "mode": "same-thread-turns (azd CLI, --session-id shared)",
+  "note": "Superseded load_test.py's own same-thread-turns aiohttp mode: that mode's conversation-id extraction from the raw SSE 'response.created' event body returned null for direct aiohttp POSTs (the platform only returns a non-null conversation object via azd's own client-session negotiation, not a bare stream:true POST), so its 4 'follow-up' requests each silently started a NEW conversation instead of reusing one -- see README.md 'Known limitation' section. This file records the corrected same-thread test, run via two concurrent `azd ai agent invoke --session-id <same-guid>` processes (PowerShell Start-Job, truly concurrent OS processes) instead.",
+  "session_id": "8ab3dcb9-8713-45d4-980b-edd20ee06eb2",
+  "conversation_id_both_turns": "conv_0b4d2f2a2564c8fc00LLm4tLigYCnJULtuWiHCKYCc0R6v8L1Z",
+  "requested_count": 2,
+  "success_count": 2,
+  "error_count": 0,
+  "results": [
+    {
+      "turn": "A",
+      "message": "Turn A: what's the status of the investigation?",
+      "elapsed_seconds": 21.693,
+      "server_reported_seconds": 20.321,
+      "status": "completed, full valid report returned"
+    },
+    {
+      "turn": "B",
+      "message": "Turn B: any anomalies found yet?",
+      "elapsed_seconds": 19.999,
+      "server_reported_seconds": 18.402,
+      "status": "completed, full valid report returned"
+    }
+  ],
+  "observation": "Both concurrent requests against the same conversation ID completed independently in ~20s each (matching the single-request baseline latency from sequential-cold-start-3.json), not stacked to ~40s. This indicates the platform did NOT observably serialize/queue the two same-thread turns behind one another with material added delay, and neither request errored or was rejected. Both responses were coherent and each addressed its own distinct message -- no evidence of state corruption or cross-talk between the two concurrent turns was observed in this single trial."
+}

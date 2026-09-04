@@ -16,22 +16,27 @@ services:
     anomaly-conn:
         host: azure.ai.connection
         endpoint: ${ANOMALY_MCP_URL}
-        type: custom
+        type: remote-tool
     defender-conn:
         host: azure.ai.connection
         endpoint: ${DEFENDER_MCP_URL}
-        type: custom
+        type: remote-tool
     security-tools:
         host: azure.ai.toolbox
         uses:
             - ai-project
             - defender-conn
             - anomaly-conn
+        connections:
+            - name: defender-conn
+            - name: anomaly-conn
         tools:
-            - connection: defender-conn
-              type: mcp
-            - connection: anomaly-conn
-              type: mcp
+            - type: mcp
+              connection: defender-conn
+              server_label: defender-conn
+            - type: mcp
+              connection: anomaly-conn
+              server_label: anomaly-conn
     threat-assessment-agent:
         project: ./src/threat-assessment-agent
         host: azure.ai.agent
@@ -54,6 +59,12 @@ services:
               version: 2.0.0
         environmentVariables:
             - name: AZURE_AI_MODEL_DEPLOYMENT_NAME
+              value: gpt-4o-mini
+            - name: AZURE_AI_PROJECT_ENDPOINT
+              value: ${FOUNDRY_PROJECT_ENDPOINT}
+            - name: AZURE_OPENAI_ENDPOINT
+              value: ${accountEndpoint}
+            - name: AZURE_OPENAI_DEPLOYMENT
               value: gpt-4o-mini
         toolboxes:
             - security-tools
