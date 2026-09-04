@@ -321,12 +321,16 @@ jobs:
       # Converts read-only into a generated file; see
       # eval/convert_for_ai_agent_evals.py for the evaluator selection
       # rationale and follow-on work on custom-rubric wiring.
+      # Output filename must have exactly one dot: action.py derives the
+      # uploaded dataset's name from Path(data_path).stem, and the Foundry
+      # dataset name API rejects anything but alphanumerics/dashes/underscores
+      # (a second dot, e.g. "golden-dataset.ai-agent-evals", is rejected).
       - name: Convert golden dataset to ai-agent-evals format
         run: |
           set -euo pipefail
           python3 eval/convert_for_ai_agent_evals.py \
             "${{ github.workspace }}/${{ env.GOLDEN_DATASET_PATH }}" \
-            "${{ runner.temp }}/golden-dataset.ai-agent-evals.json"
+            "${{ runner.temp }}/golden_dataset_for_ai_agent_evals.json"
 
       # Official evaluation action (air-canada-foundry-hosted-agents-research.md,
       # "GitHub Actions evaluation step", lines 264-280). Marked "Not
@@ -340,7 +344,7 @@ jobs:
           azure-ai-project-endpoint: ${{ vars.FOUNDRY_PROJECT_ENDPOINT }}
           deployment-name: ${{ vars.FOUNDRY_MODEL_NAME }}
           agent-ids: "${{ env.AGENT_NAME }}:${{ needs.deploy-staging.outputs.agent_version }}"
-          data-path: ${{ runner.temp }}/golden-dataset.ai-agent-evals.json
+          data-path: ${{ runner.temp }}/golden_dataset_for_ai_agent_evals.json
 
   # ---------------------------------------------------------------------
   # Stage 6: Manual production-approval gate
