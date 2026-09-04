@@ -235,21 +235,31 @@ jobs:
         working-directory: ${{ env.AGENT_PROJECT_DIR }}
         run: |
           set -euo pipefail
-          set +e
-          azd ai agent invoke "$AGENT_TEST_PROMPT" > /tmp/agent-response.txt 2>&1
-          INVOKE_EXIT=$?
-          set -e
-          echo "--- Agent response ---"
-          cat /tmp/agent-response.txt
-          echo "--- End agent response ---"
-          if [ $INVOKE_EXIT -ne 0 ]; then
-            echo "::error::azd ai agent invoke exited with code $INVOKE_EXIT"
-            exit $INVOKE_EXIT
-          fi
-          if [ ! -s /tmp/agent-response.txt ]; then
-            echo "::error::The staging agent returned an empty response."
-            exit 1
-          fi
+          # A freshly deployed hosted agent's per-instance managed identity
+          # can intermittently 401 on the very first calls
+          # (Microsoft.CognitiveServices/.../chat/completions/action) while
+          # its RBAC role assignment is still converging across Azure AD
+          # replicas -- retry with backoff instead of failing on the first
+          # transient PermissionDenied.
+          MAX_ATTEMPTS=5
+          for attempt in $(seq 1 "$MAX_ATTEMPTS"); do
+            set +e
+            azd ai agent invoke "$AGENT_TEST_PROMPT" > /tmp/agent-response.txt 2>&1
+            INVOKE_EXIT=$?
+            set -e
+            echo "--- Agent response (attempt $attempt/$MAX_ATTEMPTS) ---"
+            cat /tmp/agent-response.txt
+            echo "--- End agent response ---"
+            if [ $INVOKE_EXIT -eq 0 ] && [ -s /tmp/agent-response.txt ]; then
+              break
+            fi
+            if [ "$attempt" -eq "$MAX_ATTEMPTS" ]; then
+              echo "::error::azd ai agent invoke failed after $MAX_ATTEMPTS attempts (exit $INVOKE_EXIT)"
+              exit 1
+            fi
+            echo "::warning::Attempt $attempt failed (exit $INVOKE_EXIT); retrying in 20s (possible RBAC propagation delay)."
+            sleep 20
+          done
 
       - name: Contract test (Responses-protocol output shape)
         working-directory: ${{ env.AGENT_PROJECT_DIR }}
@@ -462,16 +472,25 @@ jobs:
         working-directory: ${{ env.AGENT_PROJECT_DIR }}
         run: |
           set -euo pipefail
-          set +e
-          azd ai agent invoke "$AGENT_TEST_PROMPT" > /tmp/prod-smoke-response.txt 2>&1
-          INVOKE_EXIT=$?
-          set -e
-          cat /tmp/prod-smoke-response.txt
-          if [ $INVOKE_EXIT -ne 0 ]; then
-            echo "::error::azd ai agent invoke exited with code $INVOKE_EXIT"
-            exit $INVOKE_EXIT
-          fi
-          test -s /tmp/prod-smoke-response.txt
+          # See staging-tests' smoke test comment: retry to absorb
+          # transient RBAC-propagation 401s on a freshly deployed agent.
+          MAX_ATTEMPTS=5
+          for attempt in $(seq 1 "$MAX_ATTEMPTS"); do
+            set +e
+            azd ai agent invoke "$AGENT_TEST_PROMPT" > /tmp/prod-smoke-response.txt 2>&1
+            INVOKE_EXIT=$?
+            set -e
+            cat /tmp/prod-smoke-response.txt
+            if [ $INVOKE_EXIT -eq 0 ] && [ -s /tmp/prod-smoke-response.txt ]; then
+              break
+            fi
+            if [ "$attempt" -eq "$MAX_ATTEMPTS" ]; then
+              echo "::error::azd ai agent invoke failed after $MAX_ATTEMPTS attempts (exit $INVOKE_EXIT)"
+              exit 1
+            fi
+            echo "::warning::Attempt $attempt failed (exit $INVOKE_EXIT); retrying in 20s (possible RBAC propagation delay)."
+            sleep 20
+          done
 
       - name: Check Application Insights for post-deploy exceptions (breach signal)
         run: |
