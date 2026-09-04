@@ -229,10 +229,17 @@ jobs:
         working-directory: ${{ env.AGENT_PROJECT_DIR }}
         run: |
           set -euo pipefail
+          set +e
           azd ai agent invoke "$AGENT_TEST_PROMPT" > /tmp/agent-response.txt 2>&1
+          INVOKE_EXIT=$?
+          set -e
           echo "--- Agent response ---"
           cat /tmp/agent-response.txt
           echo "--- End agent response ---"
+          if [ $INVOKE_EXIT -ne 0 ]; then
+            echo "::error::azd ai agent invoke exited with code $INVOKE_EXIT"
+            exit $INVOKE_EXIT
+          fi
           if [ ! -s /tmp/agent-response.txt ]; then
             echo "::error::The staging agent returned an empty response."
             exit 1
@@ -430,8 +437,15 @@ jobs:
         working-directory: ${{ env.AGENT_PROJECT_DIR }}
         run: |
           set -euo pipefail
+          set +e
           azd ai agent invoke "$AGENT_TEST_PROMPT" > /tmp/prod-smoke-response.txt 2>&1
+          INVOKE_EXIT=$?
+          set -e
           cat /tmp/prod-smoke-response.txt
+          if [ $INVOKE_EXIT -ne 0 ]; then
+            echo "::error::azd ai agent invoke exited with code $INVOKE_EXIT"
+            exit $INVOKE_EXIT
+          fi
           test -s /tmp/prod-smoke-response.txt
 
       - name: Check Application Insights for post-deploy exceptions (breach signal)
