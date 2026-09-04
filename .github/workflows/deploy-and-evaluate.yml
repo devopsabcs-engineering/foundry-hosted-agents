@@ -16,15 +16,12 @@ on:
         description: "Path to the golden dataset used for the evaluation gate"
         required: false
         default: eval/golden-dataset.jsonl
-  push:
-    branches:
-      - main
-    paths:
-      - "src/threat-assessment-agent/**"
-      - "infra/**"
-      - "azure.yaml"
-      - "eval/**"
-      - ".github/workflows/deploy-and-evaluate.yml"
+
+# Manual dispatch only: auto-firing on every push to main caused
+# duplicate manual+auto runs and raced concurrently against
+# hosted-agent-cd.yml's own provision/deploy against the same shared
+# Cognitive Services account -- see hosted-agent-cd.yml's trigger
+# comment for the RBAC-flake connection.
 
 # Secretless OIDC federation (no stored client secrets), mirroring the
 # proven pattern in hosted-agent-cd.yml.
@@ -49,10 +46,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.13"
 
@@ -80,10 +77,10 @@ jobs:
     environment: staging
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Azure login with OIDC
-        uses: azure/login@v2
+        uses: azure/login@v3
         with:
           client-id: ${{ vars.AZURE_CLIENT_ID }}
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
@@ -111,7 +108,7 @@ jobs:
       agent_version: ${{ steps.deploy.outputs.agent_version }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Install Azure Developer CLI
         uses: Azure/setup-azd@v2
@@ -120,7 +117,7 @@ jobs:
         run: azd ext install microsoft.foundry
 
       - name: Azure login with OIDC
-        uses: azure/login@v2
+        uses: azure/login@v3
         with:
           client-id: ${{ vars.AZURE_CLIENT_ID }}
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
@@ -185,7 +182,7 @@ jobs:
       # .env that 'azd ai agent invoke' needs to recognize the service as
       # deployed; reconstructing only the input vars is not sufficient.
       - name: Upload azd environment state (for downstream jobs)
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: azd-env-staging
           path: ${{ github.workspace }}/.azure/
@@ -203,7 +200,7 @@ jobs:
     environment: staging
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Install Azure Developer CLI
         uses: Azure/setup-azd@v2
@@ -212,14 +209,14 @@ jobs:
         run: azd ext install microsoft.foundry
 
       - name: Azure login with OIDC
-        uses: azure/login@v2
+        uses: azure/login@v3
         with:
           client-id: ${{ vars.AZURE_CLIENT_ID }}
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
           subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
 
       - name: Download azd environment state (from deploy-staging)
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v6
         with:
           name: azd-env-staging
           path: ${{ github.workspace }}/.azure/
@@ -319,10 +316,10 @@ jobs:
     environment: staging
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Azure login with OIDC
-        uses: azure/login@v2
+        uses: azure/login@v3
         with:
           client-id: ${{ vars.AZURE_CLIENT_ID }}
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
@@ -377,7 +374,7 @@ jobs:
       promoted_agent_version: ${{ needs.deploy-staging.outputs.agent_version }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Install Azure Developer CLI
         uses: Azure/setup-azd@v2
@@ -386,7 +383,7 @@ jobs:
         run: azd ext install microsoft.foundry
 
       - name: Azure login with OIDC
-        uses: azure/login@v2
+        uses: azure/login@v3
         with:
           client-id: ${{ vars.AZURE_CLIENT_ID }}
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
@@ -429,7 +426,7 @@ jobs:
         run: azd deploy --no-prompt
 
       - name: Upload azd environment state (for downstream jobs)
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: azd-env-production
           path: ${{ github.workspace }}/.azure/
@@ -447,20 +444,20 @@ jobs:
     environment: production
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Install Azure Developer CLI
         uses: Azure/setup-azd@v2
 
       - name: Azure login with OIDC
-        uses: azure/login@v2
+        uses: azure/login@v3
         with:
           client-id: ${{ vars.AZURE_CLIENT_ID }}
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
           subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
 
       - name: Download azd environment state (from promote-production)
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v6
         with:
           name: azd-env-production
           path: ${{ github.workspace }}/.azure/
@@ -529,20 +526,20 @@ jobs:
     environment: production
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Install Azure Developer CLI
         uses: Azure/setup-azd@v2
 
       - name: Azure login with OIDC
-        uses: azure/login@v2
+        uses: azure/login@v3
         with:
           client-id: ${{ vars.AZURE_CLIENT_ID }}
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
           subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
 
       - name: Download azd environment state (from promote-production)
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v6
         with:
           name: azd-env-production
           path: ${{ github.workspace }}/.azure/

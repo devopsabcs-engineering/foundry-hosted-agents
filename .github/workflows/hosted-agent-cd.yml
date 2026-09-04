@@ -1,10 +1,15 @@
 name: Hosted Agent CI/CD
 
 on:
-  push:
-    branches:
-      - main
   workflow_dispatch:
+
+# Manual dispatch only: this pipeline provisions/deploys straight to the
+# shared 'air-canada-threat-assessment-poc' environment with no staging
+# gate. Auto-firing on every push to main raced concurrently against
+# deploy-and-evaluate.yml's own provision/deploy cycles against the same
+# Cognitive Services account, which is the likely true cause of
+# intermittent 401 PermissionDenied errors seen on hosted agent invokes
+# (concurrent provisioning operations against shared production state).
 
 permissions:
   id-token: write
@@ -27,7 +32,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Install Azure Developer CLI
         uses: Azure/setup-azd@v2
@@ -45,7 +50,7 @@ jobs:
           azd ai agent --help > /dev/null
 
       - name: Azure login with OIDC
-        uses: azure/login@v2
+        uses: azure/login@v3
         with:
           client-id: ${{ vars.AZURE_CLIENT_ID }}
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
