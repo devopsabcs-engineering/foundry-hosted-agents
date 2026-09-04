@@ -314,6 +314,20 @@ jobs:
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
           subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
 
+      # microsoft/ai-agent-evals requires a single JSON document shaped like
+      # {"name", "evaluators", "data": [{"query": ...}]} (see
+      # https://github.com/microsoft/ai-agent-evals#data-file), not this
+      # repo's JSONL golden dataset (used as-is by eval/deterministic-tests/).
+      # Converts read-only into a generated file; see
+      # eval/convert_for_ai_agent_evals.py for the evaluator selection
+      # rationale and follow-on work on custom-rubric wiring.
+      - name: Convert golden dataset to ai-agent-evals format
+        run: |
+          set -euo pipefail
+          python3 eval/convert_for_ai_agent_evals.py \
+            "${{ github.workspace }}/${{ env.GOLDEN_DATASET_PATH }}" \
+            "${{ runner.temp }}/golden-dataset.ai-agent-evals.json"
+
       # Official evaluation action (air-canada-foundry-hosted-agents-research.md,
       # "GitHub Actions evaluation step", lines 264-280). Marked "Not
       # verified" in the Evidence Confidence Register — this step's exact
@@ -326,7 +340,7 @@ jobs:
           azure-ai-project-endpoint: ${{ vars.FOUNDRY_PROJECT_ENDPOINT }}
           deployment-name: ${{ vars.FOUNDRY_MODEL_NAME }}
           agent-ids: "${{ env.AGENT_NAME }}:${{ needs.deploy-staging.outputs.agent_version }}"
-          data-path: ${{ github.workspace }}/${{ env.GOLDEN_DATASET_PATH }}
+          data-path: ${{ runner.temp }}/golden-dataset.ai-agent-evals.json
 
   # ---------------------------------------------------------------------
   # Stage 6: Manual production-approval gate
