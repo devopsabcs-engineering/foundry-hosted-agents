@@ -27,9 +27,6 @@ services:
             - ai-project
             - defender-conn
             - anomaly-conn
-        connections:
-            - name: defender-conn
-            - name: anomaly-conn
         tools:
             - type: mcp
               connection: defender-conn
