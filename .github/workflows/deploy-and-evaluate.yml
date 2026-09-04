@@ -232,17 +232,22 @@ jobs:
         working-directory: ${{ env.AGENT_PROJECT_DIR }}
         run: |
           set -euo pipefail
-          # A freshly deployed hosted agent's per-instance managed identity
-          # can intermittently 401 on chat/completions calls while its RBAC
-          # role assignment re-converges across Azure AD replicas -- this is
-          # more frequent here because staging and production currently
-          # share the same Cognitive Services account/model deployment (see
-          # repo memory / Planning Log follow-on item on staging isolation),
-          # so every 'azd provision' re-touches shared production state.
-          # Azure's documented data-plane RBAC propagation window can be
-          # several minutes, not seconds -- retry with a longer budget
-          # rather than failing on the first transient PermissionDenied.
-          MAX_ATTEMPTS=8
+          # WI-11 (see .copilot-tracking/plans/logs/2026-09-03/ and the
+          # project wiki's RBAC-401-Investigation page): a freshly deployed
+          # hosted agent's per-instance managed identity 401s on every
+          # chat/completions call with 'PermissionDenied'. This was
+          # originally suspected to be a transient RBAC-propagation delay,
+          # but is now CONFIRMED PERSISTENT -- broadened RBAC (Cognitive
+          # Services Contributor / OpenAI Contributor / Azure AI
+          # Administrator at account and project scope) still 401s, and a
+          # live CI run exhausted 8 attempts over ~4 minutes with zero
+          # recovery. A manually-created portal-native agent in the same
+          # project chats and invokes MCP tools successfully with zero
+          # 401s, isolating this to the LangGraph/Blueprint-identity hosted-
+          # agent runtime path specifically -- a platform bug, not an RBAC
+          # or code defect. This short retry only guards against a genuine
+          # one-off blip; it is not expected to recover from WI-11 itself.
+          MAX_ATTEMPTS=3
           for attempt in $(seq 1 "$MAX_ATTEMPTS"); do
             set +e
             azd ai agent invoke "$AGENT_TEST_PROMPT" > /tmp/agent-response.txt 2>&1
@@ -255,11 +260,11 @@ jobs:
               break
             fi
             if [ "$attempt" -eq "$MAX_ATTEMPTS" ]; then
-              echo "::error::azd ai agent invoke failed after $MAX_ATTEMPTS attempts (exit $INVOKE_EXIT)"
+              echo "::error::azd ai agent invoke failed after $MAX_ATTEMPTS attempts (exit $INVOKE_EXIT) -- see WI-11, this is a known persistent platform 401, not a transient RBAC delay"
               exit 1
             fi
-            echo "::warning::Attempt $attempt failed (exit $INVOKE_EXIT); retrying in 30s (possible RBAC propagation delay)."
-            sleep 30
+            echo "::warning::Attempt $attempt failed (exit $INVOKE_EXIT); retrying in 15s."
+            sleep 15
           done
 
       - name: Contract test (Responses-protocol output shape)
@@ -473,9 +478,11 @@ jobs:
         working-directory: ${{ env.AGENT_PROJECT_DIR }}
         run: |
           set -euo pipefail
-          # See staging-tests' smoke test comment: retry to absorb
-          # transient RBAC-propagation 401s on a freshly deployed agent.
-          MAX_ATTEMPTS=8
+          # See staging-tests' smoke test comment (WI-11): this 401 is a
+          # confirmed persistent hosted-agent platform bug, not a transient
+          # RBAC-propagation delay. This short retry only guards against a
+          # genuine one-off blip.
+          MAX_ATTEMPTS=3
           for attempt in $(seq 1 "$MAX_ATTEMPTS"); do
             set +e
             azd ai agent invoke "$AGENT_TEST_PROMPT" > /tmp/prod-smoke-response.txt 2>&1
@@ -486,11 +493,11 @@ jobs:
               break
             fi
             if [ "$attempt" -eq "$MAX_ATTEMPTS" ]; then
-              echo "::error::azd ai agent invoke failed after $MAX_ATTEMPTS attempts (exit $INVOKE_EXIT)"
+              echo "::error::azd ai agent invoke failed after $MAX_ATTEMPTS attempts (exit $INVOKE_EXIT) -- see WI-11, this is a known persistent platform 401, not a transient RBAC delay"
               exit 1
             fi
-            echo "::warning::Attempt $attempt failed (exit $INVOKE_EXIT); retrying in 30s (possible RBAC propagation delay)."
-            sleep 30
+            echo "::warning::Attempt $attempt failed (exit $INVOKE_EXIT); retrying in 15s."
+            sleep 15
           done
 
       - name: Check Application Insights for post-deploy exceptions (breach signal)
