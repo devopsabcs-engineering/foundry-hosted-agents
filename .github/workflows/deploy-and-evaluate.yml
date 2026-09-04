@@ -236,12 +236,16 @@ jobs:
         run: |
           set -euo pipefail
           # A freshly deployed hosted agent's per-instance managed identity
-          # can intermittently 401 on the very first calls
-          # (Microsoft.CognitiveServices/.../chat/completions/action) while
-          # its RBAC role assignment is still converging across Azure AD
-          # replicas -- retry with backoff instead of failing on the first
-          # transient PermissionDenied.
-          MAX_ATTEMPTS=5
+          # can intermittently 401 on chat/completions calls while its RBAC
+          # role assignment re-converges across Azure AD replicas -- this is
+          # more frequent here because staging and production currently
+          # share the same Cognitive Services account/model deployment (see
+          # repo memory / Planning Log follow-on item on staging isolation),
+          # so every 'azd provision' re-touches shared production state.
+          # Azure's documented data-plane RBAC propagation window can be
+          # several minutes, not seconds -- retry with a longer budget
+          # rather than failing on the first transient PermissionDenied.
+          MAX_ATTEMPTS=8
           for attempt in $(seq 1 "$MAX_ATTEMPTS"); do
             set +e
             azd ai agent invoke "$AGENT_TEST_PROMPT" > /tmp/agent-response.txt 2>&1
@@ -257,8 +261,8 @@ jobs:
               echo "::error::azd ai agent invoke failed after $MAX_ATTEMPTS attempts (exit $INVOKE_EXIT)"
               exit 1
             fi
-            echo "::warning::Attempt $attempt failed (exit $INVOKE_EXIT); retrying in 20s (possible RBAC propagation delay)."
-            sleep 20
+            echo "::warning::Attempt $attempt failed (exit $INVOKE_EXIT); retrying in 30s (possible RBAC propagation delay)."
+            sleep 30
           done
 
       - name: Contract test (Responses-protocol output shape)
@@ -474,7 +478,7 @@ jobs:
           set -euo pipefail
           # See staging-tests' smoke test comment: retry to absorb
           # transient RBAC-propagation 401s on a freshly deployed agent.
-          MAX_ATTEMPTS=5
+          MAX_ATTEMPTS=8
           for attempt in $(seq 1 "$MAX_ATTEMPTS"); do
             set +e
             azd ai agent invoke "$AGENT_TEST_PROMPT" > /tmp/prod-smoke-response.txt 2>&1
@@ -488,8 +492,8 @@ jobs:
               echo "::error::azd ai agent invoke failed after $MAX_ATTEMPTS attempts (exit $INVOKE_EXIT)"
               exit 1
             fi
-            echo "::warning::Attempt $attempt failed (exit $INVOKE_EXIT); retrying in 20s (possible RBAC propagation delay)."
-            sleep 20
+            echo "::warning::Attempt $attempt failed (exit $INVOKE_EXIT); retrying in 30s (possible RBAC propagation delay)."
+            sleep 30
           done
 
       - name: Check Application Insights for post-deploy exceptions (breach signal)
