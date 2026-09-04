@@ -38,7 +38,10 @@ jobs:
       - name: Verify azd Foundry extension
         run: |
           set -euo pipefail
-          azd ext list | grep -q "microsoft.foundry"
+          # Capture output before grepping: piping directly into `grep -q` can
+          # SIGPIPE the writer (exit 141) once grep matches and quits early.
+          ext_list="$(azd ext list)"
+          grep -q "microsoft.foundry" <<< "$ext_list"
           azd ai agent --help > /dev/null
 
       - name: Azure login with OIDC
