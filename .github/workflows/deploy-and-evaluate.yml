@@ -179,6 +179,18 @@ jobs:
           echo "Deployed candidate version: $AGENT_VERSION"
           echo "agent_version=$AGENT_VERSION" >> "$GITHUB_OUTPUT"
 
+      # Downstream jobs run on fresh runners with no local .azure state.
+      # 'azd deploy' writes agent-specific bookkeeping keys (e.g.
+      # AGENT_THREAT_ASSESSMENT_AGENT_ENDPOINT/VERSION) into the local
+      # .env that 'azd ai agent invoke' needs to recognize the service as
+      # deployed; reconstructing only the input vars is not sufficient.
+      - name: Upload azd environment state (for downstream jobs)
+        uses: actions/upload-artifact@v4
+        with:
+          name: azd-env-staging
+          path: .azure/
+          retention-days: 1
+
   # ---------------------------------------------------------------------
   # Stage 4: Smoke, contract, and streaming tests against staging
   # ---------------------------------------------------------------------
@@ -204,26 +216,18 @@ jobs:
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
           subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
 
+      - name: Download azd environment state (from deploy-staging)
+        uses: actions/download-artifact@v4
+        with:
+          name: azd-env-staging
+          path: .azure/
+
       - name: Configure azd authentication and select staging environment
         working-directory: ${{ env.AGENT_PROJECT_DIR }}
         run: |
           set -euo pipefail
-          # Each job runs on a fresh runner with no local .azure state, so
-          # the environment must be recreated here (not just selected) to
-          # match the one deploy-staging provisioned.
           azd config set auth.useAzCliAuth true
-          azd env select "$STAGING_AZD_ENV_NAME" || azd env new "$STAGING_AZD_ENV_NAME" --no-prompt
-
-          azd env set AZURE_SUBSCRIPTION_ID "${{ vars.AZURE_SUBSCRIPTION_ID }}"
-          azd env set AZURE_TENANT_ID "${{ vars.AZURE_TENANT_ID }}"
-          azd env set AZURE_LOCATION "${{ vars.AZURE_LOCATION }}"
-          azd env set AZURE_RESOURCE_GROUP "${{ vars.AZURE_RESOURCE_GROUP }}"
-          azd env set FOUNDRY_PROJECT_ENDPOINT "${{ vars.FOUNDRY_PROJECT_ENDPOINT }}"
-          azd env set AZURE_AI_PROJECT_ID "${{ vars.AZURE_AI_PROJECT_ID }}"
-          azd env set FOUNDRY_MODEL_NAME "${{ vars.FOUNDRY_MODEL_NAME }}"
-          azd env set MCP_ACR_NAME "${{ vars.MCP_ACR_NAME }}"
-          azd env set DEFENDER_MCP_IMAGE "${{ vars.DEFENDER_MCP_IMAGE }}"
-          azd env set ANOMALY_MCP_IMAGE "${{ vars.ANOMALY_MCP_IMAGE }}"
+          azd env select "$STAGING_AZD_ENV_NAME"
 
       - name: Smoke test (plain Responses-protocol invoke)
         working-directory: ${{ env.AGENT_PROJECT_DIR }}
@@ -390,6 +394,13 @@ jobs:
         working-directory: ${{ env.AGENT_PROJECT_DIR }}
         run: azd deploy --no-prompt
 
+      - name: Upload azd environment state (for downstream jobs)
+        uses: actions/upload-artifact@v4
+        with:
+          name: azd-env-production
+          path: .azure/
+          retention-days: 1
+
   # ---------------------------------------------------------------------
   # Stage 7: Post-deploy monitoring check
   # ---------------------------------------------------------------------
@@ -412,26 +423,18 @@ jobs:
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
           subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
 
+      - name: Download azd environment state (from promote-production)
+        uses: actions/download-artifact@v4
+        with:
+          name: azd-env-production
+          path: .azure/
+
       - name: Configure azd authentication and select production environment
         working-directory: ${{ env.AGENT_PROJECT_DIR }}
         run: |
           set -euo pipefail
-          # Each job runs on a fresh runner with no local .azure state, so
-          # the environment must be recreated here (not just selected) to
-          # match the one promote-production provisioned.
           azd config set auth.useAzCliAuth true
-          azd env select "$PRODUCTION_AZD_ENV_NAME" || azd env new "$PRODUCTION_AZD_ENV_NAME" --no-prompt
-
-          azd env set AZURE_SUBSCRIPTION_ID "${{ vars.AZURE_SUBSCRIPTION_ID }}"
-          azd env set AZURE_TENANT_ID "${{ vars.AZURE_TENANT_ID }}"
-          azd env set AZURE_LOCATION "${{ vars.AZURE_LOCATION }}"
-          azd env set AZURE_RESOURCE_GROUP "${{ vars.AZURE_RESOURCE_GROUP }}"
-          azd env set FOUNDRY_PROJECT_ENDPOINT "${{ vars.FOUNDRY_PROJECT_ENDPOINT }}"
-          azd env set AZURE_AI_PROJECT_ID "${{ vars.AZURE_AI_PROJECT_ID }}"
-          azd env set FOUNDRY_MODEL_NAME "${{ vars.FOUNDRY_MODEL_NAME }}"
-          azd env set MCP_ACR_NAME "${{ vars.MCP_ACR_NAME }}"
-          azd env set DEFENDER_MCP_IMAGE "${{ vars.DEFENDER_MCP_IMAGE }}"
-          azd env set ANOMALY_MCP_IMAGE "${{ vars.ANOMALY_MCP_IMAGE }}"
+          azd env select "$PRODUCTION_AZD_ENV_NAME"
 
       - name: Post-deploy smoke invoke
         working-directory: ${{ env.AGENT_PROJECT_DIR }}
@@ -493,26 +496,18 @@ jobs:
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
           subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
 
+      - name: Download azd environment state (from promote-production)
+        uses: actions/download-artifact@v4
+        with:
+          name: azd-env-production
+          path: .azure/
+
       - name: Configure azd authentication and select production environment
         working-directory: ${{ env.AGENT_PROJECT_DIR }}
         run: |
           set -euo pipefail
-          # Each job runs on a fresh runner with no local .azure state, so
-          # the environment must be recreated here (not just selected) to
-          # match the one promote-production provisioned.
           azd config set auth.useAzCliAuth true
-          azd env select "$PRODUCTION_AZD_ENV_NAME" || azd env new "$PRODUCTION_AZD_ENV_NAME" --no-prompt
-
-          azd env set AZURE_SUBSCRIPTION_ID "${{ vars.AZURE_SUBSCRIPTION_ID }}"
-          azd env set AZURE_TENANT_ID "${{ vars.AZURE_TENANT_ID }}"
-          azd env set AZURE_LOCATION "${{ vars.AZURE_LOCATION }}"
-          azd env set AZURE_RESOURCE_GROUP "${{ vars.AZURE_RESOURCE_GROUP }}"
-          azd env set FOUNDRY_PROJECT_ENDPOINT "${{ vars.FOUNDRY_PROJECT_ENDPOINT }}"
-          azd env set AZURE_AI_PROJECT_ID "${{ vars.AZURE_AI_PROJECT_ID }}"
-          azd env set FOUNDRY_MODEL_NAME "${{ vars.FOUNDRY_MODEL_NAME }}"
-          azd env set MCP_ACR_NAME "${{ vars.MCP_ACR_NAME }}"
-          azd env set DEFENDER_MCP_IMAGE "${{ vars.DEFENDER_MCP_IMAGE }}"
-          azd env set ANOMALY_MCP_IMAGE "${{ vars.ANOMALY_MCP_IMAGE }}"
+          azd env select "$PRODUCTION_AZD_ENV_NAME"
 
       - name: Roll back to the previous known-good version
         working-directory: ${{ env.AGENT_PROJECT_DIR }}
