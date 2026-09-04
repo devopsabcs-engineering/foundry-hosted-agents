@@ -184,6 +184,15 @@ jobs:
       # AGENT_THREAT_ASSESSMENT_AGENT_ENDPOINT/VERSION) into the local
       # .env that 'azd ai agent invoke' needs to recognize the service as
       # deployed; reconstructing only the input vars is not sufficient.
+      - name: Diagnose azd environment storage location
+        run: |
+          echo "GITHUB_WORKSPACE=$GITHUB_WORKSPACE"
+          echo "HOME=$HOME"
+          find "$GITHUB_WORKSPACE" -maxdepth 2 -iname ".azure*" 2>/dev/null
+          find "$HOME" -maxdepth 4 -iname "*.env" -path "*air-canada*" 2>/dev/null
+          find / -maxdepth 6 -iname "azd" -o -iname ".azd" 2>/dev/null | head -20
+          azd env list
+
       - name: Upload azd environment state (for downstream jobs)
         uses: actions/upload-artifact@v4
         with:
