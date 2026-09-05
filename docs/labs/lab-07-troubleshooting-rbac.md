@@ -4,6 +4,8 @@ title: "Lab 07 - Real-World Troubleshooting: RBAC 401"
 description: "Follow a real, still-open Azure support investigation into a 401 PermissionDenied error, using nothing but the Azure CLI."
 ---
 
+> 🇫🇷 **[Version française](../fr/labs/lab-07-troubleshooting-rbac)**
+
 ## Overview
 
 | | |

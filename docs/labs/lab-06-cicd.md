@@ -4,6 +4,8 @@ title: "Lab 06 - CI/CD: Evaluation-Gated Release Pipeline"
 description: "Walk both GitHub Actions pipelines: the direct PoC pipeline and the full staging-to-production, evaluation-gated release flow."
 ---
 
+> 🇫🇷 **[Version française](../fr/labs/lab-06-cicd)**
+
 ## Overview
 
 | | |

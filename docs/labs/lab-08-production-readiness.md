@@ -4,6 +4,8 @@ title: "Lab 08 - Production Readiness and Decision Gates"
 description: "Read the PoC's production decision-gate scorecard and understand how phased experiments feed a conditional go/no-go decision."
 ---
 
+> 🇫🇷 **[Version française](../fr/labs/lab-08-production-readiness)**
+
 ## Overview
 
 | | |

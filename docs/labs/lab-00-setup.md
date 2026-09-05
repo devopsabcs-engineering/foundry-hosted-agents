@@ -4,6 +4,8 @@ title: "Lab 00 - Prerequisites and Environment Setup"
 description: "Install required tools, clone the repository, create a Python virtual environment, and verify Azure access."
 ---
 
+> 🇫🇷 **[Version française](../fr/labs/lab-00-setup)**
+
 ## Overview
 
 | | |

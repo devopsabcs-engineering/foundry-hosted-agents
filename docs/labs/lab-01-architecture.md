@@ -4,6 +4,8 @@ title: "Lab 01 - Architecture Deep Dive"
 description: "Understand the LangGraph supervisor/specialist pattern, MCP tool isolation, and how Foundry Hosted Agents fits around it."
 ---
 
+> 🇫🇷 **[Version française](../fr/labs/lab-01-architecture)**
+
 ## Overview
 
 | | |

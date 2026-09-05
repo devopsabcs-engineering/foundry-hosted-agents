@@ -4,6 +4,8 @@ title: "Lab 05 - Evaluations: Deterministic + LLM-as-Judge"
 description: "Run the deterministic evaluation suite, then walk the built-in and custom LLM-as-judge rubric mapping."
 ---
 
+> 🇫🇷 **[Version française](../fr/labs/lab-05-evaluations)**
+
 ## Overview
 
 | | |

@@ -4,6 +4,8 @@ title: "Lab 04 - Invoke the Agent and Read Traces"
 description: "Invoke the hosted agent from the CLI and the portal, and read its Application Insights traces."
 ---
 
+> 🇫🇷 **[Version française](../fr/labs/lab-04-invoke-agent)**
+
 ## Overview
 
 | | |

@@ -4,6 +4,8 @@ title: "Lab 02 - Deploy the MCP Tool Servers"
 description: "Explore, run, and smoke-test the two independent MCP tool servers that back the agent's specialists."
 ---
 
+> 🇫🇷 **[Version française](../fr/labs/lab-02-mcp-servers)**
+
 ## Overview
 
 | | |

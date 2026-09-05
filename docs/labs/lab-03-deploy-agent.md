@@ -4,6 +4,8 @@ title: "Lab 03 - Provision and Deploy the Hosted Agent"
 description: "Use azd to provision a Foundry project, model deployment, Toolbox connections, and the hosted agent itself."
 ---
 
+> 🇫🇷 **[Version française](../fr/labs/lab-03-deploy-agent)**
+
 ## Overview
 
 | | |
