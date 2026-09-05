@@ -16,10 +16,9 @@ defaults:
       path: "assets"
     values:
       nav_exclude: true
-  - scope:
-      path: "fr"
-    values:
-      nav_exclude: true
 
 nav_order_base: 0
 heading_anchors: true
+
+mermaid:
+  version: "10.9.1"

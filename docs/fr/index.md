@@ -1,5 +1,4 @@
 ---
-nav_exclude: true
 lang: fr
 layout: default
 title: Accueil

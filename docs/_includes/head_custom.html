@@ -1,0 +1,20 @@
+<style>
+  .nav-list-item.lang-hidden { display: none !important; }
+</style>
+<script>
+  // just-the-docs renders one flat nav across both languages; hide items whose
+  // link language doesn't match the current page (EN pages hide /fr/ links and
+  // vice versa).
+  document.addEventListener('DOMContentLoaded', function () {
+    var onFrenchPage = /^\/fr(\/|$)/.test(window.location.pathname);
+    document.querySelectorAll('.nav-list-item').forEach(function (item) {
+      var link = item.querySelector(':scope > .nav-list-link');
+      if (!link) return;
+      var href = link.getAttribute('href') || '';
+      var isFrenchLink = /^\/fr(\/|$)/.test(href);
+      if (onFrenchPage !== isFrenchLink) {
+        item.classList.add('lang-hidden');
+      }
+    });
+  });
+</script>
