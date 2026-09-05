@@ -1,20 +1,25 @@
+{%- assign is_fr_page = false -%}
+{%- if page.lang == 'fr' or page.url contains '/fr/' -%}
+  {%- assign is_fr_page = true -%}
+{%- endif -%}
 <style>
+  /* Left nav is built once for the whole site; hide the other language's links per page. */
+  {%- if is_fr_page %}
+  #site-nav .nav-list-item:has(> a.nav-list-link:not([href^="/fr/"])) { display: none; }
+  {%- else %}
+  #site-nav .nav-list-item:has(> a.nav-list-link[href^="/fr/"]) { display: none; }
+  {%- endif %}
   .nav-list-item.lang-hidden { display: none !important; }
 </style>
 <script>
-  // just-the-docs renders one flat nav across both languages; hide items whose
-  // link language doesn't match the current page (EN pages hide /fr/ links and
-  // vice versa).
+  // Fallback for browsers without CSS :has() support.
   document.addEventListener('DOMContentLoaded', function () {
-    var onFrenchPage = /^\/fr(\/|$)/.test(window.location.pathname);
-    document.querySelectorAll('.nav-list-item').forEach(function (item) {
-      var link = item.querySelector(':scope > .nav-list-link');
+    var isFrPage = {{ is_fr_page }};
+    document.querySelectorAll('#site-nav .nav-list-item').forEach(function (item) {
+      var link = item.querySelector('a.nav-list-link');
       if (!link) return;
-      var href = link.getAttribute('href') || '';
-      var isFrenchLink = /^\/fr(\/|$)/.test(href);
-      if (onFrenchPage !== isFrenchLink) {
-        item.classList.add('lang-hidden');
-      }
+      var isFrLink = (link.getAttribute('href') || '').indexOf('/fr/') === 0;
+      if (isFrPage !== isFrLink) item.classList.add('lang-hidden');
     });
   });
 </script>
