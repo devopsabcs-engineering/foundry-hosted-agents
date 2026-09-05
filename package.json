@@ -5,7 +5,8 @@
   "description": "Build scripts for the Air Canada Foundry Hosted Agents decision deliverables",
   "type": "module",
   "scripts": {
-    "build-deck": "node scripts/build-deck.js"
+    "build-deck": "node scripts/build-deck.js",
+    "build-workshop-deck": "node scripts/build-workshop-deck.js"
   },
   "dependencies": {
     "pptxgenjs": "file:./vendor-tarballs/pptxgenjs-4.0.1.tgz"

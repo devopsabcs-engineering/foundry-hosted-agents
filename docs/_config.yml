@@ -1,0 +1,33 @@
+title: "Foundry Hosted Agents Workshop"
+description: "Hands-on workshop: host a real LangGraph multi-agent system on Microsoft Foundry Hosted Agents"
+remote_theme: just-the-docs/just-the-docs
+baseurl: "/foundry-hosted-agents"
+url: "https://devopsabcs-engineering.github.io"
+
+exclude:
+  - ../src/
+  - ../mcp/
+  - ../infra/
+  - ../eval/
+  - ../experiments/
+  - ../deliverables/
+  - ../scripts/
+  - ../.venv/
+  - ../node_modules/
+  - ../.azure/
+  - ../.github/
+  - ../.copilot-tracking/
+  - Gemfile.lock
+
+defaults:
+  - scope:
+      path: ""
+    values:
+      layout: "default"
+  - scope:
+      path: "assets"
+    values:
+      nav_exclude: true
+
+nav_order_base: 0
+heading_anchors: true
