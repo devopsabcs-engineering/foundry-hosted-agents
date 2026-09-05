@@ -18,6 +18,8 @@
 mono_crash.*
 
 assets/
+!docs/assets/
+!docs/assets/**
 .copilot-tracking/
 
 # Local scratch/debug artifacts (pip/pytest/server-smoke .pid and log dumps)
