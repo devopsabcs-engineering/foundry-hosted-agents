@@ -38,11 +38,7 @@ def load_records(golden_dataset_path: Path) -> list[dict]:
             try:
                 records.append(json.loads(line))
             except json.JSONDecodeError as exc:
-                print(
-                    f"::warning::Skipping invalid JSON on line {line_number} of "
-                    f"{golden_dataset_path}: {exc}",
-                    file=sys.stderr,
-                )
+                raise ValueError(f"Invalid JSON on line {line_number} of {golden_dataset_path}") from exc
     return records
 
 
@@ -54,11 +50,19 @@ def to_query(record: dict) -> str:
 
 def convert(golden_dataset_path: Path, output_path: Path) -> None:
     records = load_records(golden_dataset_path)
-    data = [
-        {"query": to_query(record), "context": record.get("id", "")}
-        for record in records
-        if to_query(record)
-    ]
+    if not records:
+        raise ValueError("Golden dataset is empty")
+    data = []
+    seen = set()
+    for record in records:
+        identifier = record.get("id")
+        query = to_query(record)
+        if not identifier or identifier in seen or not isinstance(query, str) or not query.strip():
+            raise ValueError("Every golden record must have a unique id and a nonempty user query")
+        if not isinstance(record.get("expected"), dict) or not record["expected"]:
+            raise ValueError(f"Missing expectations for {identifier}")
+        seen.add(identifier)
+        data.append({"id": identifier, "query": query, "context": query, "expected": record["expected"]})
     envelope = {
         "name": "threat-assessment-agent-golden-dataset",
         "evaluators": DEFAULT_EVALUATORS,

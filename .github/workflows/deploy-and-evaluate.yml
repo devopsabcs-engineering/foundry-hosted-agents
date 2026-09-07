@@ -70,6 +70,9 @@ jobs:
       - name: Responses contract validator regression tests
         run: bash scripts/test-agent-response.sh
 
+      - name: Runtime role assignment regression tests
+        run: bash scripts/test-agent-rbac.sh
+
   # ---------------------------------------------------------------------
   # Stage 2: Bicep validate and what-if
   # ---------------------------------------------------------------------
@@ -298,37 +301,61 @@ jobs:
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
           subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
 
-      # microsoft/ai-agent-evals requires a single JSON document shaped like
-      # {"name", "evaluators", "data": [{"query": ...}]} (see
-      # https://github.com/microsoft/ai-agent-evals#data-file), not this
-      # repo's JSONL golden dataset (used as-is by eval/deterministic-tests/).
-      # Converts read-only into a generated file; see
-      # eval/convert_for_ai_agent_evals.py for the evaluator selection
-      # rationale and follow-on work on custom-rubric wiring.
-      # Output filename must have exactly one dot: action.py derives the
-      # uploaded dataset's name from Path(data_path).stem, and the Foundry
-      # dataset name API rejects anything but alphanumerics/dashes/underscores
-      # (a second dot, e.g. "golden-dataset.ai-agent-evals", is rejected).
-      - name: Convert golden dataset to ai-agent-evals format
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+
+      - name: Install evaluation SDKs
+        run: pip install azure-ai-projects==2.6.0 openai==3.6.0 azure-identity==1.25.3
+
+      - name: Install Azure Developer CLI
+        uses: Azure/setup-azd@v2
+
+      - name: Install azd Foundry extension
+        run: azd ext install microsoft.foundry
+
+      - name: Download staging environment state
+        uses: actions/download-artifact@v6
+        with:
+          name: azd-env-staging
+          path: ${{ github.workspace }}/.azure/
+
+      - name: Select staging environment
+        run: |
+          azd config set auth.useAzCliAuth true
+          azd env select "$STAGING_AZD_ENV_NAME"
+
+      - name: Convert golden dataset without dropping cases
         run: |
           set -euo pipefail
           python3 eval/convert_for_ai_agent_evals.py \
-            "${{ github.workspace }}/${{ env.GOLDEN_DATASET_PATH }}" \
+            "$GOLDEN_DATASET_PATH" \
             "${{ runner.temp }}/golden_dataset_for_ai_agent_evals.json"
 
-      # Official evaluation action (air-canada-foundry-hosted-agents-research.md,
-      # "GitHub Actions evaluation step", lines 264-280). Marked "Not
-      # verified" in the Evidence Confidence Register — this step's exact
-      # pass/fail signal (action exit code) is trusted as the gate here,
-      # but has not been exercised against a live Foundry project in this
-      # repo. Confirm before treating this as a production-proven gate.
-      - name: Run microsoft/ai-agent-evals against the golden dataset
-        uses: microsoft/ai-agent-evals@v3-beta
+      - name: Capture hosted responses and enforce evaluation policy
+        timeout-minutes: 90
+        env:
+          PROJECT_ENDPOINT: ${{ needs.deploy-staging.outputs.project_endpoint }}
+          AGENT_VERSION: ${{ needs.deploy-staging.outputs.agent_version }}
+          JUDGE_DEPLOYMENT: ${{ vars.FOUNDRY_MODEL_NAME }}
+          AZURE_DEV_USER_AGENT: microsoft_foundry_skill
+        run: |
+          python eval/run_hosted_evaluation.py \
+            --endpoint "$PROJECT_ENDPOINT" --agent "$AGENT_NAME" \
+            --version "$AGENT_VERSION" --deployment "$JUDGE_DEPLOYMENT" \
+            --dataset "${{ runner.temp }}/golden_dataset_for_ai_agent_evals.json" \
+            --output-dir "${{ runner.temp }}/evaluation-evidence" \
+            --minimum-pass-rate 1.0
+
+      - name: Upload evaluation evidence even on failure
+        if: always()
+        uses: actions/upload-artifact@v6
         with:
-          azure-ai-project-endpoint: ${{ needs.deploy-staging.outputs.project_endpoint }}
-          deployment-name: ${{ vars.FOUNDRY_MODEL_NAME }}
-          agent-ids: "${{ env.AGENT_NAME }}:${{ needs.deploy-staging.outputs.agent_version }}"
-          data-path: ${{ runner.temp }}/golden_dataset_for_ai_agent_evals.json
+          name: evaluation-evidence
+          path: ${{ runner.temp }}/evaluation-evidence/
+          retention-days: 7
+          if-no-files-found: warn
 
   # ---------------------------------------------------------------------
   # Stage 6: Manual production-approval gate
@@ -385,16 +412,16 @@ jobs:
         working-directory: ${{ env.AGENT_PROJECT_DIR }}
         run: |
           set -euo pipefail
-          azd ai agent show --no-prompt > /tmp/prod-agent-show-before.txt 2>&1 || true
-          cat /tmp/prod-agent-show-before.txt || true
-          PREVIOUS_VERSION=$(grep -oE 'version[^0-9]*[0-9]+' /tmp/prod-agent-show-before.txt | head -n1 | grep -oE '[0-9]+' || true)
-          echo "previous_agent_version=${PREVIOUS_VERSION:-none}" >> "$GITHUB_OUTPUT"
+          azd ai agent show "$AGENT_NAME" --output json > /tmp/prod-agent-show-before.json
+          PREVIOUS_VERSION=$(jq -er '.version | select(type == "string" and test("^[0-9]+$"))' /tmp/prod-agent-show-before.json)
+          jq -e '.status == "active"' /tmp/prod-agent-show-before.json
+          echo "previous_agent_version=$PREVIOUS_VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Provision production infrastructure (idempotent)
         working-directory: ${{ env.AGENT_PROJECT_DIR }}
         run: azd provision --no-prompt
 
-      - name: Deploy the evaluated candidate to production
+      - name: Deploy evaluated source to production (remote rebuild)
         id: deploy
         working-directory: ${{ env.AGENT_PROJECT_DIR }}
         run: |
@@ -409,6 +436,7 @@ jobs:
         run: bash scripts/configure-agent-rbac.sh "$AGENT_NAME"
 
       - name: Upload azd environment state (for downstream jobs)
+        if: always()
         uses: actions/upload-artifact@v6
         with:
           name: azd-env-production
@@ -416,6 +444,15 @@ jobs:
           retention-days: 1
           if-no-files-found: error
           include-hidden-files: true
+
+      - name: Upload production version evidence
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: production-version-evidence
+          path: /tmp/prod-agent-show*.json
+          retention-days: 7
+          if-no-files-found: warn
 
   # ---------------------------------------------------------------------
   # Stage 7: Post-deploy monitoring check
@@ -495,9 +532,13 @@ jobs:
           EXCEPTION_COUNT=$(az monitor log-analytics query \
             --workspace "$WORKSPACE_ID" \
             --analytics-query "AppExceptions | where TimeGenerated > ago(10m) | count" \
-            --query "[0].Count" -o tsv || echo "0")
+            --query "[0].Count" -o tsv)
+          if ! [[ "$EXCEPTION_COUNT" =~ ^[0-9]+$ ]]; then
+            echo "::error::Telemetry query returned no valid exception count. Health is unknown."
+            exit 1
+          fi
           echo "Post-deploy exception count (last 10m): $EXCEPTION_COUNT"
-          if [ "${EXCEPTION_COUNT:-0}" -gt "0" ]; then
+          if [ "$EXCEPTION_COUNT" -gt "0" ]; then
             echo "::error::Detected $EXCEPTION_COUNT exception(s) in Application Insights within 10 minutes of production promotion."
             exit 1
           fi
@@ -505,59 +546,18 @@ jobs:
   # ---------------------------------------------------------------------
   # Stage 8: Rollback on breach
   # ---------------------------------------------------------------------
-  rollback-on-breach:
-    name: Rollback production on breach
+  recovery-required:
+    name: Manual production recovery required
     needs: [promote-production, post-deploy-monitoring]
-    if: failure() && needs.promote-production.result == 'success'
+    if: always() && (needs.promote-production.result == 'failure' || needs.post-deploy-monitoring.result == 'failure')
     runs-on: ubuntu-latest
-    environment: production
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v6
-
-      - name: Install Azure Developer CLI
-        uses: Azure/setup-azd@v2
-
-      - name: Azure login with OIDC
-        uses: azure/login@v3
-        with:
-          client-id: ${{ vars.AZURE_CLIENT_ID }}
-          tenant-id: ${{ vars.AZURE_TENANT_ID }}
-          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
-
-      - name: Download azd environment state (from promote-production)
-        uses: actions/download-artifact@v6
-        with:
-          name: azd-env-production
-          path: ${{ github.workspace }}/.azure/
-
-      - name: Configure azd authentication and select production environment
-        working-directory: ${{ env.AGENT_PROJECT_DIR }}
+      - name: Report partial deployment or monitoring failure
+        env:
+          PREVIOUS_VERSION: ${{ needs.promote-production.outputs.previous_agent_version }}
+          DEPLOYED_VERSION: ${{ needs.promote-production.outputs.promoted_agent_version }}
         run: |
-          set -euo pipefail
-          azd config set auth.useAzCliAuth true
-          azd env select "$PRODUCTION_AZD_ENV_NAME"
-
-      - name: Roll back to the previous known-good version
-        working-directory: ${{ env.AGENT_PROJECT_DIR }}
-        run: |
-          set -euo pipefail
-          PREVIOUS_VERSION="${{ needs.promote-production.outputs.previous_agent_version }}"
-          if [ -z "$PREVIOUS_VERSION" ] || [ "$PREVIOUS_VERSION" = "none" ]; then
-            echo "::error::No previous production version was recorded; cannot roll back automatically. Escalate to manual recovery."
-            exit 1
-          fi
-
-          # NOTE (unverified): switching a hosted agent's serving/active
-          # version to a specific prior version number is not confirmed in
-          # this repo (see Evidence Confidence Register). If the Foundry
-          # platform exposes a version-pointer/route-switch command (per
-          # the research CI/CD diagram's "Rollback route to prior version"
-          # step), replace the placeholder below with the confirmed
-          # command. Until then, this falls back to the always-available
-          # strategy of redeploying the last known-good source (checked
-          # out at the commit that produced $PREVIOUS_VERSION) via
-          # `azd deploy`, which is the same mechanism already proven
-          # working end-to-end in Phase 5.
-          echo "::warning::Rollback strategy: attempting to redeploy the previously live version ($PREVIOUS_VERSION). The exact 'switch active version' Foundry command is unverified in this repo; if this step fails, escalate to manual recovery via the Foundry portal."
-          azd deploy --no-prompt
+          echo "::error::Production may have changed. Inspect production-version-evidence and azd-env-production. Automatic rollback is not implemented."
+          echo "Previous version: ${PREVIOUS_VERSION:-unknown}; deployed version: ${DEPLOYED_VERSION:-unknown}." >> "$GITHUB_STEP_SUMMARY"
+          echo "Manual recovery required. Do not redeploy current source as a rollback." >> "$GITHUB_STEP_SUMMARY"
+          exit 1

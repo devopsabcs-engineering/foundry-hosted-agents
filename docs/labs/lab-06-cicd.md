@@ -32,7 +32,7 @@ Open [`.github/workflows/`](https://github.com/devopsabcs-engineering/foundry-ho
 | Pipeline | Trigger | What it does |
 |---|---|---|
 | `hosted-agent-cd.yml` | Manual (`workflow_dispatch`) | Provisions and deploys **straight to the shared PoC environment**, then runs one smoke-test invoke. No staging, no evaluation gate. |
-| `deploy-and-evaluate.yml` | Manual (`workflow_dispatch`) | Full release-control flow: lint/unit tests → Bicep validate/what-if → deploy an **immutable candidate to staging** → smoke/contract/streaming tests → **offline evaluation quality gate** → manual production approval → promote → post-deploy monitoring → rollback on breach. |
+| `deploy-and-evaluate.yml` | Manual (`workflow_dispatch`) | Lint/unit tests → Bicep validate/what-if → staging deployment → smoke/contract tests → evaluation gate → manual production approval → source rebuild → monitoring → manual recovery on failure. |
 
 Both are **manual-dispatch only** — read the comment block at the top of
 each file. This wasn't the original design; it's a lesson learned:
@@ -118,12 +118,52 @@ smoke pass is not a tool-functionality or evaluation-quality pass.
 > variables. The September 7 investigation initially found only `staging`
 > and `github-pages`. The `production` environment was then created with
 > `emmanuelknafo` as required reviewer and administrator bypass disabled.
-> No production approval was granted. `environment: production` alone does
+> The user subsequently approved production for run `34157050648`.
+> `environment: production` alone does
 > not enforce manual approval without those repository settings.
 > The current promotion rebuilds source rather than promoting the exact
-> tested artifact, and the existing rollback step redeploys current source
-> rather than restoring the recorded version. These remain release blockers;
+> tested artifact. The unsafe rollback placeholder has been removed; recovery
+> is manual until a prior-version restore path is verified. These remain release blockers;
 > do not treat a passing smoke test as production-readiness approval.
+
+### Exercise 6.6: Reject False-Green Evaluations
+
+Run [34157050648](https://github.com/devopsabcs-engineering/foundry-hosted-agents/actions/runs/34157050648)
+reported evaluation success even though all eight cases errored and all scores
+were unavailable. Its evaluation status was `completed`, not proof of passing
+quality. After manual approval, production deployment succeeded before the RBAC
+step failed with `RoleAssignmentExists`. Production was therefore changed.
+
+The corrected workflow uses `eval/run_hosted_evaluation.py` instead of trusting
+the report-only action exit code. It captures fresh, version-bound hosted
+responses, submits recorded output to Foundry judges, and retains exact run IDs,
+raw streams, results, and a summary in `evaluation-evidence`. All cases must be
+present, error-free, scored, and passing each required metric (100% by default).
+Malformed datasets, empty responses, and missing scores fail the job.
+
+Scenario text now supplies grounding context; a case ID is not evidence.
+Expected schema and tool requirements remain enforced separately. Hosted prose
+does not expose structured graph state or independently verified tool traces,
+so those requirements cannot currently qualify a release. Category-specific
+custom judge rubrics remain follow-on work, not covered by the three built-ins.
+
+During local validation, five staging cases returned valid responses. The
+prompt-injection case was rejected by Azure's jailbreak filter and correctly
+blocked the run. A diagnostic evaluation of one captured response produced
+passing scores for coherence, groundedness, and task adherence with no evaluator
+errors, but still failed the evidence gate. This is not an eight-case quality pass.
+Do not disable safety filters or weaken the dataset to obtain a green run.
+
+The RBAC helper now reuses equivalent unconditional assignments at the exact
+account scope, regardless of assignment GUID, and creates only missing roles.
+Production state and version evidence are uploaded even after partial failure.
+Telemetry-query failures no longer become a zero-exception success. Exception
+counts alone still do not prove traffic coverage or telemetry freshness.
+
+```bash
+bash scripts/test-agent-rbac.sh
+python -m pytest eval/deterministic-tests/ -q
+```
 
 ## Knowledge Check
 

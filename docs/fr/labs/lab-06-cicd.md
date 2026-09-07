@@ -33,7 +33,7 @@ Ouvrez [`.github/workflows/`](https://github.com/devopsabcs-engineering/foundry-
 | Pipeline | Déclencheur | Ce qu'il fait |
 |---|---|---|
 | `hosted-agent-cd.yml` | Manuel (`workflow_dispatch`) | Provisionne et déploie **directement vers l'environnement PoC partagé**, puis exécute un test de fumée. Pas de staging, pas de porte d'évaluation. |
-| `deploy-and-evaluate.yml` | Manuel (`workflow_dispatch`) | Flux complet de contrôle de mise en production : lint/tests unitaires → validation Bicep/what-if → déploiement d'un **candidat immuable en staging** → tests de fumée/contrat/streaming → **porte de qualité d'évaluation hors ligne** → approbation manuelle de production → promotion → surveillance post-déploiement → retour en arrière en cas de rupture. |
+| `deploy-and-evaluate.yml` | Manuel (`workflow_dispatch`) | Lint/tests → validation Bicep/what-if → staging → tests de fumée/contrat → évaluation → approbation manuelle → reconstruction du code → surveillance → récupération manuelle en cas d'échec. |
 
 Les deux sont **en déclenchement manuel uniquement** — lisez le bloc de
 commentaires en haut de chaque fichier. Ce n'était pas la conception
@@ -122,14 +122,56 @@ réussi ne prouve pas le fonctionnement des outils ni la qualité des réponses.
 > des approbateurs obligatoires et vérifiez sa fédération OIDC et ses variables.
 > Le 7 septembre, seuls `staging` et `github-pages` existaient initialement.
 > L'environnement `production` a ensuite été créé avec `emmanuelknafo` comme
-> approbateur obligatoire et sans contournement administrateur. Aucune
-> approbation de production n'a été accordée. La déclaration
+> approbateur obligatoire et sans contournement administrateur. L'utilisateur
+> a ensuite approuvé la production pour l'exécution `34157050648`. La déclaration
 > `environment: production` seule n'impose pas d'approbation manuelle sans
 > ces paramètres du dépôt.
 > La promotion reconstruit le code au lieu de promouvoir l'artefact testé,
-> et le rollback existant redéploie le code actuel au lieu de restaurer la
-> version enregistrée. Ces points bloquent une mise en production fiable ;
+> et le rollback provisoire dangereux a été supprimé. La récupération reste
+> manuelle tant qu'une restauration de version antérieure n'est pas vérifiée.
+> Ces points bloquent une mise en production fiable ;
 > un test de fumée réussi ne constitue pas une approbation de production.
+
+### Exercice 6.6 : Rejeter les faux succès d'évaluation
+
+L'exécution [34157050648](https://github.com/devopsabcs-engineering/foundry-hosted-agents/actions/runs/34157050648)
+affichait une réussite malgré huit cas en erreur et aucun score disponible.
+Le statut `completed` ne prouvait pas la qualité. Après approbation manuelle,
+le déploiement de production a réussi, puis l'étape RBAC a échoué avec
+`RoleAssignmentExists`. La production avait donc déjà changé.
+
+Le workflow utilise maintenant `eval/run_hosted_evaluation.py` au lieu de faire
+confiance au code de sortie de l'action de rapport. Il capture les réponses
+hébergées dans des sessions neuves liées à la version, les soumet aux juges
+Foundry et conserve les identifiants exacts, flux bruts, résultats et résumé
+dans `evaluation-evidence`. Tous les cas doivent être présents, sans erreur,
+avec des scores et une réussite pour chaque métrique (100 % par défaut).
+Les données mal formées, réponses vides et scores absents provoquent un échec.
+
+Le contexte de grounding est le scénario, pas son identifiant. Les exigences
+de schéma et d'outils restent distinctes. La réponse textuelle hébergée n'expose
+ni l'état structuré du graphe ni des traces d'outils vérifiées indépendamment ;
+ces exigences bloquent donc encore la qualification. Les rubriques personnalisées
+par catégorie restent à intégrer et ne sont pas couvertes par les trois juges.
+
+Lors du test local, cinq cas staging ont retourné des réponses valides. Le filtre
+Azure contre les jailbreaks a rejeté le cas d'injection, bloquant correctement
+l'exécution. Une évaluation diagnostique d'une réponse capturée a réussi les
+trois métriques sans erreur de juge, mais a échoué au contrôle des preuves.
+Ce n'est pas une réussite des huit cas. Ne désactivez pas les filtres de sécurité
+et n'affaiblissez pas les attentes du jeu de données pour obtenir un succès.
+
+Le script RBAC réutilise les attributions inconditionnelles équivalentes à la
+portée exacte du compte, quel que soit leur GUID, et crée seulement les rôles
+manquants. Les preuves de version et l'état de production sont conservés même
+après un échec partiel. Les erreurs de requête de télémétrie ne deviennent plus
+un succès avec zéro exception. Ce compte seul ne prouve toutefois ni la
+couverture du trafic ni la fraîcheur de la télémétrie.
+
+```bash
+bash scripts/test-agent-rbac.sh
+python -m pytest eval/deterministic-tests/ -q
+```
 
 ## Vérification des connaissances
 

@@ -13,11 +13,24 @@ OPENAI_ROLE=$(az role definition list --name 'Cognitive Services OpenAI User' --
 test -n "$OPENAI_ROLE"
 PRINCIPALS=$(jq -cn --arg principal "$PRINCIPAL_ID" '[$principal]')
 ROLES=$(jq -cn --arg openai "$OPENAI_ROLE" '["53ca6127-db72-4b80-b1b0-d745d6d5456d", $openai]')
+ACCOUNT_SCOPE="${PROJECT_ID%/projects/*}"
+EXISTING=$(az role assignment list --scope "$ACCOUNT_SCOPE" --subscription "$SUBSCRIPTION_ID" --output json)
+MISSING_ROLES=$(jq -cn --argjson roles "$ROLES" --argjson existing "$EXISTING" \
+  --arg principal "$PRINCIPAL_ID" --arg scope "$ACCOUNT_SCOPE" '
+  $roles - [$existing[]
+    | select((.principalId | ascii_downcase) == ($principal | ascii_downcase)
+      and (.scope | ascii_downcase) == ($scope | ascii_downcase)
+      and (.condition == null or .condition == ""))
+    | .roleDefinitionId | split("/")[-1]]')
+if jq -e 'length == 0' <<< "$MISSING_ROLES" > /dev/null; then
+  echo 'Required runtime roles already exist at account scope.'
+  exit 0
+fi
 
 az deployment group create \
-  --name agent-runtime-rbac \
+  --name "${ACCOUNT_NAME}-runtime-rbac" \
   --subscription "$SUBSCRIPTION_ID" \
   --resource-group "$RESOURCE_GROUP" \
   --template-file infra/modules/rbac.bicep \
-  --parameters accountName="$ACCOUNT_NAME" principalIds="$PRINCIPALS" roleDefinitionIds="$ROLES" \
+  --parameters accountName="$ACCOUNT_NAME" principalIds="$PRINCIPALS" roleDefinitionIds="$MISSING_ROLES" \
   --query properties.provisioningState --output tsv
