@@ -80,6 +80,13 @@ staging deployed version 31 to the production PoC account. Staging inherited
 the repository's production project variables. Retries reused the same
 failed session, so they did not test a fresh runtime.
 
+The isolated staging agent has a different instance principal from the PoC.
+Its initial role-assignment query returned no assignments. After deployment,
+`scripts/configure-agent-rbac.sh` discovers that principal and grants only
+`Foundry User` and `Cognitive Services OpenAI User` at its own account scope
+through the existing RBAC module. The CI identity must be authorized to create
+these role assignments; the workflow does not silently skip permission errors.
+
 The corrected workflow selects the staging project explicitly, verifies its
 endpoint before deploying, and passes that actual endpoint to evaluation.
 It reads `.version` from `azd ai agent show --output json`; unknown versions
@@ -108,8 +115,11 @@ smoke pass is not a tool-functionality or evaluation-quality pass.
 > [!WARNING]
 > Before running the production portion, create the `production` GitHub
 > environment with required reviewers and verify its OIDC federation and
-> variables. On September 7, only `staging` and `github-pages` existed;
-> `environment: production` alone does not enforce manual approval.
+> variables. The September 7 investigation initially found only `staging`
+> and `github-pages`. The `production` environment was then created with
+> `emmanuelknafo` as required reviewer and administrator bypass disabled.
+> No production approval was granted. `environment: production` alone does
+> not enforce manual approval without those repository settings.
 > The current promotion rebuilds source rather than promoting the exact
 > tested artifact, and the existing rollback step redeploys current source
 > rather than restoring the recorded version. These remain release blockers;

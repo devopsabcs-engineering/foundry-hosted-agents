@@ -181,6 +181,9 @@ jobs:
           echo "agent_version=$AGENT_VERSION" >> "$GITHUB_OUTPUT"
           echo "project_endpoint=$PROJECT_ENDPOINT" >> "$GITHUB_OUTPUT"
 
+      - name: Grant staging runtime model access
+        run: bash scripts/configure-agent-rbac.sh "$AGENT_NAME"
+
       # Downstream jobs run on fresh runners with no local .azure state.
       # 'azd deploy' writes agent-specific bookkeeping keys (e.g.
       # AGENT_THREAT_ASSESSMENT_AGENT_ENDPOINT/VERSION) into the local
@@ -405,6 +408,9 @@ jobs:
           AGENT_VERSION=$(jq -er '.version | select(type == "string" and test("^[0-9]+$"))' /tmp/prod-agent-show.json)
           jq -e '.status == "active"' /tmp/prod-agent-show.json
           echo "agent_version=$AGENT_VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Grant production runtime model access
+        run: bash scripts/configure-agent-rbac.sh "$AGENT_NAME"
 
       - name: Upload azd environment state (for downstream jobs)
         uses: actions/upload-artifact@v6

@@ -84,6 +84,13 @@ déployait la version 31 dans le compte PoC de production. Staging héritait
 des variables de projet de production du dépôt. Les tentatives réutilisaient
 la même session en échec, sans tester une nouvelle instance d'exécution.
 
+L'agent staging isolé possède un principal d'instance distinct de celui du PoC.
+La première requête ne retournait aucune attribution de rôle. Après le
+déploiement, `scripts/configure-agent-rbac.sh` découvre ce principal et lui
+attribue uniquement `Foundry User` et `Cognitive Services OpenAI User` à la
+portée de son compte via le module RBAC existant. L'identité CI doit pouvoir
+créer ces attributions ; les erreurs de permission ne sont pas ignorées.
+
 Le workflow corrigé sélectionne explicitement le projet staging, vérifie son
 point de terminaison avant le déploiement et le transmet à l'évaluation.
 Il lit `.version` dans `azd ai agent show --output json` ; une version inconnue
@@ -113,8 +120,12 @@ réussi ne prouve pas le fonctionnement des outils ni la qualité des réponses.
 > [!WARNING]
 > Avant la partie production, créez l'environnement GitHub `production` avec
 > des approbateurs obligatoires et vérifiez sa fédération OIDC et ses variables.
-> Le 7 septembre, seuls `staging` et `github-pages` existaient ; la déclaration
-> `environment: production` seule n'impose pas d'approbation manuelle.
+> Le 7 septembre, seuls `staging` et `github-pages` existaient initialement.
+> L'environnement `production` a ensuite été créé avec `emmanuelknafo` comme
+> approbateur obligatoire et sans contournement administrateur. Aucune
+> approbation de production n'a été accordée. La déclaration
+> `environment: production` seule n'impose pas d'approbation manuelle sans
+> ces paramètres du dépôt.
 > La promotion reconstruit le code au lieu de promouvoir l'artefact testé,
 > et le rollback existant redéploie le code actuel au lieu de restaurer la
 > version enregistrée. Ces points bloquent une mise en production fiable ;
