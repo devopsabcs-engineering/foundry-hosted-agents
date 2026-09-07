@@ -16,8 +16,11 @@ from __future__ import annotations
 from typing import Any
 
 import graph
+import httpx
+import pytest
 from azure.core.exceptions import ResourceNotFoundError
 from langgraph.graph import END
+from openai import BadRequestError
 from state import ThreatAssessmentState, get_checkpointer
 
 
@@ -31,6 +34,51 @@ class _FakeSpecialistAgent:
         return {"messages": [{"role": "assistant", "content": self._response_content}]}
 
 
+@pytest.mark.parametrize("node", [graph.evidence_investigator_node, graph.risk_analyst_node,
+                                  graph.report_composer_node])
+@pytest.mark.parametrize("code", ["content_filter", "invalid_request"])
+def test_model_rejection_handling(monkeypatch, node, code):
+    error = BadRequestError("rejected", response=httpx.Response(
+        400, request=httpx.Request("POST", "https://example.test")), body={"code": code})
+
+    def reject(*args, **kwargs):
+        raise error
+
+    monkeypatch.setattr(graph, "_chat", reject)
+    token = graph.TOOL_RESOLUTION_UNAVAILABLE.set(True)
+    try:
+        if code != "content_filter":
+            with pytest.raises(BadRequestError):
+                node(_base_state())
+        else:
+            result = node(_base_state())
+            assert result["safety_blocked"]
+            assert result["report_complete"] is False
+            assert graph.decide_next_step(_base_state(**result)) == END
+            assert "blocked by the safety policy" in result["messages"][0].content
+    finally:
+        graph.TOOL_RESOLUTION_UNAVAILABLE.reset(token)
+
+
+def test_compiled_graph_stops_after_specialist_filter(monkeypatch):
+    class FilteredAgent:
+        def invoke(self, _input):
+            raise BadRequestError("rejected", response=httpx.Response(
+                400, request=httpx.Request("POST", "https://example.test")),
+                body={"error": {"code": "content_filter"}})
+
+    def specialist(connection_id, prompt):
+        assert connection_id == graph.DEFENDER_TOOLBOX_CONNECTION
+        return FilteredAgent()
+
+    monkeypatch.setattr(graph, "_get_specialist_agent", specialist)
+    monkeypatch.setattr(graph, "_chat", lambda *args: pytest.fail("No further model calls allowed"))
+    result = graph.build_graph().invoke(_base_state())
+    assert result["safety_blocked"]
+    assert not result["evidence_complete"]
+    assert not result["risk_complete"]
+
+
 class _ToolUnavailableSpecialistAgent:
     """Stand-in for a specialist agent whose Toolbox tool-resolution call 404s."""
 
@@ -40,6 +88,7 @@ class _ToolUnavailableSpecialistAgent:
 
 def _base_state(**overrides: Any) -> ThreatAssessmentState:
     state: ThreatAssessmentState = {
+        "tool_calls": [],
         "messages": [{"role": "user", "content": "Suspicious login from unknown IP."}],
         "evidence_report": None,
         "risk_report": None,
@@ -92,6 +141,7 @@ def test_evidence_investigator_node(monkeypatch) -> None:
         "evidence_report": "evidence summary",
         "evidence_complete": True,
         "evidence_tool_unavailable": False,
+        "tool_calls": [],
     }
 
 
@@ -165,6 +215,7 @@ def test_risk_analyst_node(monkeypatch) -> None:
         "risk_report": "risk assessment",
         "risk_complete": True,
         "risk_tool_unavailable": False,
+        "tool_calls": [],
     }
 
 

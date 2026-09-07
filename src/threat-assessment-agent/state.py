@@ -9,10 +9,11 @@ disabled unless ENABLE_COSMOS_CHECKPOINTER is explicitly set (see DD-02).
 
 from __future__ import annotations
 
+import operator
 import os
 from typing import Annotated, Any, Optional
 
-from typing_extensions import TypedDict
+from typing_extensions import NotRequired, TypedDict
 
 
 def _append_messages(
@@ -32,6 +33,8 @@ class ThreatAssessmentState(TypedDict):
     evidence_complete: bool
     risk_complete: bool
     report_complete: bool
+    safety_blocked: NotRequired[bool]
+    tool_calls: Annotated[list[dict[str, str]], operator.add]
     # Set True when the corresponding specialist could not reach its Foundry
     # Toolbox MCP tool (tool-resolution API unavailable) and fell back to a
     # plain-LLM analysis. See graph.py's ResourceNotFoundError handling.

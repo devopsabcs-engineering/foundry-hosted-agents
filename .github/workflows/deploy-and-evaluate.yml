@@ -227,7 +227,7 @@ jobs:
           subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
 
       - name: Download azd environment state (from deploy-staging)
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@v7
         with:
           name: azd-env-staging
           path: ${{ github.workspace }}/.azure/
@@ -316,7 +316,7 @@ jobs:
         run: azd ext install microsoft.foundry
 
       - name: Download staging environment state
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@v7
         with:
           name: azd-env-staging
           path: ${{ github.workspace }}/.azure/
@@ -480,7 +480,7 @@ jobs:
           subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
 
       - name: Download azd environment state (from promote-production)
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@v7
         with:
           name: azd-env-production
           path: ${{ github.workspace }}/.azure/

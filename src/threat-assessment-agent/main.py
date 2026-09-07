@@ -20,6 +20,7 @@ def _load_host_server_run():
     try:
         from azure.ai.agentserver.langgraph import LangGraphAdapter, LanggraphRunContext
         from azure.core.exceptions import ResourceNotFoundError
+        from runtime_evidence import EvidenceConverter
 
         class _GracefulToolResolutionAdapter(LangGraphAdapter):
             """LangGraphAdapter that degrades gracefully instead of failing the
@@ -39,6 +40,7 @@ def _load_host_server_run():
             """
 
             async def setup_lg_run_context(self, agent_run_context):
+                TOOL_RESOLUTION_UNAVAILABLE.set(False)
                 try:
                     return await super().setup_lg_run_context(agent_run_context)
                 except ResourceNotFoundError:
@@ -49,7 +51,9 @@ def _load_host_server_run():
 
                     return LanggraphRunContext(agent_run_context, FoundryToolContext())
 
-        return _GracefulToolResolutionAdapter(compiled_graph).run
+        return _GracefulToolResolutionAdapter(
+            compiled_graph, converter=EvidenceConverter(compiled_graph)
+        ).run
     except ImportError:
         from langchain_azure_ai.agents.hosting import ResponsesHostServer
 

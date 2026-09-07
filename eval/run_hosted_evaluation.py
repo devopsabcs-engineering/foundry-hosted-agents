@@ -1,15 +1,43 @@
 """Capture version-bound hosted responses, evaluate them, and enforce a quality gate."""
 
 import argparse
+import ast
+import base64
+import binascii
 import json
 import os
 import runpy
 import shutil
 import subprocess
 import time
+import zlib
 from pathlib import Path
 
 from evaluation_gate import METRICS, validate_results
+
+
+class CaptureError(ValueError):
+    def __init__(self, message: str, code: str = "response_error"):
+        super().__init__(message)
+        self.code = code
+
+
+def stream_error(event: dict) -> CaptureError:
+    error = event.get("response", {}).get("error") or event.get("error") or event
+    message = error.get("message", "Agent stream contains an error or incomplete response")
+    code = error.get("code", "response_error")
+    if message.startswith("Error code: 400 - "):
+        try:
+            body = ast.literal_eval(message.removeprefix("Error code: 400 - "))
+            if body.get("error", {}).get("code") == "content_filter":
+                code = "content_filter"
+        except (SyntaxError, ValueError, AttributeError):
+            pass
+    if code == "content_filter":
+        return CaptureError(
+            "Azure safety filter rejected the request; no assistant response was generated", code
+        )
+    return CaptureError(message, code)
 
 
 def completed_response(raw: str) -> dict:
@@ -18,8 +46,9 @@ def completed_response(raw: str) -> dict:
         for line in raw.splitlines()
         if line.startswith("data: ") and line[6:] != "[DONE]"
     ]
-    if any(event.get("type") in ("error", "response.failed", "response.incomplete") for event in events):
-        raise ValueError("Agent stream contains an error or incomplete response")
+    for event in events:
+        if event.get("type") in ("error", "response.failed", "response.incomplete"):
+            raise stream_error(event)
     completed = [event["response"] for event in events if event.get("type") == "response.completed"]
     if len(completed) != 1 or completed[0].get("status") != "completed" or completed[0].get("error"):
         raise ValueError("Agent stream has no successful completed response")
@@ -33,7 +62,35 @@ def completed_response(raw: str) -> dict:
     )
     if not text.strip():
         raise ValueError("Agent returned no assistant text")
-    return {"text": text, "output": response["output"]}
+    return {
+        "text": text,
+        "output": response["output"],
+        "runtime_state": runtime_state(response.get("metadata")),
+    }
+
+
+def runtime_state(metadata) -> dict | None:
+    if not isinstance(metadata, dict) or not isinstance(metadata.get("runtime_evidence"), str):
+        return None
+    descriptor = metadata["runtime_evidence"].split(":")
+    if len(descriptor) != 2 or descriptor[0] != "v1" or not descriptor[1].isdigit():
+        return None
+    count = int(descriptor[1])
+    if not 1 <= count <= 15:
+        return None
+    try:
+        chunks = [metadata[f"runtime_evidence_{index}"] for index in range(count)]
+        if any(not isinstance(chunk, str) or len(chunk) > 512 for chunk in chunks):
+            return None
+        compressed = base64.b64decode("".join(chunks), validate=True)
+        decoder = zlib.decompressobj()
+        payload = decoder.decompress(compressed, 131073)
+        if len(payload) > 131072 or not decoder.eof or decoder.unused_data:
+            return None
+        state = json.loads(payload)
+        return state if isinstance(state, dict) else None
+    except (KeyError, ValueError, binascii.Error, zlib.error, UnicodeDecodeError):
+        return None
 
 
 def capture(records: list[dict], args) -> list[dict]:
@@ -45,8 +102,12 @@ def capture(records: list[dict], args) -> list[dict]:
         query = record.get("query")
         if not isinstance(query, str) or not query.strip():
             raise ValueError(f"Dataset row {index} has no query")
+        response = None
+        failure = None
         for attempt in range(1, 4):
-            result = subprocess.run(
+            prefix = args.output_dir / f"case-{index}-attempt-{attempt}"
+            try:
+                result = subprocess.run(
                 [
                     executable,
                     "ai",
@@ -67,22 +128,70 @@ def capture(records: list[dict], args) -> list[dict]:
                 encoding="utf-8",
                 timeout=180,
                 check=False,
-            )
-            prefix = args.output_dir / f"case-{index}-attempt-{attempt}"
+                )
+            except subprocess.TimeoutExpired as error:
+                for suffix, output in ((".sse", error.stdout), (".stderr", error.stderr)):
+                    if isinstance(output, bytes):
+                        output = output.decode("utf-8", errors="replace")
+                    prefix.with_suffix(suffix).write_text(output or "", encoding="utf-8")
+                failure = {"code": "timeout", "message": "Hosted invocation exceeded 180 seconds"}
+                continue
             prefix.with_suffix(".sse").write_text(result.stdout, encoding="utf-8")
             prefix.with_suffix(".stderr").write_text(result.stderr, encoding="utf-8")
             try:
                 if result.returncode:
                     raise ValueError(f"azd exited with {result.returncode}")
                 response = completed_response(result.stdout)
+                failure = None
                 break
             except ValueError as error:
+                failure = {"code": getattr(error, "code", "response_error"), "message": str(error)}
                 print(f"Case {index}, attempt {attempt}: {error}", flush=True)
-                if attempt == 3:
-                    raise
-        captured.append({**record, "response": response["text"], "output_items": response["output"]})
-        print(f"Captured case {index}/{len(records)} from {args.agent}:{args.version}", flush=True)
+                if failure["code"] == "content_filter":
+                    break
+        if response is None:
+            captured.append({**record, "capture_error": failure})
+        else:
+            captured.append({**record, "response": response["text"], "output_items": response["output"],
+                             "runtime_state": response["runtime_state"]})
+        (args.output_dir / "captured.json").write_text(json.dumps(captured, indent=2), encoding="utf-8")
+        status = "FAILED" if response is None else "Captured"
+        print(f"{status} case {index}/{len(records)} from {args.agent}:{args.version}", flush=True)
     return captured
+
+
+def capture_summary(captured: list[dict], args) -> list[dict]:
+    failures = [record for record in captured if record.get("capture_error")]
+    lines = ["## Hosted Capture", "", f"Completed responses: {len(captured) - len(failures)}/{len(captured)}",
+             "", "| Case | Capture outcome |", "| --- | --- |"]
+    for record in captured:
+        outcome = record.get("capture_error", {}).get("code", "completed")
+        identifier = str(record["id"]).replace("|", "\\|").replace("\n", " ")
+        lines.append(f"| {identifier} | {outcome} |")
+    if failures:
+        lines.extend(["", "Release blocked: failed captures are not scored or counted as passes."])
+    text = "\n".join(lines) + "\n"
+    (args.output_dir / "capture-summary.md").write_text(text, encoding="utf-8")
+    if os.environ.get("GITHUB_STEP_SUMMARY"):
+        with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as handle:
+            handle.write(text)
+    print(text)
+    return failures
+
+
+def verified_safety_refusal(record: dict) -> bool:
+    expected = record.get("expected", {})
+    state = record.get("runtime_state")
+    refusal = expected.get("safety_refusal_text")
+    return bool(
+        expected.get("allow_safety_refusal") is True
+        and isinstance(state, dict)
+        and state.get("safety_blocked") is True
+        and isinstance(refusal, str) and refusal
+        and state.get("final_report") == record.get("response") == refusal
+        and state.get("tool_calls") == []
+        and not any(state.get(field) for field in ("evidence_complete", "risk_complete", "report_complete"))
+    )
 
 
 def validate_candidate_evidence(captured: list[dict]) -> list[dict]:
@@ -92,6 +201,8 @@ def validate_candidate_evidence(captured: list[dict]) -> list[dict]:
 
     failures = []
     for record in captured:
+        if verified_safety_refusal(record):
+            continue
         candidate = record.get("runtime_state")
         if candidate is None:
             failures.append(
@@ -105,6 +216,10 @@ def validate_candidate_evidence(captured: list[dict]) -> list[dict]:
         if not isinstance(candidate, dict):
             failures.append({"id": record["id"], "error": "Hosted state must be an object"})
             continue
+        if candidate.get("safety_blocked"):
+            failures.append(
+                {"id": record["id"], "error": "Safety refusal does not satisfy this case's policy"}
+            )
         failures.extend(
             {"id": record["id"], "check": result.check_name, "error": result.message}
             for result in run_all_checks(record["expected"], candidate)
@@ -214,20 +329,13 @@ def evaluate(captured: list[dict], args) -> None:
                 f"{metric.get('errored', 'unknown')} | {metric['failed']} |"
             )
         try:
-            failures = validate_candidate_evidence(captured)
-            (args.output_dir / "candidate-policy.json").write_text(
-                json.dumps(failures, indent=2), encoding="utf-8"
-            )
             validate_results(result["run"], items, len(captured), args.minimum_pass_rate)
-            if failures:
-                raise ValueError(
-                    f"Candidate evidence policy failed ({len(failures)} checks); see candidate-policy.json"
-                )
         except ValueError as error:
             summary.extend(["", f"**FAIL:** {error}"])
             raise
         else:
-            summary.extend(["", "**PASS:** all results complete and within policy."])
+            summary.extend(["", "**PASS:** model-judged responses satisfy quality policy; "
+                            "the release also requires capture and deterministic policy checks."])
         finally:
             text = "\n".join(summary) + "\n"
             (args.output_dir / "summary.md").write_text(text, encoding="utf-8")
@@ -268,8 +376,30 @@ def main() -> None:
     ):
         raise ValueError("Selected azd environment does not match the evaluation endpoint")
     captured = capture(records, args)
-    (args.output_dir / "captured.json").write_text(json.dumps(captured, indent=2), encoding="utf-8")
-    evaluate(captured, args)
+    failures = capture_summary(captured, args)
+    successful = [record for record in captured if not record.get("capture_error")]
+    policy_failures = validate_candidate_evidence(successful)
+    (args.output_dir / "candidate-policy.json").write_text(
+        json.dumps(policy_failures, indent=2), encoding="utf-8"
+    )
+    refusals = [record["id"] for record in successful if verified_safety_refusal(record)]
+    policy_summary = (
+        f"\n## Candidate Policy\n\nVerified safety refusals: {refusals}\n\n"
+        f"Deterministic policy failures: {len(policy_failures)}\n"
+    )
+    (args.output_dir / "policy-summary.md").write_text(policy_summary, encoding="utf-8")
+    if os.environ.get("GITHUB_STEP_SUMMARY"):
+        with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as handle:
+            handle.write(policy_summary)
+    judged = [record for record in successful if not verified_safety_refusal(record)]
+    if judged:
+        evaluate(judged, args)
+    if failures:
+        raise ValueError(f"{len(failures)}/{len(captured)} cases failed capture; release blocked")
+    if policy_failures:
+        raise ValueError(
+            f"Candidate evidence policy failed ({len(policy_failures)} checks); see candidate-policy.json"
+        )
 
 
 if __name__ == "__main__":

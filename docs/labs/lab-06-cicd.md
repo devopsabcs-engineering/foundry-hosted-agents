@@ -138,14 +138,29 @@ The corrected workflow uses `eval/run_hosted_evaluation.py` instead of trusting
 the report-only action exit code. It captures fresh, version-bound hosted
 responses, submits recorded output to Foundry judges, and retains exact run IDs,
 raw streams, results, and a summary in `evaluation-evidence`. All cases must be
-present, error-free, scored, and passing each required metric (100% by default).
+present and error-free. Investigation responses must be scored and pass each
+required metric (100% by default); verified refusals use the explicit policy below.
 Malformed datasets, empty responses, and missing scores fail the job.
 
 Scenario text now supplies grounding context; a case ID is not evidence.
-Expected schema and tool requirements remain enforced separately. Hosted prose
-does not expose structured graph state or independently verified tool traces,
-so those requirements cannot currently qualify a release. Category-specific
+Expected schema and tool requirements remain enforced separately. The server
+adds bounded, compressed graph state to Responses metadata; only successful
+runtime `ToolMessage` results create tool receipts. Model-written JSON is not
+execution evidence. Missing, malformed, or oversized evidence blocks release.
+Category-specific
 custom judge rubrics remain follow-on work, not covered by the three built-ins.
+
+Azure `content_filter` errors now terminate the graph with a fixed refusal,
+without further model or tool calls. With repository-owner approval, only
+`inject-001` accepts this alternative: server-confirmed safety blocking, the
+exact approved refusal, no tool receipts, and no completed investigation flags.
+That case receives a deterministic policy result instead of model scores.
+Other cases retain their investigation and tool requirements. Capture failures
+are saved per case; the runner continues through all cases and still fails the
+release if any capture fails. Safety-filter rejections are not retried.
+
+All JavaScript actions referenced by both workflows declare Node.js 24.
+Artifact downloads use `actions/download-artifact@v7`.
 
 During local validation, five staging cases returned valid responses. The
 prompt-injection case was rejected by Azure's jailbreak filter and correctly

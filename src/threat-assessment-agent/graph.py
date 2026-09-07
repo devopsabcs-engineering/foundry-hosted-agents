@@ -17,11 +17,12 @@ from __future__ import annotations
 
 import os
 from contextvars import ContextVar
+from functools import wraps
 from typing import Any, Literal
 
 from azure.core.exceptions import ResourceNotFoundError
 from langgraph.graph import END, START, StateGraph
-
+from openai import BadRequestError
 from state import ThreatAssessmentState, get_checkpointer
 
 try:
@@ -247,6 +248,41 @@ def _degraded_specialist_result(
     }
 
 
+def _handle_content_filter(node):
+    @wraps(node)
+    def guarded(state: ThreatAssessmentState) -> dict:
+        try:
+            return node(state)
+        except BadRequestError as error:
+            body = error.body if isinstance(error.body, dict) else {}
+            details = body.get("error", body)
+            if not isinstance(details, dict) or details.get("code") != "content_filter":
+                raise
+            from langchain_core.messages import AIMessage
+
+            refusal = (
+                "I cannot continue this request because it was blocked by the safety policy. "
+                "I cannot disclose internal instructions or perform destructive actions. "
+                "No further tools will run. Submit an incident description without instructions "
+                "to override safeguards."
+            )
+            return {"safety_blocked": True, "final_report": refusal,
+                    "report_complete": False, "messages": [AIMessage(content=refusal)]}
+    return guarded
+
+
+def _tool_receipts(result: dict, node: str, connection: str) -> list[dict[str, str]]:
+    from langchain_core.messages import ToolMessage
+
+    return [
+        {"node": node, "connection": connection, "call_id": message.tool_call_id,
+         "tool": message.name or "", "status": "success"}
+        for message in result.get("messages", [])
+        if isinstance(message, ToolMessage) and message.status == "success"
+    ]
+
+
+@_handle_content_filter
 def evidence_investigator_node(state: ThreatAssessmentState) -> dict:
     """Gather and summarize raw incident evidence via the Defender MCP tool (Toolbox-backed)."""
     incident_context = _message_content(state["messages"][-1]) if state.get("messages") else ""
@@ -274,9 +310,11 @@ def evidence_investigator_node(state: ThreatAssessmentState) -> dict:
         "evidence_report": summary,
         "evidence_complete": True,
         "evidence_tool_unavailable": False,
+        "tool_calls": _tool_receipts(result, "evidence_investigator", DEFENDER_TOOLBOX_CONNECTION),
     }
 
 
+@_handle_content_filter
 def risk_analyst_node(state: ThreatAssessmentState) -> dict:
     """Assess likelihood, severity, and blast radius via the anomaly MCP tool (Toolbox-backed)."""
     evidence_report = state.get("evidence_report") or ""
@@ -304,9 +342,11 @@ def risk_analyst_node(state: ThreatAssessmentState) -> dict:
         "risk_report": assessment,
         "risk_complete": True,
         "risk_tool_unavailable": False,
+        "tool_calls": _tool_receipts(result, "risk_analyst", ANOMALY_TOOLBOX_CONNECTION),
     }
 
 
+@_handle_content_filter
 def report_composer_node(state: ThreatAssessmentState) -> dict:
     """Combine the evidence summary and risk assessment into a final report."""
     combined_input = (
@@ -352,6 +392,8 @@ def decide_next_step(
     Report Composer is only reachable once both the evidence investigator
     and the risk analyst have completed.
     """
+    if state.get("safety_blocked"):
+        return END
     if not state.get("evidence_complete"):
         return "evidence_investigator"
     if not state.get("risk_complete"):
