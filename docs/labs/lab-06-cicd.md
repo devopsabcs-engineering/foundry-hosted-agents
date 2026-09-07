@@ -72,6 +72,49 @@ RBAC bug from the outside**, even when the role assignment itself is
 correct. [Lab 07](lab-07-troubleshooting-rbac.md) shows the methodical
 process for ruling this in or out.
 
+### Exercise 6.5: Verify the Target and the Smoke-Test Contract
+
+The September 4 run [33899929713](https://github.com/devopsabcs-engineering/foundry-hosted-agents/actions/runs/33899929713)
+failed with a 401. Its deployment log also showed that the job labeled
+staging deployed version 31 to the production PoC account. Staging inherited
+the repository's production project variables. Retries reused the same
+failed session, so they did not test a fresh runtime.
+
+The corrected workflow selects the staging project explicitly, verifies its
+endpoint before deploying, and passes that actual endpoint to evaluation.
+It reads `.version` from `azd ai agent show --output json`; unknown versions
+fail instead of becoming timestamp placeholders. Each smoke attempt uses
+`--version`, `--new-session`, and `--new-conversation`.
+
+The contract gate uses `azd ai agent invoke --output raw`, which returns SSE,
+not JSON. It requires a non-empty text delta and a completed assistant text
+response, and rejects error, failed, incomplete, malformed, and empty streams.
+There is no non-empty-console-output fallback. Staging response evidence is
+retained as the `staging-smoke-evidence` artifact.
+
+Run the local regression checks before dispatching:
+
+```bash
+bash scripts/test-agent-response.sh
+actionlint -shellcheck= .github/workflows/deploy-and-evaluate.yml
+```
+
+On September 7, the validator passed against a live PoC version 32 response
+using the CI prompt, and rejected all 12 invalid regression cases. This
+does not verify staging's CI identity or the complete GitHub Actions run.
+Model responses still disclose unavailable live MCP evidence; a transport
+smoke pass is not a tool-functionality or evaluation-quality pass.
+
+> [!WARNING]
+> Before running the production portion, create the `production` GitHub
+> environment with required reviewers and verify its OIDC federation and
+> variables. On September 7, only `staging` and `github-pages` existed;
+> `environment: production` alone does not enforce manual approval.
+> The current promotion rebuilds source rather than promoting the exact
+> tested artifact, and the existing rollback step redeploys current source
+> rather than restoring the recorded version. These remain release blockers;
+> do not treat a passing smoke test as production-readiness approval.
+
 ## Knowledge Check
 
 * Which pipeline would you dispatch to test a change safely before it reaches the shared PoC environment?

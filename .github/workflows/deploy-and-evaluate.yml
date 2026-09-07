@@ -67,6 +67,9 @@ jobs:
       - name: Deterministic evaluation checks (must fail on the injected bad example)
         run: pytest eval/deterministic-tests/ -v
 
+      - name: Responses contract validator regression tests
+        run: bash scripts/test-agent-response.sh
+
   # ---------------------------------------------------------------------
   # Stage 2: Bicep validate and what-if
   # ---------------------------------------------------------------------
@@ -90,11 +93,19 @@ jobs:
         run: az bicep build --file infra/main.bicep
 
       - name: az deployment group what-if (staging resource group)
+        env:
+          AZURE_RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
+          AZURE_LOCATION: ${{ vars.AZURE_LOCATION }}
+          MCP_ACR_NAME: ${{ vars.MCP_ACR_NAME }}
+          DEFENDER_MCP_IMAGE: ${{ vars.DEFENDER_MCP_IMAGE }}
+          ANOMALY_MCP_IMAGE: ${{ vars.ANOMALY_MCP_IMAGE }}
         run: |
+          set -euo pipefail
           az deployment group what-if \
-            --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
+            --resource-group "$AZURE_RESOURCE_GROUP" \
             --template-file infra/main.bicep \
-            --parameters infra/main.parameters.json
+            --parameters environmentName="$STAGING_AZD_ENV_NAME" location="$AZURE_LOCATION" \
+              mcpAcrName="$MCP_ACR_NAME" defenderMcpImage="$DEFENDER_MCP_IMAGE" anomalyMcpImage="$ANOMALY_MCP_IMAGE"
 
   # ---------------------------------------------------------------------
   # Stage 3: Deploy immutable candidate to staging
@@ -106,6 +117,7 @@ jobs:
     environment: staging
     outputs:
       agent_version: ${{ steps.deploy.outputs.agent_version }}
+      project_endpoint: ${{ steps.deploy.outputs.project_endpoint }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
@@ -138,8 +150,8 @@ jobs:
           azd env set AZURE_TENANT_ID "${{ vars.AZURE_TENANT_ID }}"
           azd env set AZURE_LOCATION "${{ vars.AZURE_LOCATION }}"
           azd env set AZURE_RESOURCE_GROUP "${{ vars.AZURE_RESOURCE_GROUP }}"
-          azd env set FOUNDRY_PROJECT_ENDPOINT "${{ vars.FOUNDRY_PROJECT_ENDPOINT }}"
-          azd env set AZURE_AI_PROJECT_ID "${{ vars.AZURE_AI_PROJECT_ID }}"
+          azd env set FOUNDRY_PROJECT_ENDPOINT "https://aif-${STAGING_AZD_ENV_NAME}.services.ai.azure.com/api/projects/proj-${STAGING_AZD_ENV_NAME}"
+          azd env set AZURE_AI_PROJECT_ID "/subscriptions/${{ vars.AZURE_SUBSCRIPTION_ID }}/resourceGroups/${{ vars.AZURE_RESOURCE_GROUP }}/providers/Microsoft.CognitiveServices/accounts/aif-${STAGING_AZD_ENV_NAME}/projects/proj-${STAGING_AZD_ENV_NAME}"
           azd env set FOUNDRY_MODEL_NAME "${{ vars.FOUNDRY_MODEL_NAME }}"
           azd env set MCP_ACR_NAME "${{ vars.MCP_ACR_NAME }}"
           azd env set DEFENDER_MCP_IMAGE "${{ vars.DEFENDER_MCP_IMAGE }}"
@@ -154,27 +166,20 @@ jobs:
         working-directory: ${{ env.AGENT_PROJECT_DIR }}
         run: |
           set -euo pipefail
+          PROJECT_ENDPOINT=$(azd env get-values --output json | jq -er '.FOUNDRY_PROJECT_ENDPOINT')
+          EXPECTED_ENDPOINT="https://aif-${STAGING_AZD_ENV_NAME}.services.ai.azure.com/api/projects/proj-${STAGING_AZD_ENV_NAME}"
+          if [ "${PROJECT_ENDPOINT%/}" != "$EXPECTED_ENDPOINT" ]; then
+            echo "::error::Staging resolved to $PROJECT_ENDPOINT instead of $EXPECTED_ENDPOINT; refusing to deploy."
+            exit 1
+          fi
           azd deploy --no-prompt
 
-          # NOTE (unverified, see Evidence Confidence Register — "GitHub
-          # Action targeting Hosted Agent versions and portal visibility:
-          # Not verified"): the exact machine-readable output contract of
-          # `azd ai agent show` for extracting the just-deployed version
-          # number has not been independently confirmed against a live
-          # account in this repo. This step parses the best-effort
-          # human-readable output defensively and falls back to a
-          # timestamp-based tag (with a loud warning) rather than silently
-          # producing a wrong version string. Replace this parsing with the
-          # confirmed `--output json` field name once validated live.
-          azd ai agent show --no-prompt > /tmp/agent-show.txt 2>&1 || true
-          cat /tmp/agent-show.txt
-          AGENT_VERSION=$(grep -oE 'version[^0-9]*[0-9]+' /tmp/agent-show.txt | head -n1 | grep -oE '[0-9]+' || true)
-          if [ -z "$AGENT_VERSION" ]; then
-            AGENT_VERSION="unknown-$(date -u +%Y%m%dT%H%M%SZ)"
-            echo "::warning::Could not parse the deployed agent version from 'azd ai agent show' output; using fallback tag $AGENT_VERSION. Confirm the real output contract against a live account before relying on this in production."
-          fi
+          azd ai agent show "$AGENT_NAME" --output json > /tmp/agent-show.json
+          AGENT_VERSION=$(jq -er '.version | select(type == "string" and test("^[0-9]+$"))' /tmp/agent-show.json)
+          jq -e '.status == "active"' /tmp/agent-show.json
           echo "Deployed candidate version: $AGENT_VERSION"
           echo "agent_version=$AGENT_VERSION" >> "$GITHUB_OUTPUT"
+          echo "project_endpoint=$PROJECT_ENDPOINT" >> "$GITHUB_OUTPUT"
 
       # Downstream jobs run on fresh runners with no local .azure state.
       # 'azd deploy' writes agent-specific bookkeeping keys (e.g.
@@ -230,27 +235,15 @@ jobs:
 
       - name: Smoke test (plain Responses-protocol invoke)
         working-directory: ${{ env.AGENT_PROJECT_DIR }}
+        env:
+          AGENT_VERSION: ${{ needs.deploy-staging.outputs.agent_version }}
         run: |
           set -euo pipefail
-          # WI-11 (see .copilot-tracking/plans/logs/2026-09-03/ and the
-          # project wiki's RBAC-401-Investigation page): a freshly deployed
-          # hosted agent's per-instance managed identity 401s on every
-          # chat/completions call with 'PermissionDenied'. This was
-          # originally suspected to be a transient RBAC-propagation delay,
-          # but is now CONFIRMED PERSISTENT -- broadened RBAC (Cognitive
-          # Services Contributor / OpenAI Contributor / Azure AI
-          # Administrator at account and project scope) still 401s, and a
-          # live CI run exhausted 8 attempts over ~4 minutes with zero
-          # recovery. A manually-created portal-native agent in the same
-          # project chats and invokes MCP tools successfully with zero
-          # 401s, isolating this to the LangGraph/Blueprint-identity hosted-
-          # agent runtime path specifically -- a platform bug, not an RBAC
-          # or code defect. This short retry only guards against a genuine
-          # one-off blip; it is not expected to recover from WI-11 itself.
+          test -n "$AGENT_VERSION"
           MAX_ATTEMPTS=3
           for attempt in $(seq 1 "$MAX_ATTEMPTS"); do
             set +e
-            azd ai agent invoke "$AGENT_TEST_PROMPT" > /tmp/agent-response.txt 2>&1
+            azd ai agent invoke "$AGENT_NAME" "$AGENT_TEST_PROMPT" --version "$AGENT_VERSION" --new-session --new-conversation > /tmp/agent-response.txt 2>&1
             INVOKE_EXIT=$?
             set -e
             echo "--- Agent response (attempt $attempt/$MAX_ATTEMPTS) ---"
@@ -260,56 +253,32 @@ jobs:
               break
             fi
             if [ "$attempt" -eq "$MAX_ATTEMPTS" ]; then
-              echo "::error::azd ai agent invoke failed after $MAX_ATTEMPTS attempts (exit $INVOKE_EXIT) -- see WI-11, this is a known persistent platform 401, not a transient RBAC delay"
+              echo "::error::Candidate $AGENT_VERSION failed after $MAX_ATTEMPTS fresh-session attempts (exit $INVOKE_EXIT); inspect the response above for the actual error."
               exit 1
             fi
             echo "::warning::Attempt $attempt failed (exit $INVOKE_EXIT); retrying in 15s."
             sleep 15
           done
 
-      - name: Contract test (Responses-protocol output shape)
+      - name: Contract and streaming tests (Responses SSE)
         working-directory: ${{ env.AGENT_PROJECT_DIR }}
+        env:
+          AGENT_VERSION: ${{ needs.deploy-staging.outputs.agent_version }}
         run: |
           set -euo pipefail
-          # NOTE (unverified): `azd ai agent invoke --output json` is
-          # attempted for a structured contract check; if the flag is not
-          # supported by the installed azd/Foundry extension version, this
-          # falls back to a minimal non-empty-text contract check instead
-          # of failing the whole pipeline on an unconfirmed CLI flag.
-          if azd ai agent invoke --output json "$AGENT_TEST_PROMPT" > /tmp/agent-response.json 2>/tmp/agent-response-json.err; then
-            python -c "import json; data = json.load(open('/tmp/agent-response.json')); assert isinstance(data, dict), 'expected a JSON object response'; print('Contract test passed: response is valid JSON with shape', list(data.keys()))"
-          else
-            echo "::warning::'azd ai agent invoke --output json' is not confirmed supported by this azd/Foundry extension version; falling back to a plain-text contract check. Confirm the real --output json contract before relying on structured parsing in production."
-            test -s /tmp/agent-response.txt
-          fi
+          azd ai agent invoke "$AGENT_NAME" "$AGENT_TEST_PROMPT" \
+            --version "$AGENT_VERSION" --new-session --new-conversation \
+            --output raw > /tmp/agent-response.sse
+          jq -Rse -f scripts/validate-agent-response.jq /tmp/agent-response.sse
 
-      - name: Streaming test (Responses SSE response.output_text.delta events)
-        working-directory: ${{ env.AGENT_PROJECT_DIR }}
-        continue-on-error: true
-        run: |
-          set -euo pipefail
-          # NOTE (unverified, informational only — continue-on-error above):
-          # the exact REST path for a chat/response invocation is not
-          # independently confirmed in this repo (only /connections and
-          # /agents/{agent}/tools/resolve under api-version
-          # 2025-11-15-preview have been directly curl-verified; see repo
-          # memory foundry-hosted-agents-notes.md). This step attempts a
-          # direct streaming call under the same api-version/endpoint
-          # family as a best-effort check for response.output_text.delta
-          # SSE events, and is intentionally non-blocking until the real
-          # endpoint contract is confirmed live.
-          TOKEN=$(az account get-access-token --resource https://ai.azure.com --query accessToken -o tsv)
-          curl -sS -N \
-            -H "Authorization: Bearer $TOKEN" \
-            -H "Content-Type: application/json" \
-            "${{ vars.FOUNDRY_PROJECT_ENDPOINT }}/agents/${AGENT_NAME}/responses?api-version=2025-11-15-preview" \
-            -d "{\"input\": \"$AGENT_TEST_PROMPT\", \"stream\": true}" \
-            | tee /tmp/stream-response.txt || true
-          if grep -q "response.output_text.delta" /tmp/stream-response.txt; then
-            echo "Streaming test passed: observed response.output_text.delta events."
-          else
-            echo "::warning::Did not observe response.output_text.delta events on the direct streaming call; the exact streaming endpoint path is unverified (see comment above). This step does not block the pipeline."
-          fi
+      - name: Upload staging smoke evidence
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: staging-smoke-evidence
+          path: /tmp/agent-response.*
+          retention-days: 7
+          if-no-files-found: warn
 
   # ---------------------------------------------------------------------
   # Stage 5: Offline evaluation quality gate (golden dataset)
@@ -357,7 +326,7 @@ jobs:
       - name: Run microsoft/ai-agent-evals against the golden dataset
         uses: microsoft/ai-agent-evals@v3-beta
         with:
-          azure-ai-project-endpoint: ${{ vars.FOUNDRY_PROJECT_ENDPOINT }}
+          azure-ai-project-endpoint: ${{ needs.deploy-staging.outputs.project_endpoint }}
           deployment-name: ${{ vars.FOUNDRY_MODEL_NAME }}
           agent-ids: "${{ env.AGENT_NAME }}:${{ needs.deploy-staging.outputs.agent_version }}"
           data-path: ${{ runner.temp }}/golden_dataset_for_ai_agent_evals.json
@@ -376,7 +345,7 @@ jobs:
     environment: production
     outputs:
       previous_agent_version: ${{ steps.record-previous.outputs.previous_agent_version }}
-      promoted_agent_version: ${{ needs.deploy-staging.outputs.agent_version }}
+      promoted_agent_version: ${{ steps.deploy.outputs.agent_version }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
@@ -427,8 +396,15 @@ jobs:
         run: azd provision --no-prompt
 
       - name: Deploy the evaluated candidate to production
+        id: deploy
         working-directory: ${{ env.AGENT_PROJECT_DIR }}
-        run: azd deploy --no-prompt
+        run: |
+          set -euo pipefail
+          azd deploy --no-prompt
+          azd ai agent show "$AGENT_NAME" --output json > /tmp/prod-agent-show.json
+          AGENT_VERSION=$(jq -er '.version | select(type == "string" and test("^[0-9]+$"))' /tmp/prod-agent-show.json)
+          jq -e '.status == "active"' /tmp/prod-agent-show.json
+          echo "agent_version=$AGENT_VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Upload azd environment state (for downstream jobs)
         uses: actions/upload-artifact@v6
@@ -454,6 +430,9 @@ jobs:
       - name: Install Azure Developer CLI
         uses: Azure/setup-azd@v2
 
+      - name: Install azd Foundry extension
+        run: azd ext install microsoft.foundry
+
       - name: Azure login with OIDC
         uses: azure/login@v3
         with:
@@ -476,24 +455,23 @@ jobs:
 
       - name: Post-deploy smoke invoke
         working-directory: ${{ env.AGENT_PROJECT_DIR }}
+        env:
+          AGENT_VERSION: ${{ needs.promote-production.outputs.promoted_agent_version }}
         run: |
           set -euo pipefail
-          # See staging-tests' smoke test comment (WI-11): this 401 is a
-          # confirmed persistent hosted-agent platform bug, not a transient
-          # RBAC-propagation delay. This short retry only guards against a
-          # genuine one-off blip.
+          test -n "$AGENT_VERSION"
           MAX_ATTEMPTS=3
           for attempt in $(seq 1 "$MAX_ATTEMPTS"); do
             set +e
-            azd ai agent invoke "$AGENT_TEST_PROMPT" > /tmp/prod-smoke-response.txt 2>&1
+            azd ai agent invoke "$AGENT_NAME" "$AGENT_TEST_PROMPT" --version "$AGENT_VERSION" --new-session --new-conversation --output raw > /tmp/prod-smoke-response.sse 2>/tmp/prod-smoke-response.err
             INVOKE_EXIT=$?
             set -e
-            cat /tmp/prod-smoke-response.txt
-            if [ $INVOKE_EXIT -eq 0 ] && [ -s /tmp/prod-smoke-response.txt ]; then
+            cat /tmp/prod-smoke-response.err
+            if [ $INVOKE_EXIT -eq 0 ] && jq -Rse -f scripts/validate-agent-response.jq /tmp/prod-smoke-response.sse; then
               break
             fi
             if [ "$attempt" -eq "$MAX_ATTEMPTS" ]; then
-              echo "::error::azd ai agent invoke failed after $MAX_ATTEMPTS attempts (exit $INVOKE_EXIT) -- see WI-11, this is a known persistent platform 401, not a transient RBAC delay"
+              echo "::error::Production version $AGENT_VERSION failed after $MAX_ATTEMPTS fresh-session attempts (invoke exit $INVOKE_EXIT)."
               exit 1
             fi
             echo "::warning::Attempt $attempt failed (exit $INVOKE_EXIT); retrying in 15s."

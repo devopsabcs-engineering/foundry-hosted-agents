@@ -76,6 +76,50 @@ ressembler exactement, de l'extérieur, à un bogue RBAC**, même lorsque
 l'attribution de rôle elle-même est correcte. Le [Lab 07](lab-07-troubleshooting-rbac.md)
 montre le processus méthodique pour confirmer ou infirmer cette hypothèse.
 
+### Exercice 6.5 : Vérifier la cible et le contrat du test de fumée
+
+L'exécution du 4 septembre [33899929713](https://github.com/devopsabcs-engineering/foundry-hosted-agents/actions/runs/33899929713)
+a échoué avec un 401. Son journal montrait aussi que le job nommé staging
+déployait la version 31 dans le compte PoC de production. Staging héritait
+des variables de projet de production du dépôt. Les tentatives réutilisaient
+la même session en échec, sans tester une nouvelle instance d'exécution.
+
+Le workflow corrigé sélectionne explicitement le projet staging, vérifie son
+point de terminaison avant le déploiement et le transmet à l'évaluation.
+Il lit `.version` dans `azd ai agent show --output json` ; une version inconnue
+provoque un échec plutôt qu'un identifiant horodaté fictif. Chaque tentative
+utilise `--version`, `--new-session` et `--new-conversation`.
+
+Le contrôle de contrat utilise `azd ai agent invoke --output raw`, qui
+retourne du SSE et non du JSON. Il exige un delta de texte non vide et une
+réponse textuelle complète de l'assistant. Il rejette les flux en erreur,
+échoués, incomplets, mal formés ou vides, sans se rabattre sur une sortie
+console non vide. Les preuves staging sont conservées dans l'artefact
+`staging-smoke-evidence`.
+
+Exécutez les tests locaux avant de déclencher le workflow :
+
+```bash
+bash scripts/test-agent-response.sh
+actionlint -shellcheck= .github/workflows/deploy-and-evaluate.yml
+```
+
+Le 7 septembre, le validateur a accepté une réponse réelle de la version 32
+du PoC avec le prompt CI et rejeté les 12 cas invalides. Cela ne vérifie ni
+l'identité CI du staging ni l'exécution GitHub Actions complète. Les réponses
+signalent encore l'absence de preuves MCP en direct ; un test de transport
+réussi ne prouve pas le fonctionnement des outils ni la qualité des réponses.
+
+> [!WARNING]
+> Avant la partie production, créez l'environnement GitHub `production` avec
+> des approbateurs obligatoires et vérifiez sa fédération OIDC et ses variables.
+> Le 7 septembre, seuls `staging` et `github-pages` existaient ; la déclaration
+> `environment: production` seule n'impose pas d'approbation manuelle.
+> La promotion reconstruit le code au lieu de promouvoir l'artefact testé,
+> et le rollback existant redéploie le code actuel au lieu de restaurer la
+> version enregistrée. Ces points bloquent une mise en production fiable ;
+> un test de fumée réussi ne constitue pas une approbation de production.
+
 ## Vérification des connaissances
 
 * Quel pipeline déclencheriez-vous pour tester un changement en toute sécurité avant qu'il n'atteigne l'environnement PoC partagé ?

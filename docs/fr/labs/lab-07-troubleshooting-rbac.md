@@ -2,7 +2,7 @@
 permalink: /fr/labs/lab-07-troubleshooting-rbac
 lang: fr
 title: "Lab 07 - Dépannage réel : erreur RBAC 401"
-description: "Suivre une véritable investigation de support Azure, toujours ouverte, sur une erreur 401 PermissionDenied, en utilisant uniquement l'interface en ligne de commande Azure."
+description: "Diagnostiquer une erreur 401 PermissionDenied d'un agent hébergé et vérifier le rétablissement après redéploiement avec Azure CLI et azd."
 ---
 
 > 🇬🇧 **[English version](../../labs/lab-07-troubleshooting-rbac)**
@@ -40,9 +40,13 @@ to perform `POST /openai/deployments/{deployment-id}/chat/completions` operation
 
 Ceci est suivi sous le nom **WI-11** dans le
 [wiki](https://github.com/devopsabcs-engineering/foundry-hosted-agents/wiki/RBAC-401-Investigation)
-du projet et, au moment de cet atelier, reste **ouvert auprès du support
-Azure**. Vous allez reproduire les étapes de diagnostic exactes utilisées
-dans cette investigation.
+du projet et a été transmis au support Azure. Le 7 septembre 2026, la
+version 9 reproduisait encore le 401, mais un redéploiement vers la version
+32 a produit une évaluation dans une nouvelle session avec la même identité
+d'instance. Aucun changement de code source, de rôle ou de version CLI n'a
+été effectué pendant cette tentative. Le rétablissement est vérifié pour
+cette invocation ; sa cause racine et la clôture du dossier de support ne
+sont pas établies. Suivez les diagnostics ci-dessous avant de réessayer.
 
 ## Exercices
 
@@ -162,6 +166,52 @@ incorrect, **les deux** chemins devraient échouer de manière identique. Un
 chemin manuel fonctionnel à côté d'un chemin d'agent hébergé défaillant
 pointe vers quelque chose de spécifique au propre code d'acquisition de
 jeton de l'agent hébergé — pas la configuration RBAC visible côté client.
+
+### Exercice 7.7 : Redéployer et vérifier une nouvelle instance d'exécution
+
+Sélectionnez explicitement l'environnement voulu avant le déploiement.
+Pendant cette investigation, `--environment` sur `azd ai agent show`
+sélectionnait encore l'ancien environnement ; `azd env select` a corrigé
+la cible.
+
+```powershell
+azd env select air-canada-threat-assessment-poc
+azd deploy threat-assessment-agent --no-prompt
+azd ai agent show threat-assessment-agent --output json
+azd ai agent invoke threat-assessment-agent 'Assess a simulated suspicious sign-in for user test-user@example.invalid. State clearly when live evidence is unavailable.' --version 32 --new-session --new-conversation
+azd ai agent monitor threat-assessment-agent --tail 40
+```
+
+Remplacez `32` par la version retournée par votre déploiement. Comparez le
+principal d'instance, le point de terminaison du modèle et la réponse réelle
+avec l'exécution en échec. Un déploiement actif ou un HTTP 200 ne suffit pas :
+une réponse en streaming peut contenir une erreur applicative.
+
+La nouvelle tentative Air Canada a fourni les preuves suivantes :
+
+| Vérification | Résultat |
+| --- | --- |
+| Environnement | `air-canada-threat-assessment-poc` |
+| Version | `32`, active |
+| Principal d'instance | `59a21b26-5c3a-42aa-ad7f-05fe701fb25f`, inchangé depuis la v9 en échec |
+| Appel du modèle | Évaluation retournée sans 401 en 16,222 secondes |
+| Identifiant de trace | `30a160169657c5238a02872ddca6cf84` |
+| Journaux d'exécution | `End of processing CreateResponse request.` |
+
+> [!WARNING]
+> L'évaluation utilisait encore le mode dégradé existant : les preuves MCP
+> Defender et anomaly étaient indisponibles à cause de l'échec de résolution
+> Toolbox. Le rétablissement de l'authentification du modèle ne prouve pas
+> le fonctionnement des outils de bout en bout. La récupération de
+> l'historique a aussi journalisé un 404 non bloquant. Cette tentative seule
+> ne permet pas de clore l'investigation WI-11 sur la résolution des outils.
+
+Le hash du package déployé diffère de celui de la v9, et la compilation
+distante résout des dépendances aux versions peu contraintes. Même sans
+modification du code source pendant cette tentative, il ne s'agit pas d'une
+comparaison contrôlée d'artefacts d'exécution identiques. N'attribuez pas le
+rétablissement au renouvellement du jeton ou à la propagation RBAC sans
+preuve supplémentaire.
 
 ## Réflexion
 

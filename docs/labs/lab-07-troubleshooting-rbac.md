@@ -1,7 +1,7 @@
 ---
 permalink: /labs/lab-07-troubleshooting-rbac
 title: "Lab 07 - Real-World Troubleshooting: RBAC 401"
-description: "Follow a real, still-open Azure support investigation into a 401 PermissionDenied error, using nothing but the Azure CLI."
+description: "Investigate a hosted-agent 401 PermissionDenied error and verify recovery after redeployment with Azure CLI and azd."
 ---
 
 > 🇫🇷 **[Version française](../fr/labs/lab-07-troubleshooting-rbac)**
@@ -38,8 +38,12 @@ to perform `POST /openai/deployments/{deployment-id}/chat/completions` operation
 
 This is tracked as **WI-11** in the project's
 [wiki](https://github.com/devopsabcs-engineering/foundry-hosted-agents/wiki/RBAC-401-Investigation)
-and, as of this workshop, remains **open with Azure Support**. You're
-about to reproduce the exact diagnostic steps used in that investigation.
+and was escalated to Azure Support. On September 7, 2026, version 9 still
+reproduced the 401, but a redeployment to version 32 completed an assessment
+in a fresh session using the same instance identity. No source edits, role
+changes, or CLI upgrades were made during this retry. The recovery is
+verified for that invocation; its root cause and support-case closure are
+not established. Follow the diagnostic steps below before retrying.
 
 ## Exercises
 
@@ -148,6 +152,49 @@ wrong, **both** paths should fail identically. A working manual path next
 to a failing hosted-agent path points at something specific to the hosted
 agent's own token-acquisition code path — not the customer-visible RBAC
 configuration.
+
+### Exercise 7.7: Redeploy and Verify a Fresh Runtime
+
+Select the intended environment explicitly before deploying. In this
+investigation, passing `--environment` to `azd ai agent show` still selected
+the stale environment; `azd env select` corrected the target.
+
+```powershell
+azd env select air-canada-threat-assessment-poc
+azd deploy threat-assessment-agent --no-prompt
+azd ai agent show threat-assessment-agent --output json
+azd ai agent invoke threat-assessment-agent 'Assess a simulated suspicious sign-in for user test-user@example.invalid. State clearly when live evidence is unavailable.' --version 32 --new-session --new-conversation
+azd ai agent monitor threat-assessment-agent --tail 40
+```
+
+Replace `32` with the version returned by your deployment. Compare the
+instance principal, model endpoint, and actual response with the failing
+run. An active deployment or HTTP 200 alone does not prove success because
+streaming responses can contain application errors.
+
+The Air Canada retry produced the following evidence:
+
+| Check | Result |
+| --- | --- |
+| Environment | `air-canada-threat-assessment-poc` |
+| Version | `32`, active |
+| Instance principal | `59a21b26-5c3a-42aa-ad7f-05fe701fb25f`, unchanged from failing v9 |
+| Model call | Assessment returned without a 401 in 16.222 seconds |
+| Trace ID | `30a160169657c5238a02872ddca6cf84` |
+| Runtime logs | `End of processing CreateResponse request.` |
+
+> [!WARNING]
+> The assessment still used the existing degraded path: live Defender and
+> anomaly MCP evidence was unavailable because Toolbox resolution failed.
+> Model-authentication recovery does not establish end-to-end tool success.
+> Conversation-history retrieval also logged a nonfatal 404. Do not close
+> the wider WI-11 tool-resolution investigation based on this retry alone.
+
+The deployed package hash differs from v9, and remote build resolves loosely
+constrained dependencies. Although no source edits were made during this
+retry, it is not a controlled comparison of identical runtime artifacts.
+Do not attribute recovery specifically to token refresh or RBAC propagation
+without further evidence.
 
 ## Reflection
 
