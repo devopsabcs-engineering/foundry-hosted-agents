@@ -11,9 +11,11 @@ sys.path.insert(0, str(Path(__file__).parents[1]))
 from convert_for_ai_agent_evals import convert
 from run_hosted_evaluation import (
     CaptureError,
+    agent_instructions,
     capture,
     capture_summary,
     completed_response,
+    criteria,
     runtime_state,
     validate_candidate_evidence,
     verified_safety_refusal,
@@ -90,6 +92,16 @@ def stream(text="Report", status="completed"):
 
 def test_captured_response():
     assert completed_response(stream().replace("\n", "\r\n"))["text"] == "Report"
+
+
+def test_task_adherence_receives_real_agent_constraints():
+    instructions = agent_instructions()
+    assert "read-only" in instructions
+    assert "never call remediation or write tools" in instructions
+    mappings = {criterion["name"]: criterion["data_mapping"] for criterion in criteria("judge")}
+    assert mappings["task_adherence"]["query"] == "{{item.task_query}}"
+    assert mappings["groundedness"]["query"] == "{{item.query}}"
+    assert mappings["coherence"]["query"] == "{{item.query}}"
 
 
 def test_prose_cannot_claim_structured_or_tool_evidence():

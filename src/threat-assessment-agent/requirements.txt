@@ -21,6 +21,8 @@ langgraph>=1.2.11,<2.0
 langchain-azure-ai>=0.1.0
 langchain>=1.0.3,<2.0.0
 langchain-openai>=1.0.3,<2.0.0
+langchain-mcp-adapters==0.3.2
+mcp==1.29.1
 azure-ai-agentserver-langgraph
 openai>=1.40.0
 azure-identity>=1.17.0

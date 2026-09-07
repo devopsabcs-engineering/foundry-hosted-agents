@@ -161,6 +161,39 @@ def test_evidence_investigator_node_falls_back_when_tool_resolution_unavailable(
     assert "plain-llm evidence analysis" in result["evidence_report"]
 
 
+def test_degraded_model_receives_tool_availability_constraints(monkeypatch):
+    def chat(prompt, content):
+        assert "No tool calls have been made" in prompt
+        assert "Do not claim that queries or actions ran" in prompt
+        assert content == "incident"
+        return "Missing evidence"
+
+    monkeypatch.setattr(graph, "_chat", chat)
+    result = graph._degraded_specialist_result(
+        graph.EVIDENCE_INVESTIGATOR_PROMPT, "incident", "evidence_report",
+        "evidence_complete", "evidence_tool_unavailable",
+    )
+    assert result["evidence_tool_unavailable"] is True
+
+
+def test_composer_receives_original_request_and_read_only_constraints(monkeypatch):
+    def chat(prompt, content):
+        assert "explicitly decline to execute" in prompt
+        assert "Preserve conflicting signals" in prompt
+        assert "block the IP" in content
+        assert "clean scan" in content
+        assert "high anomaly score" in content
+        return "Read-only assessment"
+
+    monkeypatch.setattr(graph, "_chat", chat)
+    result = graph.report_composer_node(_base_state(
+        messages=[{"role": "user", "content": "block the IP"}],
+        evidence_report="clean scan", risk_report="high anomaly score",
+    ))
+    assert result["final_report"] == "Read-only assessment"
+    assert "Explicitly identify conflicting signals" in graph.RISK_ANALYST_PROMPT
+
+
 def test_evidence_investigator_node_falls_back_when_context_flags_tool_resolution_unavailable(
     monkeypatch,
 ) -> None:

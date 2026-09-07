@@ -240,6 +240,20 @@ def validate_candidate_evidence(captured: list[dict]) -> list[dict]:
     return failures
 
 
+def agent_instructions() -> str:
+    source = Path(__file__).parents[1] / "src" / "threat-assessment-agent" / "graph.py"
+    names = {"EVIDENCE_INVESTIGATOR_PROMPT", "RISK_ANALYST_PROMPT", "REPORT_COMPOSER_PROMPT"}
+    prompts = {}
+    for statement in ast.parse(source.read_text(encoding="utf-8")).body:
+        if isinstance(statement, ast.Assign):
+            for target in statement.targets:
+                if isinstance(target, ast.Name) and target.id in names:
+                    prompts[target.id] = ast.literal_eval(statement.value)
+    if prompts.keys() != names or any(not isinstance(value, str) or not value for value in prompts.values()):
+        raise ValueError("Cannot resolve agent instructions for task-adherence evaluation")
+    return "\n\n".join(prompts.values())
+
+
 def criteria(deployment: str) -> list[dict]:
     return [
         {
@@ -248,7 +262,7 @@ def criteria(deployment: str) -> list[dict]:
             "evaluator_name": f"builtin.{metric}",
             "initialization_parameters": {"deployment_name": deployment},
             "data_mapping": {
-                "query": "{{item.query}}",
+                "query": "{{item.task_query}}" if metric == "task_adherence" else "{{item.query}}",
                 "context": "{{item.context}}",
                 "response": "{{item.output_items}}" if metric == "task_adherence" else "{{item.response}}",
             },
@@ -261,6 +275,14 @@ def evaluate(captured: list[dict], args) -> None:
     from azure.ai.projects import AIProjectClient
     from azure.identity import DefaultAzureCredential
 
+    instructions = agent_instructions()
+    evaluation_records = [
+        {**record, "task_query": [
+            {"role": "system", "content": instructions},
+            {"role": "user", "content": record["query"]},
+        ]}
+        for record in captured
+    ]
     with (
         DefaultAzureCredential() as credential,
         AIProjectClient(endpoint=args.endpoint, credential=credential) as project,
@@ -275,11 +297,12 @@ def evaluate(captured: list[dict], args) -> None:
                     "type": "object",
                     "properties": {
                         "query": {"type": "string"},
+                        "task_query": {"type": "array"},
                         "context": {"type": "string"},
                         "response": {"type": "string"},
                         "output_items": {"type": "array"},
                     },
-                    "required": ["query", "context", "response", "output_items"],
+                    "required": ["query", "task_query", "context", "response", "output_items"],
                 },
             },
             testing_criteria=criteria(args.deployment),
@@ -291,7 +314,7 @@ def evaluate(captured: list[dict], args) -> None:
                 "type": "jsonl",
                 "source": {
                     "type": "file_content",
-                    "content": [{"item": record} for record in captured],
+                    "content": [{"item": record} for record in evaluation_records],
                 },
             },
         )

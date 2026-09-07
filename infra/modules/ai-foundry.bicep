@@ -124,7 +124,7 @@ resource defenderConnection 'Microsoft.CognitiveServices/accounts/projects/conne
   parent: project
   name: 'defender-conn'
   properties: {
-    category: 'GenericHttp'
+    category: 'RemoteTool'
     target: defenderMcpUrl
     authType: 'None'
     isSharedToAll: true
@@ -135,7 +135,7 @@ resource anomalyConnection 'Microsoft.CognitiveServices/accounts/projects/connec
   parent: project
   name: 'anomaly-conn'
   properties: {
-    category: 'GenericHttp'
+    category: 'RemoteTool'
     target: anomalyMcpUrl
     authType: 'None'
     isSharedToAll: true
