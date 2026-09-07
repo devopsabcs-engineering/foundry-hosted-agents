@@ -236,7 +236,7 @@ jobs:
           azd config set auth.useAzCliAuth true
           azd env select "$STAGING_AZD_ENV_NAME"
 
-      - name: Smoke test (plain Responses-protocol invoke)
+      - name: Smoke test (validated Responses-protocol invoke)
         working-directory: ${{ env.AGENT_PROJECT_DIR }}
         env:
           AGENT_VERSION: ${{ needs.deploy-staging.outputs.agent_version }}
@@ -246,13 +246,14 @@ jobs:
           MAX_ATTEMPTS=3
           for attempt in $(seq 1 "$MAX_ATTEMPTS"); do
             set +e
-            azd ai agent invoke "$AGENT_NAME" "$AGENT_TEST_PROMPT" --version "$AGENT_VERSION" --new-session --new-conversation > /tmp/agent-response.txt 2>&1
+            azd ai agent invoke "$AGENT_NAME" "$AGENT_TEST_PROMPT" --version "$AGENT_VERSION" --new-session --new-conversation --output raw > "/tmp/agent-response-attempt-$attempt.sse" 2> "/tmp/agent-response-attempt-$attempt.txt"
             INVOKE_EXIT=$?
             set -e
             echo "--- Agent response (attempt $attempt/$MAX_ATTEMPTS) ---"
-            cat /tmp/agent-response.txt
+            cat "/tmp/agent-response-attempt-$attempt.txt" "/tmp/agent-response-attempt-$attempt.sse"
             echo "--- End agent response ---"
-            if [ $INVOKE_EXIT -eq 0 ] && [ -s /tmp/agent-response.txt ]; then
+            if [ $INVOKE_EXIT -eq 0 ] && jq -Rse -f scripts/validate-agent-response.jq "/tmp/agent-response-attempt-$attempt.sse"; then
+              cp "/tmp/agent-response-attempt-$attempt.sse" /tmp/agent-response.sse
               break
             fi
             if [ "$attempt" -eq "$MAX_ATTEMPTS" ]; then
@@ -265,13 +266,8 @@ jobs:
 
       - name: Contract and streaming tests (Responses SSE)
         working-directory: ${{ env.AGENT_PROJECT_DIR }}
-        env:
-          AGENT_VERSION: ${{ needs.deploy-staging.outputs.agent_version }}
         run: |
           set -euo pipefail
-          azd ai agent invoke "$AGENT_NAME" "$AGENT_TEST_PROMPT" \
-            --version "$AGENT_VERSION" --new-session --new-conversation \
-            --output raw > /tmp/agent-response.sse
           jq -Rse -f scripts/validate-agent-response.jq /tmp/agent-response.sse
 
       - name: Upload staging smoke evidence
@@ -279,7 +275,7 @@ jobs:
         uses: actions/upload-artifact@v6
         with:
           name: staging-smoke-evidence
-          path: /tmp/agent-response.*
+          path: /tmp/agent-response*
           retention-days: 7
           if-no-files-found: warn
 
