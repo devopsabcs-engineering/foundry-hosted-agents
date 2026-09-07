@@ -1,4 +1,7 @@
-# Air Canada Threat & Vulnerability Assessment Agent — Foundry Hosted Agents PoC
+---
+title: Air Canada Threat and Vulnerability Assessment Agent - Foundry Hosted Agents PoC
+description: LangGraph hosted-agent proof of concept with isolated staging MCP fixtures and evaluation gates.
+---
 
 A proof of concept that hosts a LangGraph multi-agent threat-assessment workflow on **Microsoft Foundry Hosted Agents**, backed by two independent MCP tool servers (mocked Microsoft Defender and anomaly-detection data). The PoC evaluates Foundry Hosted Agents as a deployment target for Air Canada's existing LangGraph prototype and produces a decision-ready comparison against self-hosted LangGraph/LangSmith options.
 
@@ -44,7 +47,7 @@ flowchart LR
 
 * **Supervisor + specialists** — `graph.py` compiles a LangGraph `StateGraph` where a supervisor routes to three specialist nodes (Evidence Investigator, Risk Analyst, Report Composer) and only proceeds to reporting once both evidence and risk analysis are complete.
 * **Tool isolation by role** — each specialist is restricted to a single Foundry Toolbox connection (Evidence Investigator → `defender-conn`, Risk Analyst → `anomaly-conn`); the Report Composer has no tool access and only synthesizes.
-* **Graceful tool-resolution degradation** — `main.py` wraps Foundry's tool-resolution step so that a known platform-side gap (tool registry 404) degrades to an honestly-labeled plain-LLM analysis instead of crashing the request (see `state.py`'s `evidence_tool_unavailable` / `risk_tool_unavailable` flags).
+* Specialists use the authenticated, version-pinned toolbox MCP endpoint through [toolbox.py](src/threat-assessment-agent/toolbox.py), with exact read-only tool allowlists. Connections must use the ARM `RemoteTool` category; `GenericHttp` with anonymous authentication fails toolbox resolution. The obsolete per-agent tool-resolution API is no longer used.
 * **MCP servers run independently** of the agent process — `mcp/defender-server` and `mcp/anomaly-server` are separate FastMCP apps, each deployed as its own Azure Container App and reached only via the Foundry Toolbox `remote-tool` connections declared in `azure.yaml`.
 
 ## Repository layout
@@ -98,6 +101,13 @@ pytest src/threat-assessment-agent/tests/ -v
 
 ## Evaluation
 
+The golden scenarios use explicit synthetic device/account identifiers and matching mock records.
+Unknown identifiers return missing-data results, not invented anomalies or evidence of safety.
+The original incident accompanies each specialist handoff. Final-report task adherence uses
+the Report Composer's actual instructions; deterministic checks separately enforce specialist
+receipts, allowed connections, citations, and safety policy. All eight cases and the 100% gate remain.
+Passing these fixtures demonstrates workflow behavior, not real Defender detection accuracy.
+
 * **Deterministic checks** (`eval/deterministic-tests/`): schema validity, required citations, forbidden phrases, allowed-tool-call policy, degraded-mode policy, and conflict acknowledgement — run with `pytest eval/deterministic-tests/`.
 * **Rubric-based / LLM-as-judge evaluation** (`eval/rubrics/`): built-in Foundry evaluators (coherence, groundedness, task adherence, tool-call accuracy) plus custom rubrics for triage correctness, evidence-citation quality, and conflicting-signal handling — see [`eval/rubrics/README.md`](eval/rubrics/README.md) for the full gating-criterion mapping.
 
@@ -107,6 +117,13 @@ pytest src/threat-assessment-agent/tests/ -v
 * **`deploy-and-evaluate.yml`** — manual-dispatch, eval-gated release flow: lint and unit tests → Bicep validate/what-if → deploy an immutable candidate to staging → smoke/contract/streaming tests → offline evaluation quality gate → manual production approval → promote.
 
 Both workflows authenticate via secretless OIDC federation (no stored client secrets).
+
+The staging release workflow builds MCP images from the selected commit and pins them by digest.
+Staging uses dedicated `mcp-staging-*` Container Apps and an image-pull identity, leaving the
+existing `mcp-*` production apps unchanged. It rejects shared MCP URLs before deploying the agent.
+Production approval remains manual. Before promotion, review the production MCP image references
+and toolbox version together with the agent candidate; staging fixture changes are not automatically
+promoted to production tools.
 
 ## Known issues
 

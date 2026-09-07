@@ -30,9 +30,25 @@ param anomalyImage string = 'mcr.microsoft.com/k8se/quickstart:latest'
 param containerPort int = 8000
 
 var useAcr = !empty(acrName)
+var isolatedPullIdentity = useAcr && namePrefix != 'mcp'
 
 resource acr 'Microsoft.ContainerRegistry/registries@2023-07-01' existing = if (useAcr) {
   name: acrName
+}
+
+resource pullIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' = if (isolatedPullIdentity) {
+  name: '${namePrefix}-image-pull'
+  location: location
+}
+
+resource pullRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (isolatedPullIdentity) {
+  name: guid(acr!.id, pullIdentity!.id, 'AcrPull')
+  scope: acr
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '7f951dda-4ed3-4680-a7ca-43fe172d538d')
+    principalId: pullIdentity!.properties.principalId
+    principalType: 'ServicePrincipal'
+  }
 }
 
 var logAnalyticsWorkspaceName = '${namePrefix}-mcp-logs'
@@ -66,9 +82,15 @@ resource containerAppsEnvironment 'Microsoft.App/managedEnvironments@2024-03-01'
 resource defenderContainerApp 'Microsoft.App/containerApps@2024-03-01' = {
   name: '${namePrefix}-defender-server'
   location: location
-  identity: {
+  identity: isolatedPullIdentity ? {
+    type: 'UserAssigned'
+    userAssignedIdentities: {
+      '${pullIdentity!.id}': {}
+    }
+  } : {
     type: 'SystemAssigned'
   }
+  dependsOn: [pullRole]
   properties: {
     managedEnvironmentId: containerAppsEnvironment.id
     configuration: {
@@ -81,7 +103,7 @@ resource defenderContainerApp 'Microsoft.App/containerApps@2024-03-01' = {
         ? [
             {
               server: acr.properties.loginServer
-              identity: 'system'
+              identity: isolatedPullIdentity ? pullIdentity!.id : 'system'
             }
           ]
         : []
@@ -116,9 +138,15 @@ resource defenderContainerApp 'Microsoft.App/containerApps@2024-03-01' = {
 resource anomalyContainerApp 'Microsoft.App/containerApps@2024-03-01' = {
   name: '${namePrefix}-anomaly-server'
   location: location
-  identity: {
+  identity: isolatedPullIdentity ? {
+    type: 'UserAssigned'
+    userAssignedIdentities: {
+      '${pullIdentity!.id}': {}
+    }
+  } : {
     type: 'SystemAssigned'
   }
+  dependsOn: [pullRole]
   properties: {
     managedEnvironmentId: containerAppsEnvironment.id
     configuration: {
@@ -131,7 +159,7 @@ resource anomalyContainerApp 'Microsoft.App/containerApps@2024-03-01' = {
         ? [
             {
               server: acr.properties.loginServer
-              identity: 'system'
+              identity: isolatedPullIdentity ? pullIdentity!.id : 'system'
             }
           ]
         : []

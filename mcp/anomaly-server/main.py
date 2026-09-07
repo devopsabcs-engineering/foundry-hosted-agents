@@ -21,6 +21,15 @@ _MOCK_BASELINES = {
     "data_egress_mb_per_hour": 120.0,
 }
 
+_MOCK_LOGINS = {
+    "crew-admin": {"anomalousLogins": 1, "failedMfaAttempts": 3, "successfulLoginAfterMfaFailures": True, "sourceIp": "203.0.113.45", "severity": "high"},
+    "jdoe": {"anomalousLogins": 0, "approvedTravel": True, "corporateDeviceMatch": True, "severity": "low"},
+    "svc-backup": {"failedLogins": 1, "severity": "unknown", "limitations": ["Missing historical baseline and corroborating target log"]},
+    "jsmith": {"bruteForceConfirmed": True, "sourceIp": "198.51.100.7", "severity": "high"},
+    "contractor-77": {"failedLogins": 1, "corroboratingSignals": 0, "severity": "unknown"},
+    "user-042": {"anomalousLogins": 2, "impossibleTravelDetected": True, "confidence": 0.87},
+}
+
 
 @mcp.tool()
 def score_anomaly(metric: str, value: float) -> dict:
@@ -31,6 +40,7 @@ def score_anomaly(metric: str, value: float) -> dict:
     deviation = (value - baseline) / baseline if baseline else 0.0
     severity = "high" if deviation > 2 else "medium" if deviation > 0.5 else "low"
     return {
+        "synthetic": True,
         "metric": metric,
         "value": value,
         "baseline": baseline,
@@ -44,9 +54,8 @@ def detect_login_anomalies(user_id: str) -> dict:
     """Detect anomalous login patterns for a user account (mocked)."""
     return {
         "userId": user_id,
-        "anomalousLogins": 2,
-        "impossibleTravelDetected": user_id == "user-042",
-        "confidence": 0.87,
+        "synthetic": True,
+        **_MOCK_LOGINS.get(user_id, {"error": "No anomaly telemetry available for this account"}),
     }
 
 

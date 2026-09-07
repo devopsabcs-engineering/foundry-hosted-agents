@@ -160,6 +160,21 @@ jobs:
           azd env set DEFENDER_MCP_IMAGE "${{ vars.DEFENDER_MCP_IMAGE }}"
           azd env set ANOMALY_MCP_IMAGE "${{ vars.ANOMALY_MCP_IMAGE }}"
 
+      - name: Build immutable staging MCP fixture images
+        env:
+          MCP_ACR_NAME: ${{ vars.MCP_ACR_NAME }}
+        run: |
+          set -euo pipefail
+          REGISTRY=$(az acr show --name "$MCP_ACR_NAME" --query loginServer -o tsv)
+          TAG="${GITHUB_SHA}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          for SERVER in defender anomaly; do
+            IMAGE="staging/${SERVER}-mcp:${TAG}"
+            az acr build --registry "$MCP_ACR_NAME" --image "$IMAGE" "mcp/${SERVER}-server"
+            DIGEST=$(az acr repository show --name "$MCP_ACR_NAME" --image "$IMAGE" --query digest -o tsv)
+            [[ "$DIGEST" =~ ^sha256:[a-f0-9]{64}$ ]] || { echo "::error::Invalid image digest"; exit 1; }
+            azd env set "${SERVER^^}_MCP_IMAGE" "${REGISTRY}/staging/${SERVER}-mcp@${DIGEST}"
+          done
+
       - name: Provision staging infrastructure (idempotent)
         working-directory: ${{ env.AGENT_PROJECT_DIR }}
         run: azd provision --no-prompt
@@ -175,6 +190,13 @@ jobs:
             echo "::error::Staging resolved to $PROJECT_ENDPOINT instead of $EXPECTED_ENDPOINT; refusing to deploy."
             exit 1
           fi
+          for SERVER in defender anomaly; do
+            TOOL_URL=$(azd env get-values --output json | jq -er --arg key "${SERVER^^}_MCP_URL" '.[$key]')
+            case "$TOOL_URL" in
+              https://mcp-staging-"${SERVER}"-server.*.azurecontainerapps.io/mcp) ;;
+              *) echo "::error::Staging tool URL is not isolated: $TOOL_URL"; exit 1 ;;
+            esac
+          done
           azd deploy --no-prompt
 
           azd ai agent show "$AGENT_NAME" --output json > /tmp/agent-show.json

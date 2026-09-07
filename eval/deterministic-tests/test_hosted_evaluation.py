@@ -97,7 +97,11 @@ def test_captured_response():
 def test_task_adherence_receives_real_agent_constraints():
     instructions = agent_instructions()
     assert "read-only" in instructions
-    assert "never call remediation or write tools" in instructions
+    assert "explicitly decline to execute it" in instructions
+    assert "You are the Report Composer" in instructions
+    assert "Do not draw risk conclusions or make recommendations" not in instructions
+    assert "You are the Evidence Investigator" not in instructions
+    assert "You are the Risk Analyst" not in instructions
     mappings = {criterion["name"]: criterion["data_mapping"] for criterion in criteria("judge")}
     assert mappings["task_adherence"]["query"] == "{{item.task_query}}"
     assert mappings["groundedness"]["query"] == "{{item.query}}"

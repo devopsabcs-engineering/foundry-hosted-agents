@@ -242,7 +242,7 @@ def validate_candidate_evidence(captured: list[dict]) -> list[dict]:
 
 def agent_instructions() -> str:
     source = Path(__file__).parents[1] / "src" / "threat-assessment-agent" / "graph.py"
-    names = {"EVIDENCE_INVESTIGATOR_PROMPT", "RISK_ANALYST_PROMPT", "REPORT_COMPOSER_PROMPT"}
+    names = {"REPORT_COMPOSER_PROMPT"}
     prompts = {}
     for statement in ast.parse(source.read_text(encoding="utf-8")).body:
         if isinstance(statement, ast.Assign):
