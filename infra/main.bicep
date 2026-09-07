@@ -77,6 +77,8 @@ module aiFoundry 'modules/ai-foundry.bicep' = {
     modelVersion: modelVersion
     modelSkuName: modelSkuName
     modelSkuCapacity: modelSkuCapacity
+    defenderMcpUrl: 'https://${mcpContainerApps.outputs.defenderContainerAppFqdn}/mcp'
+    anomalyMcpUrl: 'https://${mcpContainerApps.outputs.anomalyContainerAppFqdn}/mcp'
   }
 }
 
@@ -103,6 +105,10 @@ output accountName string = aiFoundry.outputs.accountName
 output accountEndpoint string = aiFoundry.outputs.accountEndpoint
 output projectName string = aiFoundry.outputs.projectName
 output modelDeploymentName string = aiFoundry.outputs.modelDeploymentName
+output FOUNDRY_PROJECT_ENDPOINT string = aiFoundry.outputs.projectEndpoint
+// ARM resource ID of the Foundry project -- required by azd's azure.ai.agent host
+// target to publish/deploy hosted agents (distinct from the v2 data-plane project endpoint above).
+output AZURE_AI_PROJECT_ID string = aiFoundry.outputs.projectId
 output logAnalyticsWorkspaceId string = monitoring.outputs.logAnalyticsWorkspaceId
 output applicationInsightsConnectionString string = monitoring.outputs.applicationInsightsConnectionString
 output DEFENDER_MCP_URL string = 'https://${mcpContainerApps.outputs.defenderContainerAppFqdn}/mcp'

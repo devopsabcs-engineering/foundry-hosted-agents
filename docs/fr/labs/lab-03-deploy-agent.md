@@ -86,6 +86,41 @@ Cette étape téléverse `src/threat-assessment-agent/` et le construit à
 distance selon `dependencyResolution: remote_build`, puis publie une
 nouvelle version de l'agent hébergé.
 
+> **Dépannage : `no Foundry project endpoint resolved`**
+>
+> Si `azd deploy` échoue sur le service `security-tools` ou
+> `threat-assessment-agent` avec cette erreur, votre environnement a été
+> provisionné avant l'ajout du point de terminaison du projet Foundry comme
+> sortie bicep. Relancez `azd provision` pour le récupérer, ou définissez-le
+> manuellement pour cet environnement :
+>
+> ```powershell
+> azd env set FOUNDRY_PROJECT_ENDPOINT "https://<accountName>.services.ai.azure.com/api/projects/<projectName>"
+> ```
+>
+> `<accountName>` et `<projectName>` sont les valeurs `accountName`/`projectName`
+> déjà présentes dans votre fichier `.azure/<env>/.env`.
+
+> **Dépannage : `failed to resolve connection "defender-conn"` (ou `anomaly-conn`)**
+>
+> Cela signifie que la connexion n'existe pas encore sur le projet Foundry.
+> Les connexions Toolbox `defender-conn`/`anomaly-conn` sont créées par
+> `azd provision` depuis le bicep (pas par `azd deploy`) ; si votre
+> environnement a été provisionné avant l'ajout de ces connexions comme
+> ressources bicep, elles n'ont jamais été créées. Relancez
+> `azd provision` pour les créer, puis relancez `azd deploy`.
+
+> **Dépannage : `AZURE_AI_PROJECT_ID is not set`**
+>
+> Le service `threat-assessment-agent` a besoin de l'ID de ressource ARM
+> du projet Foundry (différent de `FOUNDRY_PROJECT_ENDPOINT`). Si votre
+> environnement a été provisionné avant l'ajout de cette sortie bicep,
+> relancez `azd provision` pour la récupérer, ou définissez-la manuellement :
+>
+> ```powershell
+> azd env set AZURE_AI_PROJECT_ID "/subscriptions/<subscriptionId>/resourceGroups/<resourceGroup>/providers/Microsoft.CognitiveServices/accounts/<accountName>/projects/<projectName>"
+> ```
+
 ### Exercice 3.4 : Trouver l'agent dans le portail
 
 ![Vue d'ensemble du projet Foundry dans le portail Azure](../../assets/images/03-azure-foundry-project-overview.png)

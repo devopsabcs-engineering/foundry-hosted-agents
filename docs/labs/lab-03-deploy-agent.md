@@ -85,6 +85,40 @@ This step uploads `src/threat-assessment-agent/` and builds it remotely
 per `dependencyResolution: remote_build`, then publishes a new hosted-agent
 version.
 
+> **Troubleshooting: `no Foundry project endpoint resolved`**
+>
+> If `azd deploy` fails on the `security-tools` or `threat-assessment-agent`
+> service with this error, your environment was provisioned before the
+> Foundry project endpoint was added as a bicep output. Re-run
+> `azd provision` to pick it up, or set it manually for this environment:
+>
+> ```powershell
+> azd env set FOUNDRY_PROJECT_ENDPOINT "https://<accountName>.services.ai.azure.com/api/projects/<projectName>"
+> ```
+>
+> `<accountName>` and `<projectName>` are the `accountName`/`projectName`
+> values already in your `.azure/<env>/.env` file.
+
+> **Troubleshooting: `failed to resolve connection "defender-conn"` (or `anomaly-conn`)**
+>
+> This means the connection doesn't exist yet on the Foundry project. The
+> `defender-conn`/`anomaly-conn` Toolbox connections are created by
+> `azd provision` from bicep (not by `azd deploy`), so if your environment
+> was provisioned before these connections were added as bicep resources,
+> they were never created. Re-run `azd provision` to create them, then
+> retry `azd deploy`.
+
+> **Troubleshooting: `AZURE_AI_PROJECT_ID is not set`**
+>
+> The `threat-assessment-agent` service needs the Foundry project's ARM
+> resource ID (distinct from `FOUNDRY_PROJECT_ENDPOINT`). If your
+> environment was provisioned before this was added as a bicep output,
+> re-run `azd provision` to pick it up, or set it manually:
+>
+> ```powershell
+> azd env set AZURE_AI_PROJECT_ID "/subscriptions/<subscriptionId>/resourceGroups/<resourceGroup>/providers/Microsoft.CognitiveServices/accounts/<accountName>/projects/<projectName>"
+> ```
+
 ### Exercise 3.4: Find the Agent in the Portal
 
 ![Foundry project overview in the Azure Portal](../assets/images/03-azure-foundry-project-overview.png)

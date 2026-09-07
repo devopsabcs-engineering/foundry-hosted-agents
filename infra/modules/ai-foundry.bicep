@@ -31,6 +31,12 @@ param modelSkuName string = 'GlobalStandard'
 @description('Model deployment SKU capacity (thousands of tokens-per-minute)')
 param modelSkuCapacity int = 10
 
+@description('MCP endpoint URL for the Defender tool server. Leave empty to skip creating the connection.')
+param defenderMcpUrl string = ''
+
+@description('MCP endpoint URL for the Anomaly tool server. Leave empty to skip creating the connection.')
+param anomalyMcpUrl string = ''
+
 // Basic Agent Setup: Microsoft-managed conversation/file/vector storage — no capabilityHosts.
 resource account 'Microsoft.CognitiveServices/accounts@2025-06-01' = {
   name: accountName
@@ -108,3 +114,30 @@ output projectId string = project.id
 output projectName string = project.name
 output projectPrincipalId string = project.identity.principalId
 output modelDeploymentName string = modelDeployment.name
+// Foundry v2 project endpoint (not derivable from account.properties.endpoint's .cognitiveservices.azure.com domain)
+output projectEndpoint string = 'https://${account.name}.services.ai.azure.com/api/projects/${project.name}'
+
+// azd's azure.ai.connection host (azure.yaml: defender-conn/anomaly-conn) treats connections whose
+// endpoint resolves from a bicep output as infrastructure-managed and skips creating them itself
+// during `azd deploy` -- so these MCP Toolbox connections must be created here instead.
+resource defenderConnection 'Microsoft.CognitiveServices/accounts/projects/connections@2025-04-01-preview' = if (!empty(defenderMcpUrl)) {
+  parent: project
+  name: 'defender-conn'
+  properties: {
+    category: 'GenericHttp'
+    target: defenderMcpUrl
+    authType: 'None'
+    isSharedToAll: true
+  }
+}
+
+resource anomalyConnection 'Microsoft.CognitiveServices/accounts/projects/connections@2025-04-01-preview' = if (!empty(anomalyMcpUrl)) {
+  parent: project
+  name: 'anomaly-conn'
+  properties: {
+    category: 'GenericHttp'
+    target: anomalyMcpUrl
+    authType: 'None'
+    isSharedToAll: true
+  }
+}
