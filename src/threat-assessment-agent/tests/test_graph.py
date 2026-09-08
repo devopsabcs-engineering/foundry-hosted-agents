@@ -268,6 +268,8 @@ def test_risk_analyst_retains_incident_when_summary_drops_identifiers(monkeypatc
         evidence_report="device not found",
     ))
     assert "Never invent arguments" in graph.RISK_ANALYST_PROMPT
+    assert "you must independently call detect_login_anomalies" in graph.RISK_ANALYST_PROMPT
+    assert "does not replace this verification" in graph.RISK_ANALYST_PROMPT
     assert "Limitations section" in graph.REPORT_COMPOSER_PROMPT
 
 
