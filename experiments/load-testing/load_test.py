@@ -40,10 +40,12 @@ MESSAGE = (
 def _get_bearer_token() -> str:
     """Fetch a bearer token for the ai.azure.com resource via az CLI."""
     proc = subprocess.run(
-        ["az", "account", "get-access-token", "--resource", "https://ai.azure.com", "--query", "accessToken", "-o", "tsv"],
+        ["az", "account", "get-access-token", "--resource", "https://ai.azure.com",
+         "--query", "accessToken", "-o", "tsv"],
         capture_output=True,
         text=True,
         check=True,
+        timeout=60,
         shell=(sys.platform == "win32"),
     )
     token = proc.stdout.strip()
@@ -76,7 +78,12 @@ async def _invoke_once(
     try:
         async with session.post(endpoint, json=body) as resp:
             result["status"] = resp.status
+            if resp.status != 200:
+                raise RuntimeError(f"HTTP {resp.status}")
             event_count = 0
+            completed = False
+            completion_count = 0
+            has_delta = False
             response_conversation_id = None
             async for line in resp.content:
                 text = line.decode("utf-8", errors="replace").strip()
@@ -84,17 +91,44 @@ async def _invoke_once(
                     continue
                 event_count += 1
                 payload = text[len("data:") :].strip()
+                if payload == "[DONE]":
+                    continue
                 try:
                     parsed = json.loads(payload)
-                except json.JSONDecodeError:
-                    continue
+                except json.JSONDecodeError as exc:
+                    raise RuntimeError("Malformed SSE JSON") from exc
+                event_type = parsed.get("type", "")
+                response = parsed.get("response", {})
+                if (
+                    event_type in {"error", "response.failed", "response.incomplete", "response.error"}
+                    or parsed.get("error") or response.get("error")
+                ):
+                    raise RuntimeError(f"Failed SSE event: {event_type}")
+                if response.get("status") in {"failed", "incomplete", "cancelled"}:
+                    raise RuntimeError("Response did not complete")
+                if (
+                    event_type == "response.output_text.delta"
+                    and isinstance(parsed.get("delta"), str) and parsed["delta"].strip()
+                ):
+                    has_delta = True
+                if event_type == "response.completed":
+                    completion_count += 1
+                    completed = response.get("status") == "completed" and any(
+                        item.get("type") == "message" and item.get("role") == "assistant" and any(
+                            content.get("type") == "output_text"
+                            and isinstance(content.get("text"), str) and content["text"].strip()
+                            for content in item.get("content", [])
+                        ) for item in response.get("output", [])
+                    )
                 conv = parsed.get("response", {}).get("conversation", {})
                 if isinstance(conv, dict) and conv.get("id"):
                     response_conversation_id = conv["id"]
             result["event_count"] = event_count
             result["response_conversation_id"] = response_conversation_id
+            if not completed or not has_delta or completion_count != 1:
+                raise RuntimeError("Missing completed assistant text or nonempty text delta")
     except Exception as exc:  # noqa: BLE001 - a load probe must record every failure mode
-        result["status"] = None
+        result.setdefault("status", None)
         result["error"] = f"{type(exc).__name__}: {exc}"
     finally:
         result["latency_seconds"] = round(time.monotonic() - started, 3)
@@ -106,7 +140,7 @@ async def run_concurrent_sessions(endpoint: str, token: str, count: int) -> list
     import aiohttp
 
     headers = {"Authorization": f"Bearer {token}"}
-    async with aiohttp.ClientSession(headers=headers) as session:
+    async with aiohttp.ClientSession(headers=headers, timeout=aiohttp.ClientTimeout(total=180)) as session:
         tasks = [_invoke_once(session, endpoint, MESSAGE, conversation_id=None) for _ in range(count)]
         return await asyncio.gather(*tasks)
 
@@ -116,9 +150,12 @@ async def run_same_thread_turns(endpoint: str, token: str, count: int) -> list[d
     import aiohttp
 
     headers = {"Authorization": f"Bearer {token}"}
-    async with aiohttp.ClientSession(headers=headers) as session:
+    async with aiohttp.ClientSession(headers=headers, timeout=aiohttp.ClientTimeout(total=180)) as session:
         seed = await _invoke_once(session, endpoint, MESSAGE, conversation_id=None)
         conv_id = seed.get("response_conversation_id")
+        if seed.get("error") or not conv_id:
+            seed["error"] = seed.get("error") or "No conversation ID; same-thread test cannot run"
+            return [seed]
         tasks = [
             _invoke_once(session, endpoint, f"Follow-up turn #{i}: any update?", conversation_id=conv_id)
             for i in range(count)
@@ -133,7 +170,7 @@ async def run_sequential_cold_start(endpoint: str, token: str, count: int) -> li
 
     headers = {"Authorization": f"Bearer {token}"}
     results = []
-    async with aiohttp.ClientSession(headers=headers) as session:
+    async with aiohttp.ClientSession(headers=headers, timeout=aiohttp.ClientTimeout(total=180)) as session:
         for _ in range(count):
             results.append(await _invoke_once(session, endpoint, MESSAGE, conversation_id=None))
     return results
@@ -154,6 +191,8 @@ def main() -> None:
     parser.add_argument("--endpoint", default=DEFAULT_ENDPOINT)
     parser.add_argument("--out", default=None, help="Path to write raw JSON results")
     args = parser.parse_args()
+    if not 1 <= args.count <= 20:
+        parser.error("--count must be between 1 and 20")
 
     token = _get_bearer_token()
 
@@ -170,13 +209,14 @@ def main() -> None:
     errors = [r for r in results if r.get("error") is not None]
 
     summary = {
+        "contract": "completed-text-v2",
         "mode": args.mode,
         "requested_count": args.count,
         "wall_clock_seconds": wall_elapsed,
         "success_count": len(latencies),
         "error_count": len(errors),
-        "latency_p50_seconds": _percentile(latencies, 50),
-        "latency_p95_seconds": _percentile(latencies, 95),
+        "latency_p50_seconds": _percentile(latencies, 50) if latencies else None,
+        "latency_p95_seconds": _percentile(latencies, 95) if latencies else None,
         "latency_min_seconds": min(latencies) if latencies else None,
         "latency_max_seconds": max(latencies) if latencies else None,
         "results": results,
@@ -189,6 +229,8 @@ def main() -> None:
         out_path.parent.mkdir(parents=True, exist_ok=True)
         out_path.write_text(json.dumps(summary, indent=2), encoding="utf-8")
         print(f"Wrote raw results to {out_path}")
+    if errors:
+        raise SystemExit(1)
 
 
 if __name__ == "__main__":

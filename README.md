@@ -68,6 +68,13 @@ flowchart LR
 
 ## Getting started
 
+### Continuous test reporting
+
+[Continuous validation and trend publishing](docs/continuous-validation.md) adds offline push/PR checks,
+main-push staging evaluations and five-request load probes, Actions summaries, and run-linked wiki charts.
+It does not deploy or promote. Automatic wiki publication requires `WIKI_PUSH_TOKEN` and the workflows
+on `main`; see the setup and replay instructions before treating the pipeline as operational.
+
 ### Prerequisites
 
 * [Azure Developer CLI (`azd`)](https://learn.microsoft.com/azure/developer/azure-developer-cli/install-azd) with the Foundry extension: `azd ext install microsoft.foundry`

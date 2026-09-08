@@ -15,6 +15,10 @@ permissions:
   id-token: write
   contents: read
 
+concurrency:
+  group: foundry-shared-environments
+  queue: max
+
 env:
   # azd project root (this repo's azure.yaml lives at the repo root; the
   # agent source itself lives under src/threat-assessment-agent).

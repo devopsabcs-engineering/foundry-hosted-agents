@@ -29,6 +29,10 @@ permissions:
   id-token: write
   contents: read
 
+concurrency:
+  group: foundry-shared-environments
+  queue: max
+
 env:
   AGENT_PROJECT_DIR: .
   AGENT_NAME: threat-assessment-agent
@@ -62,10 +66,10 @@ jobs:
       - name: Agent graph unit tests
         run: |
           pip install -r src/threat-assessment-agent/requirements.txt -r src/threat-assessment-agent/requirements-dev.txt
-          pytest src/threat-assessment-agent/tests/ -v
+          pytest src/threat-assessment-agent/tests/ -v --junitxml=offline-evidence/agent.xml
 
       - name: Deterministic evaluation checks (must fail on the injected bad example)
-        run: pytest eval/deterministic-tests/ -v
+        run: pytest eval/deterministic-tests/ -v --junitxml=offline-evidence/deterministic.xml
 
       - name: Responses contract validator regression tests
         run: bash scripts/test-agent-response.sh
@@ -75,6 +79,18 @@ jobs:
 
       - name: Production version discovery regression tests
         run: bash scripts/test-production-version.sh
+
+      - name: Publish offline test summary
+        if: always()
+        run: python scripts/ci_results.py --junit offline-evidence
+
+      - name: Retain offline test measurements
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: offline-test-evidence-${{ github.run_attempt }}
+          path: offline-evidence/*.xml
+          retention-days: 30
 
   # ---------------------------------------------------------------------
   # Stage 2: Bicep validate and what-if
@@ -370,6 +386,9 @@ jobs:
           JUDGE_DEPLOYMENT: ${{ vars.FOUNDRY_MODEL_NAME }}
           AZURE_DEV_USER_AGENT: microsoft_foundry_skill
         run: |
+          python scripts/ci_results.py \
+            --context "${{ runner.temp }}/evaluation-evidence/context.json" \
+            --dataset "$GOLDEN_DATASET_PATH" --agent-version "$AGENT_VERSION"
           python eval/run_hosted_evaluation.py \
             --endpoint "$PROJECT_ENDPOINT" --agent "$AGENT_NAME" \
             --version "$AGENT_VERSION" --deployment "$JUDGE_DEPLOYMENT" \
@@ -381,7 +400,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v6
         with:
-          name: evaluation-evidence
+          name: evaluation-evidence-${{ github.run_attempt }}
           path: ${{ runner.temp }}/evaluation-evidence/
           retention-days: 7
           if-no-files-found: warn

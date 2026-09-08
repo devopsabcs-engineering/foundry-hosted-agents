@@ -1,0 +1,99 @@
+name: Publish Test Trends
+
+on:
+  workflow_run:
+    workflows: [Continuous Validation, 'Deploy and Evaluate (Staging -> Production)']
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: Completed main-branch source run ID to publish or repair
+        required: true
+      attempt:
+        description: Source run attempt
+        required: true
+        default: '1'
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: foundry-wiki-test-trends
+  queue: max
+
+jobs:
+  publish:
+    if: ${{ github.event_name == 'workflow_dispatch' || (github.event.workflow_run.head_repository.full_name == github.repository && github.event.workflow_run.event != 'pull_request') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ github.token }}
+      SOURCE_RUN: ${{ inputs.run_id || github.event.workflow_run.id }}
+      SOURCE_ATTEMPT: ${{ inputs.attempt || github.event.workflow_run.run_attempt }}
+    steps:
+      - name: Check out trusted default-branch reporting code
+        uses: actions/checkout@v6
+        with:
+          ref: refs/heads/main
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - name: Verify source run provenance
+        run: |
+          set -euo pipefail
+          [[ "$SOURCE_RUN" =~ ^[0-9]+$ ]]
+          [[ "$SOURCE_ATTEMPT" =~ ^[0-9]+$ ]]
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN/attempts/$SOURCE_ATTEMPT" > source-run.json
+          jq -e --arg repo "$GITHUB_REPOSITORY" '
+            .repository.full_name == $repo and .head_repository.full_name == $repo
+            and .head_branch == "main" and .status == "completed"
+            and (.event == "push" or .event == "workflow_dispatch")
+            and (.path == ".github/workflows/continuous-validation.yml" or .path == ".github/workflows/deploy-and-evaluate.yml")
+          ' source-run.json
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN/attempts/$SOURCE_ATTEMPT/jobs?per_page=100" > source-jobs.json
+      - name: Download only this attempt's known evidence artifacts
+        run: |
+          set -euo pipefail
+          mkdir -p evidence
+          gh api --paginate "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN/artifacts?per_page=100" --jq '.artifacts[] | select(.expired == false) | .name' > artifact-names.txt
+          for KIND in offline-test-evidence evaluation-evidence load-test-evidence; do
+            NAME="$KIND-$SOURCE_ATTEMPT"
+            if grep -Fxq "$NAME" artifact-names.txt; then
+              gh run download "$SOURCE_RUN" --repo "$GITHUB_REPOSITORY" --name "$NAME" --dir "evidence/$KIND"
+            fi
+          done
+      - name: Build aggregate report and workflow summary
+        id: report
+        run: python scripts/ci_results.py --evidence evidence --run source-run.json --jobs source-jobs.json --output ci-report
+      - name: Retain aggregate report independently of wiki credentials
+        if: ${{ always() && steps.report.outcome == 'success' }}
+        uses: actions/upload-artifact@v6
+        with:
+          name: ci-report-${{ env.SOURCE_RUN }}-${{ env.SOURCE_ATTEMPT }}
+          path: ci-report/
+          retention-days: 90
+      - name: Update generated wiki history and trends
+        env:
+          WIKI_PUSH_TOKEN: ${{ secrets.WIKI_PUSH_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ -z "$WIKI_PUSH_TOKEN" ]; then
+            echo '::error::Configure WIKI_PUSH_TOKEN with write access to this repository wiki. Aggregate report is retained.'
+            echo 'Wiki publication failed: WIKI_PUSH_TOKEN is not configured. Aggregate results remain in this run summary and artifact.' >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+          AUTH_HEADER="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$WIKI_PUSH_TOKEN" | base64 -w0)"
+          echo "::add-mask::$AUTH_HEADER"
+          git -c "http.https://github.com/.extraheader=$AUTH_HEADER" clone "https://github.com/$GITHUB_REPOSITORY.wiki.git" wiki
+          python scripts/ci_results.py --evidence evidence --run source-run.json --jobs source-jobs.json --output ci-report --wiki wiki
+          git -C wiki config user.name 'github-actions[bot]'
+          git -C wiki config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git -C wiki add Continuous-Test-Trends.md trend-history/
+          if ! git -C wiki diff --cached --quiet; then
+            git -C wiki commit -m "docs: refresh CI test trends for $SOURCE_RUN attempt $SOURCE_ATTEMPT"
+            git -C wiki -c "http.https://github.com/.extraheader=$AUTH_HEADER" push origin HEAD
+          fi
+          echo "[Published test trends](https://github.com/$GITHUB_REPOSITORY/wiki/Continuous-Test-Trends)" >> "$GITHUB_STEP_SUMMARY"

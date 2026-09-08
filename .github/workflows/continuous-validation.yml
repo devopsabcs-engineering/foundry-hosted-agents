@@ -1,0 +1,175 @@
+name: Continuous Validation
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  offline:
+    name: Offline regression tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+      - name: Install test dependencies
+        run: |
+          python -m pip install ruff pytest aiohttp
+          python -m pip install -r src/threat-assessment-agent/requirements.txt -r src/threat-assessment-agent/requirements-dev.txt
+          mkdir -p evidence
+      - name: Lint evaluation suite
+        run: ruff check eval
+      - name: Agent graph tests
+        if: ${{ !cancelled() }}
+        run: pytest src/threat-assessment-agent/tests/ -v --junitxml=evidence/agent.xml
+      - name: Deterministic evaluation tests
+        if: ${{ !cancelled() }}
+        run: pytest eval/deterministic-tests/ -v --junitxml=evidence/deterministic.xml
+      - name: Reporting and load contract tests
+        if: ${{ !cancelled() }}
+        run: pytest scripts/tests/test_ci_results.py experiments/load-testing/test_load_test.py -v --junitxml=evidence/reporting.xml
+      - name: Responses stream contract
+        if: ${{ !cancelled() }}
+        run: bash scripts/test-agent-response.sh
+      - name: Runtime role regression
+        if: ${{ !cancelled() }}
+        run: bash scripts/test-agent-rbac.sh
+      - name: Version resolver regression
+        if: ${{ !cancelled() }}
+        run: bash scripts/test-production-version.sh
+      - name: Publish offline summary
+        if: always()
+        run: python scripts/ci_results.py --junit evidence
+      - name: Retain offline results
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: offline-test-evidence-${{ github.run_attempt }}
+          path: evidence/*.xml
+          retention-days: 30
+
+  live:
+    name: Staging evaluations and bounded load
+    if: ${{ github.ref == 'refs/heads/main' && github.event_name != 'pull_request' }}
+    needs: offline
+    runs-on: ubuntu-latest
+    timeout-minutes: 110
+    environment: staging
+    concurrency:
+      group: foundry-shared-environments
+      queue: max
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      AGENT_NAME: threat-assessment-agent
+      STAGING_AZD_ENV_NAME: air-canada-threat-assessment-staging
+      PROJECT_ENDPOINT: https://aif-air-canada-threat-assessment-staging.services.ai.azure.com/api/projects/proj-air-canada-threat-assessment-staging
+      JUDGE_DEPLOYMENT: ${{ vars.FOUNDRY_MODEL_NAME }}
+      GOLDEN_DATASET_PATH: eval/golden-dataset.jsonl
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+      - name: Install evaluation and probe dependencies
+        run: python -m pip install azure-ai-projects==2.6.0 openai==3.6.0 azure-identity==1.25.3 aiohttp
+      - uses: azure/login@v3
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - uses: Azure/setup-azd@v2
+      - name: Configure local staging context without deployment
+        env:
+          SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+          RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
+        run: |
+          set -euo pipefail
+          azd ext install microsoft.foundry
+          azd config set auth.useAzCliAuth true
+          azd env new "$STAGING_AZD_ENV_NAME" --no-prompt
+          azd env set AZURE_SUBSCRIPTION_ID "$SUBSCRIPTION_ID"
+          azd env set AZURE_TENANT_ID "$TENANT_ID"
+          azd env set AZURE_RESOURCE_GROUP "$RESOURCE_GROUP"
+          azd env set FOUNDRY_PROJECT_ENDPOINT "$PROJECT_ENDPOINT"
+          azd env set AZURE_AI_PROJECT_ID "/subscriptions/$SUBSCRIPTION_ID/resourceGroups/$RESOURCE_GROUP/providers/Microsoft.CognitiveServices/accounts/aif-$STAGING_AZD_ENV_NAME/projects/proj-$STAGING_AZD_ENV_NAME"
+          azd env set FOUNDRY_MODEL_NAME "$JUDGE_DEPLOYMENT"
+      - name: Resolve the active staging version
+        id: target
+        run: |
+          set -euo pipefail
+          mkdir -p evaluation-evidence load-test-evidence
+          VERSION=$(bash scripts/record-production-version.sh "$AGENT_NAME" "$RUNNER_TEMP/staging-before")
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          python scripts/ci_results.py --context load-test-evidence/context.json --dataset "$GOLDEN_DATASET_PATH" --agent-state "$RUNNER_TEMP/staging-before.json"
+          cp load-test-evidence/context.json evaluation-evidence/context.json
+          python eval/convert_for_ai_agent_evals.py "$GOLDEN_DATASET_PATH" "$RUNNER_TEMP/golden.json"
+      - name: Exact-version golden evaluations
+        id: evaluations
+        timeout-minutes: 90
+        env:
+          AGENT_VERSION: ${{ steps.target.outputs.version }}
+        run: |
+          python eval/run_hosted_evaluation.py --endpoint "$PROJECT_ENDPOINT" --agent "$AGENT_NAME" \
+            --version "$AGENT_VERSION" --deployment "$JUDGE_DEPLOYMENT" \
+            --dataset "$RUNNER_TEMP/golden.json" --output-dir evaluation-evidence --minimum-pass-rate 1.0
+      - name: Five concurrent staging Responses streams
+        id: load
+        if: ${{ !cancelled() && steps.target.outcome == 'success' }}
+        timeout-minutes: 5
+        run: |
+          python experiments/load-testing/load_test.py concurrent-sessions --count 5 \
+            --endpoint "$PROJECT_ENDPOINT/agents/$AGENT_NAME/endpoint/protocols/openai/responses?api-version=v1" \
+            --out load-test-evidence/concurrent-sessions.json
+      - name: Verify route stability
+        if: ${{ always() && steps.target.outcome == 'success' }}
+        env:
+          EXPECTED_VERSION: ${{ steps.target.outputs.version }}
+        run: |
+          set -euo pipefail
+          AFTER=$(bash scripts/record-production-version.sh "$AGENT_NAME" "$RUNNER_TEMP/staging-after")
+          python scripts/ci_results.py --context load-test-evidence/context.json --version-after "$AFTER"
+          test "$AFTER" = "$EXPECTED_VERSION"
+      - name: Live execution summary
+        if: always()
+        env:
+          TARGET_OUTCOME: ${{ steps.target.outcome }}
+          EVALUATION_OUTCOME: ${{ steps.evaluations.outcome }}
+          LOAD_OUTCOME: ${{ steps.load.outcome }}
+        run: |
+          python scripts/ci_results.py --load load-test-evidence
+          {
+            echo '## Staging Live Validation'
+            echo ''
+            printf '| Step | Outcome |\n| --- | --- |\n| Target discovery | %s |\n| Evaluations | %s |\n| Load probe | %s |\n' "$TARGET_OUTCOME" "$EVALUATION_OUTCOME" "$LOAD_OUTCOME"
+            echo ''
+            echo 'Existing staging only; no deployment. Full aggregate measurements and wiki publication are in the linked Publish Test Trends workflow.'
+            echo '[Test trends](https://github.com/devopsabcs-engineering/foundry-hosted-agents/wiki/Continuous-Test-Trends)'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Retain evaluation evidence
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: evaluation-evidence-${{ github.run_attempt }}
+          path: evaluation-evidence/
+          retention-days: 30
+      - name: Retain load evidence
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: load-test-evidence-${{ github.run_attempt }}
+          path: load-test-evidence/
+          retention-days: 30
