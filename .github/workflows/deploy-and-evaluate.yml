@@ -73,6 +73,9 @@ jobs:
       - name: Runtime role assignment regression tests
         run: bash scripts/test-agent-rbac.sh
 
+      - name: Production version discovery regression tests
+        run: bash scripts/test-production-version.sh
+
   # ---------------------------------------------------------------------
   # Stage 2: Bicep validate and what-if
   # ---------------------------------------------------------------------
@@ -121,6 +124,8 @@ jobs:
     outputs:
       agent_version: ${{ steps.deploy.outputs.agent_version }}
       project_endpoint: ${{ steps.deploy.outputs.project_endpoint }}
+      defender_mcp_image: ${{ steps.build-mcp.outputs.defender_mcp_image }}
+      anomaly_mcp_image: ${{ steps.build-mcp.outputs.anomaly_mcp_image }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
@@ -161,6 +166,7 @@ jobs:
           azd env set ANOMALY_MCP_IMAGE "${{ vars.ANOMALY_MCP_IMAGE }}"
 
       - name: Build immutable staging MCP fixture images
+        id: build-mcp
         env:
           MCP_ACR_NAME: ${{ vars.MCP_ACR_NAME }}
         run: |
@@ -173,6 +179,7 @@ jobs:
             DIGEST=$(az acr repository show --name "$MCP_ACR_NAME" --image "$IMAGE" --query digest -o tsv)
             [[ "$DIGEST" =~ ^sha256:[a-f0-9]{64}$ ]] || { echo "::error::Invalid image digest"; exit 1; }
             azd env set "${SERVER^^}_MCP_IMAGE" "${REGISTRY}/staging/${SERVER}-mcp@${DIGEST}"
+            echo "${SERVER}_mcp_image=${REGISTRY}/staging/${SERVER}-mcp@${DIGEST}" >> "$GITHUB_OUTPUT"
           done
 
       - name: Provision staging infrastructure (idempotent)
@@ -413,7 +420,11 @@ jobs:
 
       - name: Configure azd authentication and select production environment
         working-directory: ${{ env.AGENT_PROJECT_DIR }}
+        env:
+          DEFENDER_MCP_IMAGE: ${{ needs.deploy-staging.outputs.defender_mcp_image }}
+          ANOMALY_MCP_IMAGE: ${{ needs.deploy-staging.outputs.anomaly_mcp_image }}
         run: |
+          set -euo pipefail
           azd config set auth.useAzCliAuth true
           azd config set defaults.subscription "${{ vars.AZURE_SUBSCRIPTION_ID }}"
           azd env select "$PRODUCTION_AZD_ENV_NAME" || azd env new "$PRODUCTION_AZD_ENV_NAME" --no-prompt
@@ -426,17 +437,19 @@ jobs:
           azd env set AZURE_AI_PROJECT_ID "${{ vars.AZURE_AI_PROJECT_ID }}"
           azd env set FOUNDRY_MODEL_NAME "${{ vars.FOUNDRY_MODEL_NAME }}"
           azd env set MCP_ACR_NAME "${{ vars.MCP_ACR_NAME }}"
-          azd env set DEFENDER_MCP_IMAGE "${{ vars.DEFENDER_MCP_IMAGE }}"
-          azd env set ANOMALY_MCP_IMAGE "${{ vars.ANOMALY_MCP_IMAGE }}"
+          for SERVER in DEFENDER ANOMALY; do
+            IMAGE_KEY="${SERVER}_MCP_IMAGE"
+            IMAGE="${!IMAGE_KEY}"
+            [[ "$IMAGE" =~ @sha256:[a-f0-9]{64}$ ]] || { echo "::error::Missing evaluated MCP image digest"; exit 1; }
+            azd env set "$IMAGE_KEY" "$IMAGE"
+          done
 
       - name: Record the currently-live production version (for rollback)
         id: record-previous
         working-directory: ${{ env.AGENT_PROJECT_DIR }}
         run: |
           set -euo pipefail
-          azd ai agent show "$AGENT_NAME" --output json > /tmp/prod-agent-show-before.json
-          PREVIOUS_VERSION=$(jq -er '.version | select(type == "string" and test("^[0-9]+$"))' /tmp/prod-agent-show-before.json)
-          jq -e '.status == "active"' /tmp/prod-agent-show-before.json
+          PREVIOUS_VERSION=$(bash scripts/record-production-version.sh "$AGENT_NAME" /tmp/prod-agent-show-before)
           echo "previous_agent_version=$PREVIOUS_VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Provision production infrastructure (idempotent)
