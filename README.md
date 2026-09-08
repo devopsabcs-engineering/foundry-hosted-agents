@@ -121,9 +121,11 @@ Both workflows authenticate via secretless OIDC federation (no stored client sec
 The staging release workflow builds MCP images from the selected commit and pins them by digest.
 Staging uses dedicated `mcp-staging-*` Container Apps and an image-pull identity, leaving the
 existing `mcp-*` production apps unchanged. It rejects shared MCP URLs before deploying the agent.
-Production approval remains manual. Before promotion, review the production MCP image references
-and toolbox version together with the agent candidate; staging fixture changes are not automatically
-promoted to production tools.
+Production requires environment approval. After approval, promotion provisions the production
+MCP apps with the exact image digests evaluated in staging and rebuilds the evaluated agent source.
+Review the production toolbox version together with the candidate. Before provisioning, the workflow
+resolves the currently routed production version from Foundry and records its active status for
+manual recovery; missing or ambiguous routing blocks promotion.
 
 ## Known issues
 
