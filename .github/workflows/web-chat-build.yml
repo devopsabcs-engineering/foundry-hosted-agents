@@ -1,0 +1,68 @@
+name: Web Chat Build
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Test and build web chat
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          registry-url: https://registry.npmjs.org
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - name: Install backend test dependencies
+        run: python -m pip install -r apps/web-chat/requirements.txt pytest
+      - name: Backend authorization and session tests
+        env:
+          PYTHONPATH: apps/web-chat
+        run: python -m pytest apps/web-chat/tests -q --junitxml=web-chat-evidence/backend.xml
+      - name: Resolve frontend dependencies on the hosted runner
+        working-directory: apps/web-chat/frontend
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci
+          else
+            npm install
+          fi
+      - name: Frontend stream contract tests
+        working-directory: apps/web-chat/frontend
+        run: npm test
+      - name: Compile frontend
+        working-directory: apps/web-chat/frontend
+        run: npm run build
+      - name: Retain compiled frontend and dependency lock
+        uses: actions/upload-artifact@v6
+        with:
+          name: web-chat-frontend-${{ github.sha }}
+          path: |
+            apps/web-chat/frontend/dist/
+            apps/web-chat/frontend/package-lock.json
+          if-no-files-found: error
+          retention-days: 14
+      - name: Retain backend test results
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: web-chat-tests-${{ github.run_attempt }}
+          path: web-chat-evidence/
+          retention-days: 14
+      - name: Build summary
+        run: |
+          {
+            echo '## Web Chat Build'
+            echo 'Dependencies, tests, and compilation ran on a GitHub-hosted runner.'
+            echo 'The frontend artifact contains dist/ and the dependency lockfile.'
+            echo 'No Azure deployment or local npm policy changes were performed.'
+          } >> "$GITHUB_STEP_SUMMARY"
