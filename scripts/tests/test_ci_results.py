@@ -35,7 +35,10 @@ def test_junit_counts_cases_without_double_counting_nested_suites(tmp_path):
         '<testcase><skipped/></testcase></testsuite></testsuite></testsuites>'
     )
     totals = report.junit_totals(tmp_path)
-    assert totals == {"tests": 3, "failed": 1, "skipped": 1, "passed": 1, "seconds": 1.0}
+    assert totals == {
+        "tests": 3, "failed": 1, "skipped": 1, "passed": 1, "seconds": 1.0,
+        "by_type": {"Other JUnit": 3},
+    }
 
 
 def test_history_is_idempotent_and_preserves_attempts(tmp_path):
@@ -128,10 +131,65 @@ def test_charts_and_run_links_with_failed_and_missing_samples(tmp_path):
         }
         records.append(record)
     text = report.render_trends(records)
-    assert text.count("```mermaid") == 6
+    assert text.count("```mermaid") == 7
     assert 'bar [100.0, 50.0, 0.0]' in text
     assert 'bar [3, 5]' in text
     assert all(record["url"] in text for record in records)
     preview = os.environ.get("CI_TREND_PREVIEW")
     if preview:
         Path(preview).write_text("Synthetic rendering fixture, not executed CI results.\n\n" + text)
+
+
+def test_junit_inventory_by_type_includes_skipped_and_empty_suites(tmp_path):
+    (tmp_path / "agent.xml").write_text('<testsuite><testcase/><testcase><skipped/></testcase></testsuite>')
+    (tmp_path / "deterministic.xml").write_text('<testsuite><testcase><failure/></testcase></testsuite>')
+    (tmp_path / "reporting.xml").write_text('<testsuite/>')
+    totals = report.junit_totals(tmp_path)
+    assert totals["by_type"] == {
+        "Agent graph": 2, "Deterministic evaluation": 1, "Reporting and load contracts": 0,
+    }
+    assert totals["tests"] == sum(totals["by_type"].values()) == 3
+    assert totals["skipped"] == 1
+
+
+def test_test_counts_do_not_invent_historical_breakdowns_or_missing_live_counts():
+    counts = report.test_counts({"tests": {"tests": 124}})
+    assert counts["Total offline tests"] == 124
+    assert all(value is None for name, value in counts.items() if name != "Total offline tests")
+
+
+def test_inventory_charts_show_growth_and_decline_not_cumulative_runs(tmp_path):
+    records = []
+    for index, count in enumerate([2, 4, 3], start=1):
+        record = report.collect(tmp_path, run(), {"jobs": []})
+        record["run_id"] = index
+        record["run_number"] = index
+        record["tests"] = {
+            "tests": count, "passed": count, "failed": 0, "skipped": 0,
+            "by_type": {"Agent graph": count},
+        }
+        records.append(record)
+    text = report.render_trends(records)
+    assert 'x-axis ["V1.1", "V2.1", "V3.1"]' in text
+    assert text.count("bar [2, 4, 3]") == 2
+    assert "bar [2, 6, 9]" not in text
+    assert "N/A" in text
+    assert "| Agent graph | 3 |" in report.summary(records[-1])
+
+
+def test_live_counts_keep_cases_judges_and_load_requests_separate():
+    counts = report.test_counts({
+        "evaluation": {"captured": 8, "judged": 7, "judge_rates": dict.fromkeys(report.METRICS, 1)},
+        "load": {"requested_count": 5, "success_count": 4, "error_count": 1},
+    })
+    assert counts["Live evaluation cases"] == 8
+    assert counts["Judge checks"] == 21
+    assert counts["Load requests"] == 5
+    assert counts["Total offline tests"] is None
+
+
+def test_judge_inventory_without_case_count_remains_unknown():
+    counts = report.test_counts({
+        "evaluation": {"judge_rates": dict.fromkeys(report.METRICS, 1)},
+    })
+    assert counts["Judge checks"] is None

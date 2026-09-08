@@ -69,6 +69,26 @@ source artifacts do not erase already stored measurements. Missing measurements 
 are omitted from charts, never converted to zero. Failed workflow outcomes remain in the table even
 when some individual measurements passed.
 
+### Test Suite Growth
+
+The wiki includes a run-linked inventory table and separate count charts for total offline tests,
+agent graph tests, deterministic evaluation tests, and reporting/load-contract tests. These counts
+come from the JUnit testcase records, including skipped tests. Shell checks remain per-step outcomes,
+not invented testcase counts. Unknown JUnit file categories are grouped as Other JUnit when present.
+
+Each column is one measured run or attempt, not a cumulative execution count. New tests increase
+the inventory; rerunning an unchanged suite leaves its count flat. Removed tests remain visible as
+decreases. The offline total already includes its component types, so do not add them together again.
+
+Live evaluation cases, completed judge checks, and load requests have separate count charts. These
+measure available results and may overlap or repeat scenarios; they are not extra offline test cases
+or proof of coverage growth. Missing results remain N/A. A partial run may report fewer available tests.
+The source offline summary and publisher summary also include the test-type breakdown.
+
+Historical aggregates without type counts remain N/A for that breakdown. Replay their source attempts
+while JUnit artifacts are retained to recover measured counts. To add another column, execute a new
+validation run; replaying publication of the same attempt updates that point without duplicating it.
+
 Evaluation series are separated by dataset and evaluator-code hashes, judge deployment, and environment.
 Changing the model behind an existing judge deployment name is not automatically version-detected;
 use a new deployment name when changing the judge if you need separately comparable series.

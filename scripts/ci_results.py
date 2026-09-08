@@ -28,9 +28,17 @@ def junit_totals(directory):
     if not files:
         return None
     totals = dict(tests=0, failed=0, skipped=0, seconds=0.0)
+    by_type = {}
     for path in files:
         root = ET.parse(path).getroot()
+        label = {
+            "agent": "Agent graph",
+            "deterministic": "Deterministic evaluation",
+            "reporting": "Reporting and load contracts",
+        }.get(path.stem, "Other JUnit")
+        by_type.setdefault(label, 0)
         for case in root.iter("testcase"):
+            by_type[label] += 1
             totals["tests"] += 1
             totals["failed"] += int(case.find("failure") is not None or case.find("error") is not None)
             totals["skipped"] += int(case.find("skipped") is not None)
@@ -40,6 +48,7 @@ def junit_totals(directory):
             totals["seconds"] += duration
     totals["passed"] = totals["tests"] - totals["failed"] - totals["skipped"]
     totals["seconds"] = round(totals["seconds"], 3)
+    totals["by_type"] = by_type
     return totals
 
 
@@ -277,6 +286,8 @@ def summary(record):
         lines.append(f"| {name} | {cell(value)} |")
     for metric, rate in (evaluation.get("judge_rates") or {}).items():
         lines.append(f"| {metric} pass rate | {rate:.0%} |")
+    lines += ["", "### Test Counts by Type", "", "| Type | Count |", "| --- | --- |"]
+    lines += [f"| {name} | {cell(value)} |" for name, value in test_counts(record).items()]
     lines += [
         "",
         "N/A means not measured or unavailable, not zero. "
@@ -291,6 +302,25 @@ def summary(record):
 def run_label(record):
     prefix = "R" if record["workflow"].startswith("Deploy") else "V"
     return f"{prefix}{record.get('run_number') or record['run_id']}.{record['attempt']}"
+
+
+def test_counts(record):
+    tests = record.get("tests") or {}
+    by_type = tests.get("by_type") or {}
+    evaluation = record.get("evaluation") or {}
+    load = record.get("load") or {}
+    return {
+        "Total offline tests": tests.get("tests"),
+        "Agent graph": by_type.get("Agent graph"),
+        "Deterministic evaluation": by_type.get("Deterministic evaluation"),
+        "Reporting and load contracts": by_type.get("Reporting and load contracts"),
+        "Other JUnit": by_type.get("Other JUnit"),
+        "Live evaluation cases": evaluation.get("captured"),
+        "Judge checks": evaluation["judged"] * len(METRICS)
+        if evaluation.get("judge_rates") is not None and evaluation.get("judged") is not None else None,
+        "Load requests": load.get("success_count", 0) + load.get("error_count", 0)
+        if load.get("success_count") is not None and load.get("error_count") is not None else None,
+    }
 
 
 def chart(title, samples, axis):
@@ -350,6 +380,40 @@ def render_trends(records):
             " / ".join(cell(load.get(key)) for key in ("latency_p50_seconds", "latency_p95_seconds")),
         ]
         lines.append("| " + " | ".join(values) + " |")
+    counts = [(record, test_counts(record)) for record in recent]
+    count_types = list(test_counts({}))
+    if not any(values["Other JUnit"] is not None for _, values in counts):
+        count_types.remove("Other JUnit")
+    lines += [
+        "",
+        "## Test Suite Growth",
+        "",
+        "Counts per run, not cumulative executions. Offline inventory includes skipped tests. "
+        "Adding tests increases inventory; rerunning the same suite does not. Decreases remain visible.",
+        "Total offline tests is the sum of the JUnit types, not an additional test type. "
+        "Shell regression steps are tracked as job outcomes and are not included in JUnit counts.",
+        "Live evaluation cases, judge checks and load requests are measured separately: "
+        "these overlap or repeat scenarios and must not be added to the offline inventory. "
+        "They reflect available results, not undiscovered or unexecuted cases.",
+        "Historical records without a type breakdown show N/A until their retained artifacts are replayed.",
+        "",
+        "| Run / attempt | " + " | ".join(count_types) + " |",
+        "| --- | " + " | ".join("---" for _ in count_types) + " |",
+    ]
+    for record, values in reversed(counts):
+        lines.append(
+            f"| [{run_label(record)} / {record['run_id']}]({record['url']}) | "
+            + " | ".join(cell(values[name]) for name in count_types) + " |"
+        )
+    for name in count_types:
+        lines += [
+            "",
+            chart(
+                name,
+                [(record, values[name]) for record, values in counts if values[name] is not None],
+                "count",
+            ),
+        ]
     lines += [
         "",
         "## Test Failures",
@@ -498,7 +562,9 @@ def main():
         text = (
             "## Offline Test Results\n\n"
             + (
-                "\n".join(f"- {key}: {value}" for key, value in totals.items())
+                "\n".join(f"- {key}: {value}" for key, value in totals.items() if key != "by_type")
+                + "\n\n| Test type | Count |\n| --- | --- |\n"
+                + "\n".join(f"| {name} | {count} |" for name, count in totals["by_type"].items())
                 if totals
                 else "No JUnit results available; inspect failed setup/test steps."
             )
