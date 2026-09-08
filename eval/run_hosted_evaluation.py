@@ -271,6 +271,18 @@ def criteria(deployment: str) -> list[dict]:
     ]
 
 
+def collect_output_items(client, eval_id: str, run_id: str, expected_count: int) -> list[dict]:
+    for attempt in range(7):
+        items = [
+            item.model_dump(mode="json")
+            for item in client.evals.runs.output_items.list(eval_id=eval_id, run_id=run_id)
+        ]
+        if len(items) >= expected_count or attempt == 6:
+            return items
+        print(f"Evaluation outputs available: {len(items)}/{expected_count}; retrying retrieval", flush=True)
+        time.sleep(10)
+
+
 def evaluate(captured: list[dict], args) -> None:
     from azure.ai.projects import AIProjectClient
     from azure.identity import DefaultAzureCredential
@@ -333,10 +345,7 @@ def evaluate(captured: list[dict], args) -> None:
                 raise TimeoutError(f"Evaluation exceeded 20 minutes: {run.id}")
             time.sleep(10)
             run = client.evals.runs.retrieve(eval_id=evaluation.id, run_id=run.id)
-        items = [
-            item.model_dump(mode="json")
-            for item in client.evals.runs.output_items.list(eval_id=evaluation.id, run_id=run.id)
-        ]
+        items = collect_output_items(client, evaluation.id, run.id, len(captured))
         result = {"run": run.model_dump(mode="json"), "items": items}
         (args.output_dir / "results.json").write_text(json.dumps(result, indent=2), encoding="utf-8")
         summary = [

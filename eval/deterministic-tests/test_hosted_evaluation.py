@@ -14,12 +14,34 @@ from run_hosted_evaluation import (
     agent_instructions,
     capture,
     capture_summary,
+    collect_output_items,
     completed_response,
     criteria,
     runtime_state,
     validate_candidate_evidence,
     verified_safety_refusal,
 )
+
+
+@pytest.mark.parametrize("counts,expected_calls", [([5, 7], 2), ([5] * 7, 7), ([7], 1), ([8], 1)])
+def test_output_collection_waits_only_for_missing_rows(monkeypatch, counts, expected_calls):
+    calls = []
+    delays = []
+    pages = iter(counts)
+
+    def list_items(**kwargs):
+        calls.append(kwargs)
+        return [SimpleNamespace(model_dump=lambda mode: {"id": "duplicate"}) for _ in range(next(pages))]
+
+    client = SimpleNamespace(evals=SimpleNamespace(runs=SimpleNamespace(
+        output_items=SimpleNamespace(list=list_items))))
+    monkeypatch.setattr("run_hosted_evaluation.time.sleep", delays.append)
+    result = collect_output_items(client, "evaluation", "run", 7)
+    assert len(result) == counts[-1]
+    assert len(calls) == expected_calls
+    assert delays == [10] * (expected_calls - 1)
+    assert all(call == {"eval_id": "evaluation", "run_id": "run"} for call in calls)
+    assert all(item == {"id": "duplicate"} for item in result)
 
 
 def filtered_stream():
