@@ -5,6 +5,7 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import PptxGenJS from 'pptxgenjs';
+import { addReleaseSlides } from './release-slides.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, '..');
@@ -49,7 +50,7 @@ function bullets(slide, items, opts = {}) {
   const runs = [];
   for (const text of items) {
     runs.push({
-      text: `${text}\n`,
+      text,
       options: {
         color: C.textPri, fontSize: opts.fontSize || 15, fontFace: 'Segoe UI',
         breakLine: true, bullet: { code: '25CF', indent: 20 },
@@ -113,14 +114,14 @@ const SLIDES = [
         'Each specialist has its own prompt, tool permissions, and evaluation criteria',
         'Tool isolation by role: Evidence Investigator \u2192 defender-conn only, Risk Analyst \u2192 anomaly-conn only',
         'The Report Composer has zero tool access — it only synthesizes',
-        'A known platform-side tool-resolution gap degrades gracefully to an honestly-labeled plain-LLM analysis instead of crashing',
+        'Supported versioned MCP transport, fresh Entra tokens and RemoteTool connections now work; runtime receipts prove specialist tool execution',
       ],
       fr: [
         'Un superviseur LangGraph route vers trois nœuds spécialistes : Enquêteur de preuves, Analyste de risque, Rédacteur de rapport',
         'Chaque spécialiste a son propre prompt, ses permissions d\u2019outils et ses critères d\u2019évaluation',
         'Isolation des outils par rôle : Enquêteur de preuves \u2192 defender-conn uniquement, Analyste de risque \u2192 anomaly-conn uniquement',
         'Le Rédacteur de rapport n\u2019a aucun accès aux outils — il ne fait que synthétiser',
-        'Une lacune connue côté plateforme dans la résolution d\u2019outils dégrade gracieusement vers une analyse LLM simple, honnêtement étiquetée, plutôt que de planter',
+        'Le transport MCP versionné, les jetons Entra renouvelés et les connexions RemoteTool fonctionnent ; les reçus prouvent les appels des spécialistes',
       ],
     },
   },
@@ -171,15 +172,15 @@ const SLIDES = [
       en: [
         'Golden dataset: 8 categories (true/false positive, ambiguous, missing data, conflicting tools, prompt injection, unauthorized actions, unsupported conclusions)',
         'Deterministic: schema validity, required citations, allowed tool calls, policy constraints — fast, reproducible',
-        'Built-in Foundry evaluators first: coherence, groundedness, task adherence, tool-call accuracy',
-        'Custom rubrics only where the catalog doesn\u2019t reach: triage correctness, citation quality, conflict handling',
+        'Verified Foundry judges: coherence, groundedness, task adherence. Seven reports per metric, 21/21 passed at unchanged 100% thresholds',
+        'Eight captures, zero deterministic policy failures; inject-001 is a verified safety refusal with no tool calls, not a model-judge result',
         'Policy rules (e.g. never claim an unauthorized remediation action) stay deterministic, not LLM-judged',
       ],
       fr: [
         'Jeu de données de référence : 8 catégories (vrai/faux positif, ambigu, données manquantes, outils contradictoires, injection de prompt, actions non autorisées, conclusions non étayées)',
         'Déterministe : validité du schéma, citations requises, appels d\u2019outils autorisés, contraintes de politique — rapide, reproductible',
-        'Évaluateurs Foundry intégrés en premier : cohérence, ancrage, adhérence à la tâche, précision des appels d\u2019outils',
-        'Rubriques personnalisées uniquement là où le catalogue ne suffit pas : justesse du triage, qualité des citations, gestion des conflits',
+        'Juges Foundry vérifiés : cohérence, ancrage, respect de la tâche. Sept rapports par mesure, 21/21 réussites, seuils inchangés à 100 %',
+        'Huit captures, aucune violation déterministe ; inject-001 est un refus de sécurité vérifié sans outil, pas un résultat de juge',
         'Les règles de politique (ex. ne jamais prétendre avoir agi sans autorisation) restent déterministes, pas jugées par LLM',
       ],
     },
@@ -189,41 +190,41 @@ const SLIDES = [
     title: { en: 'Evaluation-Gated Release Pipeline', fr: 'Pipeline de mise en production contrôlé par évaluation' },
     bullets: {
       en: [
-        'Two pipelines: hosted-agent-cd.yml (direct to shared PoC env) and deploy-and-evaluate.yml (full staging \u2192 production flow)',
+        'Two manual pipelines: direct PoC deployment, or deploy-and-evaluate.yml with isolated staging and production accounts/projects',
         'Full flow: lint/tests \u2192 Bicep validate \u2192 deploy immutable candidate to staging \u2192 smoke/contract/streaming tests',
         'Offline evaluation quality gate runs against the staging candidate before any manual production approval',
         'Secretless OIDC federation — no stored client secrets in either pipeline',
-        'Lesson learned: auto-firing both pipelines on every push raced against the same shared resource — now manual-dispatch only',
+        'Run 34178081808 passed end to end: staging 6, production 34, exact evaluated MCP digests, normal approvals. Manual recovery; no automatic rollback or canary',
       ],
       fr: [
-        'Deux pipelines : hosted-agent-cd.yml (direct vers l\u2019environnement PoC partagé) et deploy-and-evaluate.yml (flux complet staging \u2192 production)',
+        'Deux pipelines manuels : déploiement direct PoC, ou deploy-and-evaluate.yml avec comptes et projets staging/production séparés',
         'Flux complet : lint/tests \u2192 validation Bicep \u2192 déploiement d\u2019un candidat immuable en staging \u2192 tests de fumée/contrat/streaming',
         'La porte de qualité d\u2019évaluation hors ligne s\u2019exécute contre le candidat de staging avant toute approbation manuelle de production',
         'Fédération OIDC sans secret — aucun secret client stocké dans les deux pipelines',
-        'Leçon apprise : déclencher automatiquement les deux pipelines à chaque push entrait en concurrence sur la même ressource partagée — désormais manuel uniquement',
+        'Exécution 34178081808 réussie : staging 6, production 34, mêmes condensats MCP évalués, approbations normales. Récupération manuelle, sans rollback automatique ni canary',
       ],
     },
   },
   {
     kicker: { en: 'Real-world troubleshooting', fr: 'Dépannage réel' },
-    title: { en: 'Diagnosing a Live RBAC 401 (Still Open)', fr: 'Diagnostiquer un vrai 401 RBAC (encore ouvert)' },
-    accent: C.red,
+    title: { en: 'WI-11 Resolved: Separate Observation from RCA', fr: 'WI-11 résolu : distinguer observation et cause racine' },
+    accent: C.green,
     bullets: {
       en: [
-        'Symptom: 401 PermissionDenied on Azure OpenAI chat completions from the hosted agent\u2019s own Instance Identity',
-        'Don\u2019t trust the error message\u2019s own diagnosis — verify the role assignment directly with az role assignment list',
-        'Read the built-in role\u2019s dataActions from az role definition list — proves the role does cover the exact data action',
-        'Check disableLocalAuth, networkAcls, and Azure Policy state to rule out silent overrides',
-        'Enumerate tenant Conditional Access policies for service-principal-targeted conditions',
-        'A working manual-agent path next to a failing hosted-agent path points at the platform, not customer-side RBAC',
+        'Historical model 401 recovered on v32; the same runtime principal now passes the complete v34 production release',
+        'Validate the actual runtime principal, role dataActions, scope, conditions, network policy and token audience',
+        'Separate MCP failures were fixed with the supported versioned endpoint, RemoteTool connections and current protocol negotiation',
+        'Original incident propagation and independent specialist lookups restored required evidence; strict evaluation thresholds were unchanged',
+        'The old Azure cache explanation remains an unconfirmed hypothesis. A successful redeployment is recovery evidence, not a controlled server-side RCA',
+        'Support request 2609040400007027 is a historical reference; no support-ticket closure is claimed',
       ],
       fr: [
-        'Symptôme : 401 PermissionDenied sur les complétions de chat Azure OpenAI depuis l\u2019identité propre de l\u2019agent hébergé',
-        'Ne pas faire confiance au diagnostic du message d\u2019erreur — vérifier directement l\u2019attribution de rôle avec az role assignment list',
-        'Lire les dataActions du rôle intégré via az role definition list — prouve que le rôle couvre bien l\u2019action de données exacte',
-        'Vérifier disableLocalAuth, networkAcls et l\u2019état des politiques Azure pour écarter les remplacements silencieux',
-        'Énumérer les politiques d\u2019accès conditionnel du tenant ciblant les principaux de service',
-        'Un chemin d\u2019agent manuel fonctionnel à côté d\u2019un chemin d\u2019agent hébergé défaillant pointe vers la plateforme, pas le RBAC côté client',
+        'Le 401 modèle a disparu en v32 ; le même principal réussit maintenant la mise en production complète v34',
+        'Vérifier le principal effectif, les dataActions, la portée, les conditions, les politiques réseau et l’audience du jeton',
+        'Les erreurs MCP distinctes ont été corrigées : point de terminaison versionné, connexions RemoteTool, négociation du protocole actuel',
+        'Le contexte original et les recherches indépendantes des spécialistes rétablissent les preuves ; seuils qualité inchangés',
+        'L’explication par le cache Azure reste une hypothèse. Un redéploiement réussi prouve le rétablissement, pas une cause racine côté serveur',
+        'Le ticket 2609040400007027 reste une référence historique ; aucune fermeture du ticket support n’est affirmée',
       ],
     },
   },
@@ -233,14 +234,14 @@ const SLIDES = [
     bullets: {
       en: [
         'Four experiment tracks: load testing, Cosmos DB checkpointer, Agent 365 onboarding, continuous evaluation',
-        'Quality gate: Pass — golden dataset + 12/12 deterministic checks + rubric mapping',
+        'Quality gate passed: 8 captures, zero policy failures, 21/21 judge checks, verified safety refusal and tool receipts',
         'Scale, Security, Operations gates: Conditional — partial evidence, named follow-ups',
         'Platform status, Data, Cost gates: Not testable in this PoC — require commercial/legal/platform confirmation',
         'Overall recommendation: conditional go for continued PoC-to-pilot investment, not an unconditional yes/no',
       ],
       fr: [
         'Quatre pistes d\u2019expérimentation : test de charge, checkpointer Cosmos DB, intégration Agent 365, évaluation continue',
-        'Porte Qualité : Pass — jeu de données de référence + 12/12 vérifications déterministes + correspondance des rubriques',
+        'Porte Qualité réussie : 8 captures, aucune violation, 21/21 vérifications, refus de sécurité et reçus d’outils vérifiés',
         'Portes Échelle, Sécurité, Opérations : Conditional — preuves partielles, suivis nommés',
         'Portes Statut de plateforme, Données, Coût : Not testable in this PoC — nécessitent une confirmation commerciale/juridique/plateforme',
         'Recommandation globale : go conditionnel pour poursuivre l\u2019investissement PoC vers pilote, pas un oui/non net',
@@ -249,21 +250,21 @@ const SLIDES = [
   },
   {
     kicker: { en: 'Wrap-up', fr: 'Conclusion' },
-    title: { en: 'Everything Here Is Real', fr: 'Tout ici est réel' },
+    title: { en: 'A Proven Release, with Explicit Limits', fr: 'Une mise en production prouvée, des limites explicites' },
     bullets: {
       en: [
-        'Every command, screenshot, and log excerpt in this workshop comes from a real deployment, not a simulation',
+        'The deployment and evaluation ran for real; the MCP security telemetry is synthetic, not live customer data',
         'Repository: github.com/devopsabcs-engineering/foundry-hosted-agents',
-        'Wiki: architecture notes, manual-agent workaround, and the live RBAC 401 investigation log',
+        'Wiki: current architecture, verified release artifacts, operational runbook, and resolved WI-11 history',
         'Full bilingual step-by-step labs: this deck\u2019s companion GitHub Pages site',
-        'Fork it, run it, and follow WI-11 as it resolves',
+        'Production v34 smoke passed; zero trailing-window exceptions is not a soak test or proof of complete distributed tracing',
       ],
       fr: [
-        'Chaque commande, capture d\u2019écran et extrait de journal de cet atelier provient d\u2019un déploiement réel, pas d\u2019une simulation',
+        'Le déploiement et l’évaluation sont réels ; la télémétrie de sécurité MCP est synthétique, pas une donnée client réelle',
         'Dépôt : github.com/devopsabcs-engineering/foundry-hosted-agents',
-        'Wiki : notes d\u2019architecture, contournement manuel de l\u2019agent, et le journal d\u2019investigation RBAC 401 en direct',
+        'Wiki : architecture actuelle, artefacts vérifiés, guide opérationnel et historique WI-11 résolu',
         'Labs complets, bilingues, pas à pas : le site GitHub Pages compagnon de ce deck',
-        'Forkez-le, exécutez-le, et suivez la résolution de WI-11',
+        'Test de production v34 réussi ; zéro exception récente ne prouve ni l’endurance ni le traçage distribué complet',
       ],
     },
   },
@@ -274,7 +275,7 @@ function buildDeck(lang) {
   pptx.defineLayout({ name: 'WIDE', width: 13.33, height: 7.5 });
   pptx.layout = 'WIDE';
 
-  SLIDES.forEach((def, i) => {
+  SLIDES.forEach((def) => {
     const s = newSlide(pptx);
     if (def.isTitle) {
       s.addShape('rect', { x: 0, y: 0, w: 13.33, h: 7.5, fill: { color: C.blueDeep } });
@@ -287,12 +288,16 @@ function buildDeck(lang) {
       s.addText(lang === 'en' ? 'devopsabcs-engineering/foundry-hosted-agents' : 'devopsabcs-engineering/foundry-hosted-agents', {
         x: 0.8, y: 6.7, w: 11.7, h: 0.4, fontSize: 12, color: '8AB4E0', fontFace: 'Segoe UI',
       });
+      s.addNotes('Verified release 34178081808, 2026-09-08 UTC. WI-11 resolved for this implementation. Synthetic fixtures; production readiness remains conditional.');
+      addReleaseSlides(pptx, lang);
       return;
     }
     header(s, { kicker: def.kicker[lang], title: def.title[lang], accent: def.accent });
     bullets(s, def.bullets[lang]);
-    footer(s, `${lang === 'en' ? 'Foundry Hosted Agents Workshop' : 'Atelier Foundry Hosted Agents'} — ${i} / ${SLIDES.length - 1}`);
+    s.addNotes(`${def.bullets[lang].join('\n')}\nSources: repository code and wiki Release-Evidence / Operations. Verified release 34178081808; historical experiments retain their original limits.`);
+    footer(s, lang === 'en' ? 'Foundry Hosted Agents Workshop' : 'Atelier Foundry Hosted Agents');
   });
+  pptx.slides.forEach((slide, index) => slide.addText(`${index + 1} / ${pptx.slides.length}`, { x: 12.4, y: 7.14, w: 0.6, h: 0.24, fontSize: 9, color: C.textLight, align: 'right' }));
 
   return pptx;
 }

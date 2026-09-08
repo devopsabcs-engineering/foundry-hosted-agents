@@ -1,7 +1,28 @@
 <!-- markdownlint-disable-file -->
 # Deck Outline: Air Canada Foundry Hosted Agents Decision and Multi-Agent PoC
 
-Source document for `scripts/build-deck.js`. All content below is transcribed from `.copilot-tracking/research/2026-09-03/air-canada-foundry-hosted-agents-research.md` (cited as "research.md" below); no figures, comparisons, or gate criteria are invented here.
+Companion outline for `scripts/build-deck.js`, which contains the slide content
+directly and does not parse this file. The original research baseline below
+is supplemented by verified release evidence from September 8, 2026. Research
+citations describe their original scope; planned capabilities are not claims
+that every production-readiness gate has passed.
+
+## Current release proof
+
+Four proof slides follow the title in the generated deck: pipeline results,
+evaluations, tool receipts and production smoke/monitoring. The deck now has
+31 slides, including 14 appendix slides; long open-question content is split
+across three slides to avoid clipping.
+
+* [Run 34178081808](https://github.com/devopsabcs-engineering/foundry-hosted-agents/actions/runs/34178081808): all seven release jobs passed; recovery skipped.
+* Tested commit `f3da486497450d24d540c994839db2876936d22a`: staging 6; production 33 to 34; normal approvals and exact-version production smoke passed.
+* Eight captures, zero policy failures, 21/21 checks across three built-in judges, and 28 successful MCP receipts. Injection refusal is deterministic, not a judge result.
+* WI-11 operationally resolved; internal Azure cache RCA remains unconfirmed, and support-case closure is not asserted.
+* Real tool execution uses synthetic security fixtures. Public MCP ingress, manual recovery, hosted-agent source rebuilds and a short monitoring window remain explicit limits.
+
+The proof slides embed labeled artifact renderings, not portal screenshots.
+Sources, hashes and reproducible rendering commands are in the
+[release evidence](https://github.com/devopsabcs-engineering/foundry-hosted-agents/wiki/Release-Evidence).
 
 ## Confidence Tagging Legend
 
@@ -120,18 +141,18 @@ Any figure that is not directly confirmed (pricing, exact quotas, SLA numbers) i
 
 * Baseline: offline evaluation of versioned candidate outputs against a human-reviewed golden dataset (true positives, false positives, ambiguous evidence, missing data, conflicting tools, prompt injection, unauthorized actions, unsupported conclusions) — `confirmed`. Source: research.md (Lines 508-511, Evaluation Strategy)
 * Deterministic checks: schema validity, required citations, allowed tool calls, policy constraints — `confirmed`. Source: research.md (Line 511)
-* Model-based evaluators: relevance, groundedness, task adherence, rubric scoring — `confirmed` (built-in evaluator catalog exists). Source: research.md (Line 511; Line 298, evaluator catalog)
+* Executed judges: coherence, groundedness and task adherence, scored against the final Composer report and its evidence context. Seven reports passed all three checks at unchanged 100% thresholds. Category-specific custom rubrics and tool-call-accuracy judging are not executed by the current release runner.
 * Human review required for high-impact vulnerability conclusions and any recommendation triggering remediation or operational change — `confirmed` policy requirement. Source: research.md (Line 512)
 * Continuous evaluation of sampled production traffic is a **separate preview and privacy decision** — redaction and retention must be defined before enabling — `preview`. Source: research.md (Line 513; Line 566 register row)
-* GitHub Action (`microsoft/ai-agent-evals@v3-beta`) targeting the deployed hosted-agent name/version, and portal visibility of action-created runs — `requires-validation` (not verified in research). Source: research.md (Line 567 register row)
+* Current implementation: `eval/run_hosted_evaluation.py` captures version-bound output, applies deterministic policy and submits to Foundry judges. It does not use `microsoft/ai-agent-evals`. Saved API results establish the pass; native portal visibility was not captured.
 
 ---
 
 ## Core Slide 10 — Automation (CI/CD)
 
-**Objective**: Evaluate every candidate before production traffic moves; show the full staging-to-rollback pipeline.
+**Objective**: Evaluate every candidate before production traffic moves; show the verified staging-to-production pipeline and manual recovery boundary.
 
-* Pipeline stages: lint/unit tests/dependency scan → Bicep validate + what-if → deploy immutable candidate to staging → smoke/contract/streaming tests → offline evaluation quality gate → manual production approval → deploy production version → canary/explicit route switch → post-deploy checks/monitoring → rollback route to prior version on breach — `confirmed` documented pattern. Source: research.md (Lines 518-533, CI/CD and Release Control diagram)
+* Implemented stages: lint/unit/dependency checks, Bicep validation/what-if, staging deployment, smoke/contract/streaming checks, strict evaluation, production approval/deployment, monitoring approval and post-deploy checks. Prior routed version is discovered remotely before provisioning. MCP image digests are promoted; the agent is rebuilt from the evaluated source. No canary or automatic rollback is implemented; recovery is manual. Source: run 34178081808 and the operations runbook.
 * Bicep provisions infrastructure; `azd` or Foundry APIs deploy agent versions as a **separate lifecycle** from infrastructure changes — `confirmed`. Source: research.md (Line 533)
 * Evaluations run against a non-production candidate before traffic promotion; continuous evaluation (if approved) monitors production after release and does **not** replace the release gate — `confirmed` policy. Source: research.md (Line 533)
 
@@ -142,7 +163,7 @@ Any figure that is not directly confirmed (pricing, exact quotas, SLA numbers) i
 **Objective**: Separate confirmed identity/RBAC controls from validation tracks and open blockers.
 
 * Confirmed baseline controls: each hosted agent gets an auto-created, dedicated Entra ID identity at deploy time (no manual managed-identity wiring); Foundry RBAC role family (Foundry User / Foundry Project Manager / Foundry Account Owner / Foundry Owner / Foundry Agent Consumer); Application Insights / OpenTelemetry tracing — `confirmed`. Source: research.md (Lines 300-306, RBAC roles table; explicit identity discovery discussion)
-* Explicit warning carried from research: don't assign `Cognitive Services *` roles to a CI/CD identity — Foundry has its own role family for this — `confirmed` documented guidance. Source: research.md (Lines 300-306)
+* Separate the GitHub OIDC deployment principal, hosted runtime instance principal and AgentIdentityBlueprint. Runtime model access uses Foundry User plus Cognitive Services OpenAI User at the environment's account scope. These runtime grants are not a blanket CI/CD role recipe. Zero recent exceptions is not proof of complete distributed tracing.
 * Agent 365 governance/registry onboarding: Agent 365 and Entra Agent ID are GA; SDK packages exist for Foundry tooling and LangChain observability — but no dedicated Hosted Agent onboarding guide, no confirmed LangGraph-specific package, and no proof a platform-created identity can be migrated in place — `inferred` (partially evidenced, exact path unverified). Source: research.md (Line 568 register row)
 * Platform SLA / GA status / regions / quotas / capacity / cold starts / disaster recovery — `requires-validation`, first Production Decision Gate item. Source: research.md (Line 576, Production Decision Gates — Platform status)
 
@@ -153,8 +174,8 @@ Any figure that is not directly confirmed (pricing, exact quotas, SLA numbers) i
 **Objective**: Four increments produce a defensible production decision, with owners, exit criteria, and a decision date.
 
 * **Increment 1 — Baseline Hosted Agent & LangGraph Multi-Agent Runtime**: supervisor graph + 3 specialist nodes; `azure-ai-agentserver-langgraph` wrapper on Responses protocol (port 8088); validate local run, Responses SSE, built-in conversation history; provision via Bicep, deploy via `azd` — `confirmed` plan of record. Source: research.md (Lines 589-593)
-* **Increment 2 — Decoupled MCP Tool Hosting & Foundry Integration**: Defender + Anomaly MCP servers on Container Apps with system-assigned managed identities and private networking; register as Foundry Custom Connections; bundle into Toolbox; validate tool calling, argument validation, error recovery — `confirmed` plan of record. Source: research.md (Lines 595-599)
-* **Increment 3 — Offline Security Evaluation Suite & Automated CI/CD Gates**: versioned golden dataset; deterministic schema checks + LLM-as-judge rubrics; GitHub Actions gate (lint → Bicep validate → deploy candidate to staging → `microsoft/ai-agent-evals@v3-beta` → threshold-gated promotion) — `confirmed` plan of record. Source: research.md (Lines 601-605)
+* Increment 2 implemented: Defender and Anomaly MCP servers on Container Apps, RemoteTool connections and a versioned Toolbox MCP endpoint. Public PoC ingress is used; private networking is not established by this release. Runtime receipts prove successful tool calls.
+* Increment 3 implemented: versioned golden dataset, deterministic policy and custom Python release runner with three built-in Foundry judges. Staging-to-production gates passed in the cited run; proposed category-specific rubrics are follow-on work.
 * **Increment 4 — Validation Tracks, Load Testing & Production Decision Gates**: Load & Scale Gate (10-100 concurrent users, same-thread turn concurrency, cold-start latency, active session compute); State Experiment Track (Cosmos serverless checkpointer benchmark: latency, RU cost, private endpoint reachability); Governance Validation Track (Agent 365 / Entra Agent ID onboarding probe); Continuous Evaluation Track (preview `EvaluationRule` for production sampling); Deliverable Synthesis (this deck + Production Decision Gate scorecard) — `confirmed` plan of record, individual track outcomes `requires-validation`. Source: research.md (Lines 607-611)
 * Decision gates requiring evidence before production approval: Platform status, Scale, Security, Data, Quality, Operations, Cost, Preview acceptance — full list in Appendix H below. Source: research.md (Lines 572-583, Production Decision Gates)
 * Owners and decision date: **not specified in the research document** — `requires-validation` / open item for the presenting team to fill in before delivery.
@@ -264,7 +285,7 @@ This register reframes the Evidence Confidence Register (Appendix B) by product-
 | A2A delegation protocol | Preview | `preview` |
 | Continuous evaluation (`EvaluationRule`) | Documented but preview | `preview` |
 | Microsoft Agent 365 / Entra Agent ID | GA (platform), Hosted Agent onboarding path unverified | `inferred` |
-| `microsoft/ai-agent-evals` GitHub Action | Beta tag (`@v3-beta`); hosted-agent targeting not verified | `requires-validation` |
+| `microsoft/ai-agent-evals` GitHub Action | Researched alternative; not used by the current release runner | Not part of implemented baseline |
 | LangSmith Azure BYOC | Roadmap-stated "planned for 2H 2026", not a release commitment | `requires-validation` |
 
 Source: research.md (Line 5; Lines 356-369; Lines 554-570; Line 296)
@@ -280,7 +301,7 @@ Transcribed from the Open Customer Questions section, each already separating es
 * **Tools and MCP**: custom MCP code needs its own Azure runtime; Foundry connections/Toolbox register and aggregate; auth, private reachability, throttling, versioning, and failure handling must be validated in the PoC — `requires-validation`. Source: research.md (Line 617)
 * **Multi-agent design**: a supervisor coordinating specialists inside one hosted deployment is a genuine multi-agent system; separate A2A deployments are justified only by independent ownership/release/isolation/scaling needs and remain preview — `confirmed` baseline pattern / `preview` for A2A. Source: research.md (Line 618)
 * **Evaluations**: offline/batch scoring confirmed; continuous evaluation documented but preview; GitHub Action hosted-agent targeting, portal visibility, and multi-agent trace coverage require validation — mixed `confirmed`/`preview`/`requires-validation`. Source: research.md (Line 619)
-* **Automation**: recommended flow (staging → smoke/contract/streaming/offline-eval gates → approval → promote → monitor → rollback); infrastructure and agent versions have separate deployment lifecycles — `confirmed`. Source: research.md (Line 620)
+* Automation: the full staging/evaluation/approval/production/monitoring flow passed. Recovery remains manual, not an automatic rollback promise. Infrastructure and agent versions retain separate deployment lifecycles. Source: run 34178081808; research.md (Line 620) for the original target pattern.
 * **Streaming**: Responses SSE supports progressive output events; parity with all required LangGraph events, reconnection, cancellation, and the existing UI contract must be tested — `confirmed` mechanism / `requires-validation` for parity. Source: research.md (Line 621)
 * **Conversation state**: Responses history is the baseline source of truth; adopt Cosmos checkpointer only for a documented durable-state requirement; no user-scoped conversation-list API was found — `confirmed` baseline / `requires-validation` for the list API gap. Source: research.md (Line 622)
 * **Governance**: per-agent Entra identity, Foundry RBAC, and Application Insights are supported baseline controls; Agent 365 is a validation track because the exact Hosted Agent identity onboarding and LangGraph instrumentation path was not found — `confirmed` baseline / `inferred` for Agent 365. Source: research.md (Line 623)

@@ -9,8 +9,6 @@ permalink: /fr/
 
 > 🇬🇧 **[English version](../)**
 
-# Atelier Foundry Hosted Agents
-
 Bienvenue dans l'**Atelier Foundry Hosted Agents** — un atelier pratique et
 progressif construit directement à partir d'une véritable preuve de
 concept : héberger un **système multi-agent LangGraph d'évaluation des
@@ -20,15 +18,31 @@ d'outils MCP indépendants exécutés sur Azure Container Apps.
 Vous déploierez les serveurs d'outils MCP, provisionnerez un projet
 Foundry et un agent hébergé, l'invoquerez, le soumettrez à des évaluations
 déterministes et de type LLM-as-judge, parcourrez le pipeline CI/CD qui
-promeut un candidat en production, et — fait unique — apprendrez une
-véritable investigation de dépannage de plateforme, encore ouverte à ce
-jour, en utilisant uniquement l'interface en ligne de commande Azure.
+promeut un candidat en production, puis étudierez WI-11, désormais résolu
+opérationnellement. Vous distinguerez le rétablissement observé d'une
+cause racine de plateforme qui reste non confirmée.
 
 > [!NOTE]
 > Cet atelier est construit à partir du dépôt
 > [`foundry-hosted-agents`](https://github.com/devopsabcs-engineering/foundry-hosted-agents)
-> — chaque commande, capture d'écran et extrait de journal dans ces
-> laboratoires provient de ce déploiement réel, pas d'une simulation.
+> Les déploiements et évaluations sont réels ; les outils MCP utilisent des
+> données de sécurité synthétiques, pas des données client réelles. Les
+> extraits historiques sont distingués des résultats actuels.
+
+## Mise en production vérifiée : 8 septembre 2026
+
+L'[exécution 34178081808](https://github.com/devopsabcs-engineering/foundry-hosted-agents/actions/runs/34178081808)
+a réussi les sept jobs de publication : staging version 6, huit captures,
+21/21 vérifications par juges, approbations normales, production version 34
+et test de fumée ciblant cette version. WI-11 est résolu opérationnellement.
+
+![Pipeline réussi, rendu à partir des artefacts conservés](../assets/images/release-pipeline.png)
+
+Consultez les [preuves de publication](https://github.com/devopsabcs-engineering/foundry-hosted-agents/wiki/Release-Evidence)
+et le [guide opérationnel](https://github.com/devopsabcs-engineering/foundry-hosted-agents/wiki/Operations).
+Les images sont des rendus d'artefacts, pas des captures du portail. La
+récupération reste manuelle ; zéro exception récente ne prouve ni
+l'endurance ni le traçage distribué complet.
 
 ## À qui s'adresse cet atelier ?
 

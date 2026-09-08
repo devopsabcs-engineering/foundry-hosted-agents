@@ -1,0 +1,1 @@
+Post-deploy monitoring check	Check Application Insights for post-deploy exceptions (breach signal)	2026-09-08T02:12:02.3612728Z Post-deploy exception count (last 10m): 0

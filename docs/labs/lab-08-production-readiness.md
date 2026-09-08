@@ -54,8 +54,10 @@ and find the status legend:
 
 Find the **Quality** gate row — this is the only gate marked **Pass**
 outright. Trace its evidence pointer back to the exact artifacts from
-[Lab 05](lab-05-evaluations.md): the golden dataset, the 12/12 passing
-deterministic tests, and the rubric mapping.
+[Lab 05](lab-05-evaluations.md): the golden dataset and strict policy gate,
+then run 34178081808's eight captures, 21/21 judge checks, verified injection
+refusal and 28 tool receipts. This is a pass for the synthetic suite, not
+statistical proof of security efficacy on real customer data.
 
 ### Exercise 8.3: Why "Conditional Go," Not a Clean Yes/No
 
@@ -63,11 +65,13 @@ Read the scorecard's **Overall recommendation** section. It recommends a
 **conditional go for continued PoC-to-pilot investment**, explicitly gated
 on:
 
-1. Resolution of the open tool-calling/authorization investigation (see
-   [Lab 07](lab-07-troubleshooting-rbac.md)).
-2. The continuous-evaluation RBAC fix and re-test.
-3. An extended load test to the full target range.
-4. Formal commercial/SLA/pricing confirmation.
+1. Named security, data and operations owners, including public MCP ingress and authorization review.
+2. Extended load testing with working MCP calls and a rehearsed manual recovery path.
+3. Formal commercial/SLA/pricing confirmation and preview acceptance.
+4. Re-tests of continuous evaluation, Cosmos and Agent 365 only if retained in the pilot design.
+
+WI-11 is now operationally resolved and the complete release pipeline passed;
+it is no longer listed as an open pilot blocker.
 
 This is a deliberately honest pattern: a PoC's job is to **separate what's
 proven from what still needs proving**, not to manufacture false
@@ -100,9 +104,9 @@ non-technical stakeholder audience without overstating certainty.
 ## Workshop Wrap-Up
 
 You've now taken one PoC from architecture, through deployment, invocation,
-evaluation, CI/CD, a real open troubleshooting investigation, and finally
+evaluation, verified CI/CD, a resolved troubleshooting investigation, and finally
 to an honest production-readiness recommendation. The full source for
 everything in this workshop lives in
 [`devopsabcs-engineering/foundry-hosted-agents`](https://github.com/devopsabcs-engineering/foundry-hosted-agents) —
 fork it, and the [wiki](https://github.com/devopsabcs-engineering/foundry-hosted-agents/wiki)
-will keep tracking WI-11 as it resolves.
+preserves the WI-11 history, current release proof and remaining readiness gaps.

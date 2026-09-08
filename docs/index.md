@@ -1,13 +1,12 @@
 ---
 layout: default
 title: Home
+description: A verified staging-to-production Foundry Hosted Agents workshop with release evidence and explicit pilot-readiness limits.
 nav_order: 0
 permalink: /
 ---
 
 > 🇫🇷 **[Version française](fr/)**
-
-# Foundry Hosted Agents Workshop
 
 Welcome to the **Foundry Hosted Agents Workshop** — a hands-on, progressive
 workshop built directly from a real proof of concept: hosting a
@@ -18,14 +17,30 @@ servers running on Azure Container Apps.
 You will deploy the MCP tool servers, provision a Foundry project and a
 hosted agent, invoke it, gate it with deterministic and LLM-as-judge
 evaluations, walk the CI/CD pipeline that promotes a candidate to
-production, and — uniquely — learn a real, still-open platform
-troubleshooting investigation using nothing but the Azure CLI.
+production, and study the resolved WI-11 investigation, including the
+difference between observed recovery and an unconfirmed platform root cause.
 
 > [!NOTE]
 > This workshop is built from the
 > [`foundry-hosted-agents`](https://github.com/devopsabcs-engineering/foundry-hosted-agents)
-> repository — every command, screenshot, and log excerpt in these labs
-> comes from that real deployment, not a simulation.
+> repository. Deployment and evaluation evidence are real; MCP security
+> telemetry uses synthetic fixtures, not live customer data. Historical
+> investigation excerpts are retained and labeled separately from current results.
+
+## Verified Release: September 8, 2026
+
+[Run 34178081808](https://github.com/devopsabcs-engineering/foundry-hosted-agents/actions/runs/34178081808)
+passed all seven release jobs: staging version 6, eight captured cases,
+21/21 model-judge checks, normal production approvals, production version 34,
+and its exact-version smoke test. WI-11 is operationally resolved.
+
+![Successful pipeline rendered from retained artifacts](assets/images/release-pipeline.png)
+
+See the [release evidence](https://github.com/devopsabcs-engineering/foundry-hosted-agents/wiki/Release-Evidence)
+and [operations runbook](https://github.com/devopsabcs-engineering/foundry-hosted-agents/wiki/Operations).
+The images are artifact renderings, not portal screenshots. Recovery remains
+manual; zero exceptions in a trailing window is not an endurance test or proof
+of complete distributed tracing.
 
 ## Who Is This For?
 

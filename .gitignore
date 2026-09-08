@@ -26,6 +26,12 @@ assets/
 *.pid
 *-log.txt
 
+# Retain only the curated, non-secret release proof bundle from root assets.
+!/assets/
+/assets/*
+!/assets/release-evidence/
+!/assets/release-evidence/**
+
 # Build results
 [Dd]ebug/
 [Dd]ebugPublic/

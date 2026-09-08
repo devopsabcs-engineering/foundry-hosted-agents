@@ -65,12 +65,13 @@ Ouvrez [`src/threat-assessment-agent/state.py`](https://github.com/devopsabcs-en
 et trouvez les indicateurs `evidence_tool_unavailable` /
 `risk_tool_unavailable`.
 
-`main.py` enveloppe l'étape de résolution d'outils de Foundry pour qu'une
-lacune connue côté plateforme dégrade vers une analyse LLM simple
-honnêtement étiquetée, plutôt que de faire planter la requête. C'est un
-véritable patron de préparation à la production : lorsqu'une dépendance
-dont votre graphe a besoin n'est pas disponible, échouez de manière
-*visible et honnête* dans la sortie, pas silencieusement ni par un crash.
+Ces indicateurs signalent explicitement une dépendance indisponible ; ce
+n'est pas le comportement normal de la publication vérifiée. Le transport
+actuel utilise le point MCP Toolbox versionné, des jetons Entra renouvelés
+et des connexions RemoteTool. Les deux spécialistes ont appelé leurs outils
+dans l'exécution 34178081808. Une réponse dégradée ne peut pas franchir la
+porte qualité si les reçus requis manquent. Distinguez disponibilité de
+secours et approbation qualité.
 
 ### Exercice 1.3 : Les quatre couches d'outils
 

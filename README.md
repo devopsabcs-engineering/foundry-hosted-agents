@@ -127,7 +127,19 @@ Review the production toolbox version together with the candidate. Before provis
 resolves the currently routed production version from Foundry and records its active status for
 manual recovery; missing or ambiguous routing blocks promotion.
 
-## Known issues
+## Verified release and WI-11 resolution
 
-WI-11 (a persistent `401 PermissionDenied` on Azure OpenAI calls from the hosted agent's Instance Identity, confirmed as a platform-side bug with RBAC configuration verified correct) is tracked via Azure support request `2609040400007027`. Full diagnostic history is in the wiki's [RBAC 401 Investigation](../../wiki/RBAC-401-Investigation) page.
+[Run 34178081808](https://github.com/devopsabcs-engineering/foundry-hosted-agents/actions/runs/34178081808)
+passed the entire staging-to-production pipeline on 2026-09-08 UTC. Staging version 6
+completed eight captures, zero deterministic policy failures, and 21 of 21 model-judge
+checks. Production version 34 is active; its smoke test passed and the exception query
+returned 0. WI-11 is resolved for this implementation, without claiming a confirmed
+server-side root cause or closure of support request `2609040400007027`.
+
+See the wiki's [Release Evidence](../../wiki/Release-Evidence),
+[Operations](../../wiki/Operations), and [WI-11 history](../../wiki/RBAC-401-Investigation).
+The [evidence report](assets/release-evidence/index.html) and
+[hashed source artifacts](assets/release-evidence/manifest.json) retain the proof.
+These are synthetic security fixtures: a green PoC release is not enterprise production
+certification, a sustained-load test, or evidence of complete distributed tracing.
 

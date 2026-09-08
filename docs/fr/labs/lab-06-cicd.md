@@ -61,20 +61,11 @@ identifiant fédéré, au lieu d'un secret à longue durée de vie.
 
 ### Exercice 6.4 : Une véritable leçon de concurrence
 
-Lisez attentivement le bloc de commentaires en haut de
-`hosted-agent-cd.yml` :
-
-> Le déclenchement automatique à chaque push sur main entrait en
-> concurrence avec les propres cycles de provisionnement/déploiement de
-> `deploy-and-evaluate.yml` contre le même compte Cognitive Services, ce
-> qui est probablement la vraie cause des erreurs `401 PermissionDenied`
-> intermittentes observées lors des invocations de l'agent hébergé.
-
-C'est une leçon réellement utile pour toute conception CI/CD : **deux
-pipelines indépendants écrivant sur la même ressource partagée peuvent
-ressembler exactement, de l'extérieur, à un bogue RBAC**, même lorsque
-l'attribution de rôle elle-même est correcte. Le [Lab 07](lab-07-troubleshooting-rbac.md)
-montre le processus méthodique pour confirmer ou infirmer cette hypothèse.
+Les deux workflows sont déclenchés manuellement pour éviter les déploiements
+concurrents. La concurrence était une hypothèse plausible, pas une cause
+prouvée du 401. Éliminer une course améliore le contrôle des mises en production,
+sans établir une cause racine interne à Azure. Le [Lab 07](lab-07-troubleshooting-rbac.md)
+distingue ces hypothèses du rétablissement observé.
 
 ### Exercice 6.5 : Vérifier la cible et le contrat du test de fumée
 
@@ -111,10 +102,10 @@ bash scripts/test-agent-response.sh
 actionlint -shellcheck= .github/workflows/deploy-and-evaluate.yml
 ```
 
-Le 7 septembre, le validateur a accepté une réponse réelle de la version 32
+Historiquement, le 7 septembre, le validateur a accepté une réponse réelle de la version 32
 du PoC avec le prompt CI et rejeté les 12 cas invalides. Cela ne vérifie ni
 l'identité CI du staging ni l'exécution GitHub Actions complète. Les réponses
-signalent encore l'absence de preuves MCP en direct ; un test de transport
+de cette version signalaient l'absence de preuves MCP ; un test de transport
 réussi ne prouve pas le fonctionnement des outils ni la qualité des réponses.
 
 > [!WARNING]
@@ -126,11 +117,12 @@ réussi ne prouve pas le fonctionnement des outils ni la qualité des réponses.
 > a ensuite approuvé la production pour l'exécution `34157050648`. La déclaration
 > `environment: production` seule n'impose pas d'approbation manuelle sans
 > ces paramètres du dépôt.
-> La promotion reconstruit le code au lieu de promouvoir l'artefact testé,
-> et le rollback provisoire dangereux a été supprimé. La récupération reste
-> manuelle tant qu'une restauration de version antérieure n'est pas vérifiée.
-> Ces points bloquent une mise en production fiable ;
-> un test de fumée réussi ne constitue pas une approbation de production.
+> L'exécution `34178081808` a ensuite franchi les deux portes de production
+> avec approbation normale. L'agent est reconstruit depuis le code évalué ;
+> les images MCP utilisent les mêmes condensats évalués. Ce n'est pas une
+> promotion binaire identique de l'agent. La récupération reste manuelle,
+> sans rollback automatique ni canary : des limites importantes pour une
+> adoption entreprise, malgré la réussite du pipeline.
 
 ### Exercice 6.6 : Rejeter les faux succès d'évaluation
 
@@ -168,7 +160,7 @@ cas conservent leurs exigences. La capture continue après un échec, mais tout
 Toutes les actions JavaScript des deux workflows déclarent Node.js 24.
 Les téléchargements utilisent `actions/download-artifact@v7`.
 
-Lors du test local, cinq cas staging ont retourné des réponses valides. Le filtre
+Lors d'un test local antérieur, cinq cas staging ont retourné des réponses valides. Le filtre
 Azure contre les jailbreaks a rejeté le cas d'injection, bloquant correctement
 l'exécution. Une évaluation diagnostique d'une réponse capturée a réussi les
 trois métriques sans erreur de juge, mais a échoué au contrôle des preuves.
@@ -186,6 +178,29 @@ couverture du trafic ni la fraîcheur de la télémétrie.
 bash scripts/test-agent-rbac.sh
 python -m pytest eval/deterministic-tests/ -q
 ```
+
+### Exercice 6.7 : Examiner la mise en production réussie
+
+Ouvrez l'[exécution 34178081808](https://github.com/devopsabcs-engineering/foundry-hosted-agents/actions/runs/34178081808).
+Les sept jobs ont réussi ; la récupération a été ignorée. Staging version 6
+a produit huit captures, zéro violation, 21/21 vérifications et 28 reçus d'outils.
+La production est passée de 33 à 34, avec un test de fumée ciblé réussi et les
+deux approbations requises. Zéro exception sur une fenêtre glissante ne prouve
+ni dix minutes d'endurance après déploiement ni un traçage complet.
+
+![Porte qualité réussie, rendu des artefacts conservés](../../assets/images/release-evaluations.png)
+
+Reliez les [preuves conservées](https://github.com/devopsabcs-engineering/foundry-hosted-agents/wiki/Release-Evidence)
+au commit. Les trois juges évaluent le rapport final avec le prompt et les
+preuves du Composer. Le refus d'injection est vérifié de façon déterministe,
+sans trois résultats de juge supplémentaires. Les appels MCP sont réels,
+mais les données de sécurité sont synthétiques.
+
+Avant de provisionner la production, le workflow découvre à distance la version
+numérique qui reçoit 100 % du trafic. L'état local azd d'un runner neuf ne
+suffit pas ; toute route absente ou ambiguë bloque le déploiement. Le
+[guide opérationnel](https://github.com/devopsabcs-engineering/foundry-hosted-agents/wiki/Operations)
+décrit ce contrat et la récupération manuelle.
 
 ## Vérification des connaissances
 

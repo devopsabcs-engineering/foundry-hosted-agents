@@ -1,8 +1,9 @@
-// Renders deliverables/air-canada-foundry-hosted-agents-decision.pptx from deliverables/deck-outline.md.
+// Renders the decision deck from the content below, with shared verified-release slides.
 // Idempotent: re-running regenerates the file from scratch each time (pptxgenjs is create-only).
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import PptxGenJS from 'pptxgenjs';
+import { addReleaseSlides } from './release-slides.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, '..');
@@ -79,7 +80,7 @@ function taggedBullets(slide, items, opts = {}) {
       },
     });
     runs.push({
-      text: `${text}\n`,
+      text,
       options: {
         color: C.textPri, fontSize: opts.fontSize || 12, fontFace: 'Segoe UI', breakLine: true,
       },
@@ -184,7 +185,7 @@ pptx.layout = 'LAYOUT_WIDE';
   });
   s.addShape('rect', { x: 0.9, y: 4.7, w: 4.2, h: 0.02, fill: { color: C.teal } });
   s.addText(
-    'Every claim on this deck is labeled CONFIRMED / PREVIEW / INFERRED / REQUIRES VALIDATION — see Appendix B.',
+    'Verified release: 2026-09-08 UTC | WI-11 resolved | staging 6 / production 34 | synthetic PoC data',
     { x: 0.9, y: 6.9, w: 11.5, h: 0.4, fontSize: 11, italic: true, color: C.accent10, fontFace: 'Segoe UI' },
   );
   legendStrip(s, { x: 0.9, y: 6.45, w: 11.5 });
@@ -192,13 +193,15 @@ pptx.layout = 'LAYOUT_WIDE';
 }
 
 // CORE SLIDES 1-12
+addReleaseSlides(pptx);
+
 coreSlide(pptx, {
   title: 'Decision Required',
   objective: 'Frame the single decision Air Canada must make: select a reusable hosting blueprint for LangGraph agents.',
   bullets: [
     { tag: 'confirmed', text: 'Decision framing: adopt, validate, or defer a hosting blueprint for future LangGraph agents.' },
     { tag: 'confirmed', text: 'Foundry Hosted Agents is the leading PoC candidate — not yet an unconditional production selection.' },
-    { tag: 'confirmed', text: "This deck separates what today's evidence proves from what the PoC must still prove." },
+    { tag: 'confirmed', text: 'The complete release passed: 8 captures, 21/21 judge checks, production v34 smoke. WI-11 is resolved; pilot security, capacity, cost, and recovery gates remain.' },
   ],
   source: 'research.md (Lines 535-537, 5, 420, 27-32)',
 });
@@ -298,32 +301,34 @@ coreSlide(pptx, {
   objective: 'Gate production releases on security-task outcomes, not generic fluency.',
   bullets: [
     { tag: 'confirmed', text: 'Baseline: offline evaluation of versioned candidate outputs against a human-reviewed golden dataset (true/false positives, ambiguous evidence, missing data, conflicting tools, prompt injection, unauthorized actions, unsupported conclusions).' },
-    { tag: 'confirmed', text: 'Deterministic checks: schema validity, required citations, allowed tool calls, policy constraints.' },
-    { tag: 'confirmed', text: 'Model-based evaluators: relevance, groundedness, task adherence, rubric scoring (built-in evaluator catalog exists).' },
+    { tag: 'confirmed', text: 'Verified capture: eight cases, zero deterministic policy failures, 28 runtime tool receipts; the injection case is an exact safety refusal with no tools.' },
+    { tag: 'confirmed', text: 'Executed model judges: coherence, groundedness, task adherence. Seven reports per metric, 21/21 passes; each threshold remains 100%.' },
     { tag: 'confirmed', text: 'Human review required for high-impact vulnerability conclusions and any recommendation triggering remediation or operational change.' },
     { tag: 'preview', text: 'Continuous evaluation of sampled production traffic is a separate preview and privacy decision — redaction and retention must be defined before enabling.' },
-    { tag: 'requires-validation', text: 'GitHub Action (microsoft/ai-agent-evals@v3-beta) targeting the deployed hosted-agent name/version, and portal visibility of action-created runs.' },
+    { tag: 'confirmed', text: 'Custom hosted capture/evaluation runner gates immutable staging version 6. Missing, duplicate, errored, or skipped results fail closed. No third-party evaluation Action is used.' },
   ],
-  source: 'research.md (Lines 298, 508-513, 566-567)',
+  source: 'assets/release-evidence/source/results.json; eval/run_hosted_evaluation.py; eval/evaluation_gate.py',
 });
 
 coreSlide(pptx, {
   title: 'Automation (CI/CD)',
-  objective: 'Evaluate every candidate before production traffic moves; show the full staging-to-rollback pipeline.',
+  objective: 'Verified staging-to-production path, normal approvals, and explicit manual recovery boundaries.',
   bullets: [
-    { tag: 'confirmed', text: 'Pipeline: lint/unit tests/dependency scan \u2192 Bicep validate + what-if \u2192 deploy immutable candidate to staging \u2192 smoke/contract/streaming tests \u2192 offline evaluation quality gate \u2192 manual production approval \u2192 deploy production version \u2192 canary/explicit route switch \u2192 post-deploy checks/monitoring \u2192 rollback on breach.' },
+    { tag: 'confirmed', text: 'Passed run 34178081808: lint/tests -> Bicep/what-if -> isolated staging -> smoke/contract/streaming -> evaluation -> production approval/deploy -> approved smoke/monitoring.' },
+    { tag: 'confirmed', text: 'MCP images use the evaluated SHA-256 digests. The agent is remotely rebuilt from the same source, not promoted as an identical runtime binary.' },
+    { tag: 'requires-validation', text: 'No automatic rollback or canary. Recovery job signals manual action; rehearse route and infrastructure recovery before live-data production.' },
     { tag: 'confirmed', text: 'Bicep provisions infrastructure; azd or Foundry APIs deploy agent versions as a separate lifecycle from infrastructure changes.' },
     { tag: 'confirmed', text: 'Evaluations run against a non-production candidate before traffic promotion; continuous evaluation (if approved) monitors production after release and does not replace the release gate.' },
   ],
-  source: 'research.md (Lines 518-533)',
+  source: '.github/workflows/deploy-and-evaluate.yml; scripts/record-production-version.sh; Actions 34178081808',
 });
 
 coreSlide(pptx, {
   title: 'Governance and Readiness',
   objective: 'Separate confirmed identity/RBAC controls from validation tracks and open blockers.',
   bullets: [
-    { tag: 'confirmed', text: 'Confirmed baseline controls: each hosted agent gets an auto-created, dedicated Entra ID identity at deploy time (no manual managed-identity wiring); Foundry RBAC role family; Application Insights / OpenTelemetry tracing.' },
-    { tag: 'confirmed', text: "Explicit warning: don't assign Cognitive Services * roles to a CI/CD identity — Foundry has its own role family for this." },
+    { tag: 'confirmed', text: 'Runtime instance identity is distinct from CI OIDC and Blueprint identities. Checked account-scoped runtime roles: Foundry User and Cognitive Services OpenAI User.' },
+    { tag: 'confirmed', text: 'Production smoke passed; AppExceptions query returned 0. Full specialist/model/tool trace coverage is not established by an exception count.' },
     { tag: 'inferred', text: 'Agent 365 governance/registry onboarding: Agent 365 and Entra Agent ID are GA; SDK packages exist for Foundry tooling and LangChain observability — but no dedicated Hosted Agent onboarding guide, no confirmed LangGraph-specific package, and no proof a platform-created identity can be migrated in place.' },
     { tag: 'requires-validation', text: 'Platform SLA / GA status / regions / quotas / capacity / cold starts / disaster recovery — first Production Decision Gate item.' },
   ],
@@ -335,7 +340,7 @@ coreSlide(pptx, {
   objective: 'Four increments produce a defensible production decision, with owners, exit criteria, and a decision date.',
   bullets: [
     { tag: 'confirmed', text: 'Increment 1 — Baseline Hosted Agent & LangGraph Multi-Agent Runtime: supervisor graph + 3 specialist nodes; azure-ai-agentserver-langgraph wrapper on Responses protocol (port 8088); validate local run, Responses SSE, built-in conversation history; provision via Bicep, deploy via azd.' },
-    { tag: 'confirmed', text: 'Increment 2 — Decoupled MCP Tool Hosting & Foundry Integration: Defender + Anomaly MCP servers on Container Apps with system-assigned managed identities and private networking; register as Foundry Custom Connections; bundle into Toolbox.' },
+    { tag: 'confirmed', text: 'Increment 2 delivered: separate staging/production MCP apps, RemoteTool connections, versioned MCP transport, strict specialist allowlists. Public PoC ingress; private/authenticated upstream access remains a gate.' },
     { tag: 'confirmed', text: 'Increment 3 — Offline Security Evaluation Suite & Automated CI/CD Gates: versioned golden dataset; deterministic schema checks + LLM-as-judge rubrics; GitHub Actions gate with threshold-gated promotion.' },
     { tag: 'confirmed', text: 'Increment 4 — Validation Tracks, Load Testing & Production Decision Gates: Load & Scale Gate, State Experiment Track, Governance Validation Track, Continuous Evaluation Track, Deliverable Synthesis — plan of record; individual track outcomes require validation.' },
     { tag: 'confirmed', text: 'Decision gates requiring evidence before production approval: Platform status, Scale, Security, Data, Quality, Operations, Cost, Preview acceptance — full list in Appendix H.' },
@@ -357,7 +362,7 @@ coreSlide(pptx, {
     ['Multi-agent', 'Native LangGraph supervisor, subgraphs, handoffs', 'Same plus Agent Server services', 'Same plus self-hosted Agent Server services', 'Native LangGraph supervisor and specialist agents in one deployment', 'Optional A2A split after preview and boundary gates'],
     ['Streaming', 'Implement/operate selected LangGraph stream modes', 'Agent Server streaming', 'Agent Server streaming, customer-operated', 'Responses SSE confirmed; full LangGraph event parity unverified', 'Same as baseline'],
     ['State and history', 'Customer selects/operates checkpointer and conversation index', 'Native Agent Server threads and runs', 'Native Agent Server storage, customer-operated', 'Foundry Responses history baseline', 'Optional Cosmos graph checkpoints or Standard platform dependencies'],
-    ['Evaluations', 'Customer-authored pipeline; Foundry batch evaluation can still score outputs', 'LangSmith evaluation stack', 'LangSmith evaluation stack', 'Foundry local and batch evaluation confirmed', 'Optional continuous evaluation and hosted-agent action integration after validation'],
+    ['Evaluations', 'Customer-authored pipeline; Foundry batch evaluation can still score outputs', 'LangSmith evaluation stack', 'LangSmith evaluation stack', 'Hosted capture plus Foundry judges: 21/21 passed', 'Optional continuous evaluation after privacy and identity validation'],
     ['Governance', 'Azure-native controls designed by customer', 'LangSmith Enterprise controls', 'LangSmith controls plus Azure infra controls', 'Per-agent Entra identity, Foundry RBAC, Application Insights', 'Optional Agent 365 onboarding after tenant validation'],
     ['Operational burden', 'High', 'Low to medium', 'Highest', 'Lowest candidate', 'Medium, proportional to selected extensions'],
     ['Best fit', 'Maximum control without paid Agent Server features', 'Teams already buying LangSmith, accepting SaaS', 'Teams requiring LangSmith features and customer-owned data plane', 'Air Canada PoC baseline', 'Conditional production target after gates pass'],
@@ -379,7 +384,7 @@ coreSlide(pptx, {
   const colW = [3.6, 2.6, 6.3];
   const register = [
     ['LangGraph hosted as custom Foundry code', 'Confirmed by product documentation and samples', 'Suitable for PoC implementation'],
-    ['Responses SSE progressive output', 'Confirmed; application parity untested', 'Supported, with PoC contract and reconnect testing required'],
+    ['Responses SSE progressive output', 'Smoke, contract, streaming checks passed', 'Reconnect, cancellation and complete UI parity remain separate tests'],
     ['Per-session isolation and scale-to-zero', 'Confirmed mechanism; limits and SLA unknown', 'Promising scaling model, not yet a capacity commitment'],
     ['External MCP plus connection and Toolbox aggregation', 'Documented pattern; private path untested', 'Recommended decoupling design, subject to network and auth validation'],
     ['Supervisor and specialist agents in one graph', 'Confirmed LangGraph pattern', 'Production baseline for genuine multi-agent behavior'],
@@ -388,7 +393,7 @@ coreSlide(pptx, {
     ['Cosmos DB LangGraph checkpointer', 'Package confirmed; Hosted Agent pairing untested', 'Conditional state experiment'],
     ['Offline and batch evaluation of LangGraph outputs', 'Confirmed', 'Baseline release-gate mechanism'],
     ['Continuous evaluation', 'Documented but preview', 'Optional production-monitoring experiment'],
-    ['GitHub Action targeting Hosted Agent versions and portal visibility', 'Not verified', 'Must be proven before claiming evaluation synchronization'],
+    ['Hosted capture/evaluation pipeline', 'Verified on staging v6; 21/21 passed', 'Custom runner; native portal screenshot unavailable'],
     ['Agent 365 onboarding and LangGraph instrumentation', 'Partially evidenced, exact path unverified', 'Governance option to validate, not a confirmed architecture property'],
     ['Hosted Agent pricing, quotas, and SLA', 'Insufficient current evidence', 'Obtain live commercial and platform confirmation before production decision'],
   ];
@@ -420,8 +425,8 @@ appendixBulletSlide(pptx, {
   code: 'D', title: 'Evaluation Rubric',
   bullets: [
     { tag: 'confirmed', text: 'Golden dataset composition: true positives, false positives, ambiguous evidence, missing data, conflicting tools, prompt injection, unauthorized actions, unsupported conclusions.' },
-    { tag: 'confirmed', text: 'Release-gate criteria: triage correctness, evidence citation, tool selection, tool argument accuracy, unsupported-action refusal, task completion, output-schema validity, safety, latency, token use, session compute.' },
-    { tag: 'confirmed', text: 'Evaluator types: deterministic checks (schema, citations, allowed tool calls, policy constraints) + model-based evaluators (relevance, groundedness, task adherence, rubric scoring). Built-in catalog includes quality, similarity, RAG, risk/safety, and agentic evaluator families.' },
+    { tag: 'confirmed', text: 'Executed gate: trusted runtime evidence, required receipts, policy constraints, exact safety refusal; seven reports pass coherence, groundedness, and task adherence.' },
+    { tag: 'requires-validation', text: 'Tool argument accuracy, latency, token use, and session compute need separate acceptance measures. Receipt presence or judge passes do not establish every proposed rubric dimension.' },
     { tag: 'confirmed', text: 'Human review gate required for high-impact vulnerability conclusions and any recommendation triggering remediation or operational change.' },
     { tag: 'preview', text: 'Production sampling: continuous evaluation is a separate preview/privacy decision; redact sensitive content and define retention before enabling.' },
   ],
@@ -446,7 +451,8 @@ appendixTableSlide(pptx, {
   colW: [2.6, 3.6, 2.0, 4.3],
   rows: [
     ['Foundry Agent Consumer', 'eed3b665-ab3a-47b6-8f48-c9382fb1dad6', 'account/project/agent', 'invoke-only'],
-    ['Foundry User', '53ca6127-db72-4b80-b1b0-d745d6d5456d', 'account/project', 'data-plane build/deploy — the correct role for CI/CD, not Cognitive Services *'],
+    ['Foundry User', '53ca6127-db72-4b80-b1b0-d745d6d5456d', 'account/project', 'Foundry data plane; one of two checked runtime roles'],
+    ['Cognitive Services OpenAI User', '5e0bd9bd-7b93-4f28-af87-19fc36ad61bd', 'account', 'Model access for the runtime instance principal'],
     ['Foundry Project Manager', 'eadc314b-1a2d-4efa-be10-5d325db5065e', 'account', 'create/manage projects, publish agents'],
     ['Foundry Account Owner', 'e47c6f54-e4a2-4754-9501-8e0985b135e1', 'account', 'create projects/accounts, no data-plane build'],
     ['Foundry Owner', 'c883944f-8b7b-4483-af10-35834be79c4a', 'account', 'full control'],
@@ -483,7 +489,7 @@ appendixTableSlide(pptx, {
     ['A2A delegation protocol', 'Preview', 'preview'],
     ['Continuous evaluation (EvaluationRule)', 'Documented but preview', 'preview'],
     ['Microsoft Agent 365 / Entra Agent ID', 'GA (platform), Hosted Agent onboarding path unverified', 'inferred'],
-    ['microsoft/ai-agent-evals GitHub Action', 'Beta tag (@v3-beta); hosted-agent targeting not verified', 'requires-validation'],
+    ['microsoft/ai-agent-evals GitHub Action', 'Not used by the verified release; custom runner replaces it', 'confirmed'],
     ['LangSmith Azure BYOC', 'Roadmap-stated "planned for 2H 2026," not a release commitment', 'requires-validation'],
   ],
   fontSize: 10,
@@ -503,8 +509,8 @@ appendixTableSlide(pptx, {
   const items2 = [
     { tag: 'confirmed', text: 'Evaluations: offline/batch scoring confirmed.' },
     { tag: 'preview', text: 'Continuous evaluation documented but preview.' },
-    { tag: 'requires-validation', text: 'GitHub Action hosted-agent targeting, portal visibility, and multi-agent trace coverage require validation.' },
-    { tag: 'confirmed', text: 'Automation: recommended flow (staging \u2192 smoke/contract/streaming/offline-eval gates \u2192 approval \u2192 promote \u2192 monitor \u2192 rollback); infrastructure and agent versions have separate deployment lifecycles.' },
+    { tag: 'requires-validation', text: 'Native portal presentation and complete distributed trace coverage need separate confirmation; downloaded artifacts already prove the release gate.' },
+    { tag: 'confirmed', text: 'Staging evaluation, approvals, production deployment and monitoring passed. Infrastructure and agent versions have separate lifecycles; recovery remains manual.' },
     { tag: 'confirmed', text: 'Streaming: Responses SSE supports progressive output events.' },
     { tag: 'requires-validation', text: 'Parity with all required LangGraph events, reconnection, cancellation, and the existing UI contract must be tested.' },
     { tag: 'confirmed', text: 'Conversation state: Responses history is the baseline source of truth; adopt Cosmos checkpointer only for a documented durable-state requirement.' },
@@ -514,8 +520,9 @@ appendixTableSlide(pptx, {
     { tag: 'confirmed', text: 'Reusability: reuse comes from versioned Bicep modules, azure.yaml, a standard hosted-agent wrapper, independently owned MCP contracts, common evaluation datasets, and reusable GitHub workflows.' },
     { tag: 'requires-validation', text: 'Owners and decision date for the PoC plan: not specified anywhere in the research document — open item for the presenting team.' },
   ];
-  appendixBulletSlide(pptx, { code: 'H', title: 'Open Questions', part: '1 of 2', bullets: items1, source: 'research.md (Lines 615-618)' });
-  appendixBulletSlide(pptx, { code: 'H', title: 'Open Questions', part: '2 of 2', bullets: items2, source: 'research.md (Lines 619-624)' });
+  appendixBulletSlide(pptx, { code: 'H', title: 'Open Questions', part: '1 of 3', bullets: items1, source: 'research.md (Lines 615-618)' });
+  appendixBulletSlide(pptx, { code: 'H', title: 'Open Questions', part: '2 of 3', bullets: items2.slice(0, 6), source: 'research.md (Lines 619-624); release 34178081808' });
+  appendixBulletSlide(pptx, { code: 'H', title: 'Open Questions', part: '3 of 3', bullets: items2.slice(6), source: 'research.md (Lines 619-624); release 34178081808' });
 }
 
 // ── Re-stamp footers now that final slide count is known ──────────────────
@@ -530,6 +537,6 @@ allSlides.forEach((slide, i) => {
 await pptx.writeFile({ fileName: OUTPUT_PATH });
 
 console.log(`Wrote ${OUTPUT_PATH}`);
-console.log(`Total slides: ${total} (1 title + ${CORE_SLIDE_TOTAL} core + ${appendixLog.length} appendix)`);
+console.log(`Total slides: ${total} (1 title + 4 release proofs + ${CORE_SLIDE_TOTAL} core + ${appendixLog.length} appendix)`);
 console.log('Appendix slide list:');
 for (const label of appendixLog) console.log(`  - ${label}`);

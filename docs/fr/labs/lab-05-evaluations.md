@@ -74,17 +74,25 @@ catalogue ne couvre pas**.
 | Appels d'outils autorisés / contraintes de politique | Déterministe |
 | Cohérence / fluidité | Intégré : `builtin.coherence` |
 | Ancrage (le rapport correspond aux preuves) | Intégré : `builtin.groundedness` |
-| Adhérence à la tâche (le spécialiste est resté dans son rôle) | Intégré : `builtin.task_adherence` |
-| Sélection d'outil / précision des arguments | Intégré : `builtin.tool_call_accuracy` |
-| Justesse du triage (vrai/faux positif, sévérité) | Personnalisée : `triage-correctness.rubric.yaml` |
-| Qualité de la citation de preuve | Personnalisée : `evidence-citation.rubric.yaml` |
-| Gestion des signaux contradictoires | Personnalisée : `conflict-handling.rubric.yaml` |
+| Respect de la tâche du rapport final | Exécuté : `builtin.task_adherence`, avec le prompt et le contexte du Composer |
+| Sélection d'outil / précision des arguments | Option du catalogue non exécutée : `builtin.tool_call_accuracy` |
+| Justesse du triage (vrai/faux positif, sévérité) | Rubrique proposée : `triage-correctness.rubric.yaml` |
+| Qualité de la citation de preuve | Rubrique proposée : `evidence-citation.rubric.yaml` |
+| Gestion des signaux contradictoires | Rubrique proposée : `conflict-handling.rubric.yaml` |
 
-Ouvrez `eval/rubrics/evaluator-mapping.yaml` et confirmez quels
-évaluateurs intégrés et rubriques personnalisées s'appliquent à la
-catégorie `conflict-001` — c'est le même fichier auquel
-`.github/workflows/deploy-and-evaluate.yml` fait référence pour sa porte
-de qualité d'évaluation (voir [Lab 06](lab-06-cicd.md)).
+Comparez le mapping proposé dans `eval/rubrics/evaluator-mapping.yaml` avec
+`eval/run_hosted_evaluation.py`, qui contrôle la porte réelle. Le runner
+exécute cohérence, ancrage et respect de la tâche. L'exécution 34178081808
+a capturé huit cas, réussi 21/21 vérifications sur sept rapports et produit
+zéro violation. `inject-001` suit la politique de refus vérifié, sans juge de
+modèle. Les reçus d'exécution, pas les déclarations du modèle, prouvent les appels.
+
+![21 vérifications réussies, rendu des résultats conservés](../../assets/images/release-evaluations.png)
+
+Les [preuves de publication](https://github.com/devopsabcs-engineering/foundry-hosted-agents/wiki/Release-Evidence)
+conservent les identifiants et condensats des sources. Les huit cas utilisent
+des données synthétiques : ce petit jeu ne mesure pas une efficacité statistique
+sur des incidents client réels.
 
 ### Exercice 5.4 : Pourquoi ne pas « tout simplement utiliser un juge LLM pour tout » ?
 
@@ -101,7 +109,7 @@ stratégie d'évaluation sépare les **contraintes de politique**
 
 * Quelle catégorie d'évaluation teste que l'agent ne fabrique pas avoir effectué une action ?
 * Nommez un critère de contrôle géré par un évaluateur intégré et un autre géré par une rubrique personnalisée.
-* Pourquoi `unauth-001` est-il vérifié de manière déterministe plutôt que par un juge LLM ?
+* Pourquoi `unauth-001` nécessite-t-il des contrôles déterministes en plus des juges de modèle ?
 
 ## Prochaine étape
 

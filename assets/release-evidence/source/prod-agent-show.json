@@ -1,0 +1,57 @@
+{
+  "object": "agent.version",
+  "id": "threat-assessment-agent:34",
+  "name": "threat-assessment-agent",
+  "version": "34",
+  "description": "",
+  "metadata": {
+    "enableVnextExperience": "true"
+  },
+  "created_at": 1788833345,
+  "definition": {
+    "code_configuration": {
+      "content_hash": "ae55964dddd76914e3be416fba1db36d5d16801ad5b4d18ac15dba5a2878d806",
+      "dependency_resolution": "remote_build",
+      "entry_point": [
+        "python",
+        "main.py"
+      ],
+      "runtime": "python_3_13"
+    },
+    "container_protocol_versions": [],
+    "cpu": "0.5",
+    "environment_variables": {
+      "AZURE_AI_MODEL_DEPLOYMENT_NAME": "gpt-4o-mini",
+      "AZURE_AI_PROJECT_ENDPOINT": "https://aif-air-canada-threat-assessment-poc.services.ai.azure.com/api/projects/proj-air-canada-threat-assessment-poc",
+      "AZURE_OPENAI_DEPLOYMENT": "gpt-4o-mini",
+      "AZURE_OPENAI_ENDPOINT": "https://aif-air-canada-threat-assessment-poc.cognitiveservices.azure.com/",
+      "FOUNDRY_TOOLBOX_VERSION": "1"
+    },
+    "kind": "hosted",
+    "memory": "1Gi",
+    "protocol_versions": [
+      {
+        "protocol": "responses",
+        "version": "2.0.0"
+      }
+    ]
+  },
+  "status": "active",
+  "instance_identity": {
+    "principal_id": "59a21b26-5c3a-42aa-ad7f-05fe701fb25f",
+    "client_id": "59a21b26-5c3a-42aa-ad7f-05fe701fb25f"
+  },
+  "blueprint": {
+    "principal_id": "e227baaa-48b3-4505-a19f-d840bfa2400d",
+    "client_id": "809d5ac4-8b64-4d0c-895a-c33f3e404b93"
+  },
+  "blueprint_reference": {
+    "type": "ManagedAgentIdentityBlueprint",
+    "blueprint_id": "threat-assessment-agent-5e448"
+  },
+  "agent_guid": "5e44808f-0deb-4241-a915-1ed6f9170bef",
+  "playground_url": "https://ai.azure.com/nextgen/r/ZMPSEkDtTG2oJWrfvfJdrQ,rg-air-canada-threat-assessment-poc,,aif-air-canada-threat-assessment-poc,proj-air-canada-threat-assessment-poc/build/agents/threat-assessment-agent/build?version=34",
+  "agent_endpoints": {
+    "responses": "https://aif-air-canada-threat-assessment-poc.services.ai.azure.com/api/projects/proj-air-canada-threat-assessment-poc/agents/threat-assessment-agent/endpoint/protocols/openai/responses?api-version=v1"
+  }
+}

@@ -57,8 +57,10 @@ et trouvez sa légende de statuts :
 Trouvez la ligne de la porte **Quality** — c'est la seule porte marquée
 **Pass** sans condition. Retracez son indicateur de preuve jusqu'aux
 artefacts exacts du [Lab 05](lab-05-evaluations.md) : le jeu de données de
-référence, les 12/12 tests déterministes réussis, et la correspondance des
-rubriques.
+référence et la porte déterministe stricte, puis les huit captures, 21/21
+vérifications, le refus d'injection et les 28 reçus d'outils de l'exécution
+34178081808. Ce succès sur des données synthétiques ne prouve pas une
+efficacité statistique sur des données client réelles.
 
 ### Exercice 8.3 : Pourquoi un « go conditionnel », pas un oui/non net
 
@@ -66,11 +68,13 @@ Lisez la section **Overall recommendation** de la grille. Elle recommande
 un **go conditionnel pour poursuivre l'investissement PoC vers pilote**,
 explicitement conditionné par :
 
-1. La résolution de l'investigation ouverte d'appel d'outils/autorisation
-   (voir [Lab 07](lab-07-troubleshooting-rbac.md)).
-2. La correction RBAC de l'évaluation continue et son nouveau test.
-3. Un test de charge étendu à la plage cible complète.
-4. Une confirmation commerciale/SLA/tarification formelle.
+1. Des responsables sécurité, données et opérations nommés, avec revue de l'accès MCP public et de l'autorisation.
+2. Des tests de charge étendus avec MCP fonctionnel et une récupération manuelle répétée.
+3. Une confirmation commerciale/SLA/tarification et l'acceptation des previews.
+4. De nouveaux tests d'évaluation continue, Cosmos et Agent 365 seulement si retenus pour le pilote.
+
+WI-11 est résolu opérationnellement et le pipeline complet a réussi ; ce
+n'est plus un blocage ouvert du pilote.
 
 C'est un schéma délibérément honnête : le rôle d'un PoC est de **séparer
 ce qui est prouvé de ce qui reste à prouver**, pas de fabriquer une fausse
@@ -105,9 +109,9 @@ la certitude.
 
 Vous venez de parcourir un PoC complet, de l'architecture au déploiement,
 à l'invocation, à l'évaluation, au CI/CD, à une véritable investigation de
-dépannage encore ouverte, jusqu'à une recommandation honnête de
+dépannage résolue, jusqu'à une recommandation honnête de
 préparation à la production. Le code source complet de tout ce qui figure
 dans cet atelier se trouve dans
 [`devopsabcs-engineering/foundry-hosted-agents`](https://github.com/devopsabcs-engineering/foundry-hosted-agents) —
 forkez-le, et le [wiki](https://github.com/devopsabcs-engineering/foundry-hosted-agents/wiki)
-continuera de suivre WI-11 jusqu'à sa résolution.
+conserve l'historique WI-11, les preuves actuelles et les limites restantes.

@@ -1,0 +1,18 @@
+{
+  "runUrl": "https://github.com/devopsabcs-engineering/foundry-hosted-agents/actions/runs/34178081808",
+  "commit": "f3da486497450d24d540c994839db2876936d22a",
+  "evalRun": "evalrun_2a3ce819337e44d29130876c13fc6ff4",
+  "stagingVersion": "6",
+  "productionVersion": "34",
+  "hashes": {
+    "candidate-policy.json": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+    "captured.json": "0dd74f38fee492afcb7409c457f7fd29d0600616012fe3696b0201bd5c078954",
+    "jobs.json": "2159eb4d9cc84b005067a52f19fb9daf087eac42e83b2bf0ccd89e4b7fb8d4a2",
+    "monitoring-log.txt": "ebc6f19c52edd5736578ea21f7f2ac777ff9d95a746beef8dbdd827c2724618e",
+    "prod-agent-show-before.json": "a11848901c388f7cd11dbe8bdd3782cbec471d21d4f2178f517f2649db8169e2",
+    "prod-agent-show.json": "e09820ad67eddffb53747a8f145cc85cf784ab2a260d236783ed5222a8faf696",
+    "results.json": "a2730231cb251a0d6747db54adf07e465dd8f7a384662c5e1d1833a7969dde0d",
+    "run-identity.json": "9f9390b10b3a46893911dd3732fd8c39bd828a032d3d100b08b40eb837b50356",
+    "workflow.json": "b4d5bb989d423ec45056135a300172d019c3a0c6e8f663aba1771f056b32091f"
+  }
+}

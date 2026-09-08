@@ -199,7 +199,7 @@ La nouvelle tentative Air Canada a fourni les preuves suivantes :
 | Journaux d'exécution | `End of processing CreateResponse request.` |
 
 > [!WARNING]
-> L'évaluation utilisait encore le mode dégradé existant : les preuves MCP
+> Résultat historique v32 : l'évaluation utilisait le mode dégradé. Les preuves MCP
 > Defender et anomaly étaient indisponibles à cause de l'échec de résolution
 > Toolbox. Le rétablissement de l'authentification du modèle ne prouve pas
 > le fonctionnement des outils de bout en bout. La récupération de
@@ -213,20 +213,33 @@ comparaison contrôlée d'artefacts d'exécution identiques. N'attribuez pas le
 rétablissement au renouvellement du jeton ou à la propagation RBAC sans
 preuve supplémentaire.
 
+### Exercice 7.8 : Vérifier la résolution opérationnelle
+
+Le 8 septembre, l'[exécution 34178081808](https://github.com/devopsabcs-engineering/foundry-hosted-agents/actions/runs/34178081808)
+a réussi le pipeline complet : staging 6, production 34, huit captures,
+21/21 vérifications et 28 reçus MCP réussis. WI-11 est résolu
+opérationnellement, au-delà du rétablissement partiel observé en v32.
+
+![Reçus MCP réussis et refus de sécurité, rendus des artefacts](../../assets/images/release-tools.png)
+
+Les corrections utilisent le point de terminaison MCP versionné, les connexions
+RemoteTool, le protocole actuel et des jetons Entra renouvelés. Le contexte des
+spécialistes et les recherches indépendantes de risque rétablissent les preuves.
+Les reçus confirment l'exécution, sur des données synthétiques. Le principal de
+production est inchangé. Le rétablissement ne prouve pas une cause racine liée
+au cache Azure. La clôture du ticket 2609040400007027 n'est pas confirmée.
+
 ## Réflexion
 
-À la fin des exercices 7.1 à 7.6, chaque angle côté client — attribution,
-définition de rôle, paramètres de ressource, politique Azure, accès
-conditionnel du tenant — revient propre. C'est en soi le résultat : **les
-preuves construites ici sont ce qui justifie l'escalade vers l'éditeur de
-la plateforme**, au lieu de continuer à revérifier la même attribution
-RBAC. Lisez l'investigation complète, toujours en évolution, et les
-brouillons de réponses au support dans le wiki du projet :
+Les vérifications antérieures justifiaient une escalade, pas l'élimination de
+toutes les causes possibles côté client. Les corrections MCP et applicatives
+restent distinctes du rétablissement de l'authentification du modèle. Lisez la
+résolution et l'historique conservé dans le wiki du projet :
 [Investigation RBAC 401](https://github.com/devopsabcs-engineering/foundry-hosted-agents/wiki/RBAC-401-Investigation).
 
 ## Vérification des connaissances
 
-* Nommez trois couches côté client vérifiées dans ce lab avant de conclure que le problème est côté plateforme.
+* Nommez trois couches vérifiées avant l'escalade. Pourquoi celle-ci ne prouve-t-elle pas une cause racine de plateforme ?
 * Pourquoi « le portail montre le rôle attribué » n'est-il pas suffisant — qu'a ajouté l'exercice 7.2 par-dessus cela ?
 * Quelle preuve unique de l'exercice 7.6 pointe le plus fortement vers une cause autre qu'une configuration RBAC ?
 

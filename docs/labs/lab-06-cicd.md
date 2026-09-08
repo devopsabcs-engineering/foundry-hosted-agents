@@ -59,18 +59,11 @@ secret.
 
 ### Exercise 6.4: A Real Concurrency Lesson
 
-Read the comment block at the top of `hosted-agent-cd.yml` carefully:
-
-> Auto-firing on every push to main raced concurrently against
-> `deploy-and-evaluate.yml`'s own provision/deploy cycles against the same
-> Cognitive Services account, which is the likely true cause of
-> intermittent `401 PermissionDenied` errors seen on hosted agent invokes.
-
-This is a genuinely useful lesson for any CI/CD design: **two independent
-pipelines writing to the same shared resource can look exactly like an
-RBAC bug from the outside**, even when the role assignment itself is
-correct. [Lab 07](lab-07-troubleshooting-rbac.md) shows the methodical
-process for ruling this in or out.
+Both workflows are manually dispatched to avoid competing deployments.
+Concurrent provisioning was a plausible contributor to the earlier failures,
+not a proven cause of the 401. Removing a race is useful release hygiene;
+it does not establish an Azure-internal root cause. [Lab 07](lab-07-troubleshooting-rbac.md)
+separates these hypotheses from observed recovery.
 
 ### Exercise 6.5: Verify the Target and the Smoke-Test Contract
 
@@ -106,10 +99,10 @@ bash scripts/test-agent-response.sh
 actionlint -shellcheck= .github/workflows/deploy-and-evaluate.yml
 ```
 
-On September 7, the validator passed against a live PoC version 32 response
+Historically, on September 7, the validator passed against a live PoC version 32 response
 using the CI prompt, and rejected all 12 invalid regression cases. This
 does not verify staging's CI identity or the complete GitHub Actions run.
-Model responses still disclose unavailable live MCP evidence; a transport
+That version disclosed unavailable MCP evidence; a transport
 smoke pass is not a tool-functionality or evaluation-quality pass.
 
 > [!WARNING]
@@ -121,10 +114,11 @@ smoke pass is not a tool-functionality or evaluation-quality pass.
 > The user subsequently approved production for run `34157050648`.
 > `environment: production` alone does
 > not enforce manual approval without those repository settings.
-> The current promotion rebuilds source rather than promoting the exact
-> tested artifact. The unsafe rollback placeholder has been removed; recovery
-> is manual until a prior-version restore path is verified. These remain release blockers;
-> do not treat a passing smoke test as production-readiness approval.
+> Run `34178081808` subsequently passed both required production gates with
+> normal approval. Promotion rebuilds the hosted agent from the evaluated source;
+> MCP images use the evaluated digests. This is not identical hosted-agent binary
+> promotion. Recovery is manual, without automatic rollback or canary. These
+> limitations remain relevant to enterprise readiness despite the successful release.
 
 ### Exercise 6.6: Reject False-Green Evaluations
 
@@ -162,7 +156,7 @@ release if any capture fails. Safety-filter rejections are not retried.
 All JavaScript actions referenced by both workflows declare Node.js 24.
 Artifact downloads use `actions/download-artifact@v7`.
 
-During local validation, five staging cases returned valid responses. The
+During earlier local validation, five staging cases returned valid responses. The
 prompt-injection case was rejected by Azure's jailbreak filter and correctly
 blocked the run. A diagnostic evaluation of one captured response produced
 passing scores for coherence, groundedness, and task adherence with no evaluator
@@ -179,6 +173,29 @@ counts alone still do not prove traffic coverage or telemetry freshness.
 bash scripts/test-agent-rbac.sh
 python -m pytest eval/deterministic-tests/ -q
 ```
+
+### Exercise 6.7: Inspect the Successful End-to-End Release
+
+Open [run 34178081808](https://github.com/devopsabcs-engineering/foundry-hosted-agents/actions/runs/34178081808).
+All seven release jobs passed; recovery was skipped. Staging version 6 produced
+eight captures, zero policy failures, 21/21 judge checks and 28 successful tool
+receipts. Production moved from 33 to 34 and passed its exact-version smoke.
+Both required approvals were honored. The zero-exception trailing-window check
+passed; it was not a ten-minute soak or complete tracing validation.
+
+![Successful evaluation gate rendered from retained artifacts](../assets/images/release-evaluations.png)
+
+Trace the [saved evidence](https://github.com/devopsabcs-engineering/foundry-hosted-agents/wiki/Release-Evidence)
+to the run and commit. The three judges score the final report against the
+Composer's prompt and evidence context. Injection refusal is checked
+deterministically, not counted as three additional judge passes. MCP tool
+execution is real, but the security fixtures are synthetic.
+
+Before provisioning production, the workflow discovers the numeric version
+receiving 100% traffic from remote state; a fresh CI runner cannot rely on local
+azd state. Missing or ambiguous routing fails closed. The
+[operations runbook](https://github.com/devopsabcs-engineering/foundry-hosted-agents/wiki/Operations)
+documents this contract and manual recovery.
 
 ## Knowledge Check
 

@@ -184,7 +184,7 @@ The Air Canada retry produced the following evidence:
 | Runtime logs | `End of processing CreateResponse request.` |
 
 > [!WARNING]
-> The assessment still used the existing degraded path: live Defender and
+> Historical v32 result: the assessment used the existing degraded path. Defender and
 > anomaly MCP evidence was unavailable because Toolbox resolution failed.
 > Model-authentication recovery does not establish end-to-end tool success.
 > Conversation-history retrieval also logged a nonfatal 404. Do not close
@@ -196,19 +196,34 @@ retry, it is not a controlled comparison of identical runtime artifacts.
 Do not attribute recovery specifically to token refresh or RBAC propagation
 without further evidence.
 
+### Exercise 7.8: Verify Operational Resolution
+
+On September 8, [run 34178081808](https://github.com/devopsabcs-engineering/foundry-hosted-agents/actions/runs/34178081808)
+completed the full staging-to-production pipeline: staging 6, production 34,
+eight captures, 21/21 judge checks and 28 successful MCP receipts. WI-11 is
+operationally resolved for this implementation, beyond v32's partial recovery.
+
+![Successful MCP receipts and safety refusal, rendered from artifacts](../assets/images/release-tools.png)
+
+The fixes use the versioned MCP endpoint, RemoteTool connections, current
+protocol negotiation and refreshed Entra tokens. Specialist context and
+independent risk lookups restore evidence; runtime receipts verify execution.
+The fixtures are synthetic. The production principal remains unchanged.
+Neither a successful redeployment nor this release proves an internal Azure
+cache RCA. Support request 2609040400007027 remains a historical reference;
+its closure has not been verified.
+
 ## Reflection
 
-By the end of Exercises 7.1–7.6, every customer-side angle — assignment,
-role definition, resource settings, Azure Policy, tenant Conditional
-Access — comes back clean. That is itself the finding: **the evidence
-built here is what justifies escalating to the platform vendor**, instead
-of continuing to re-check the same RBAC assignment. Read the full,
-still-evolving investigation and draft support replies in the project wiki:
+The earlier checks justified escalating an unexplained failure, not declaring
+every possible customer-side cause eliminated. Later MCP and application fixes
+were separate from model authentication recovery. Read the resolution and
+preserved investigation history in the project wiki:
 [RBAC 401 Investigation](https://github.com/devopsabcs-engineering/foundry-hosted-agents/wiki/RBAC-401-Investigation).
 
 ## Knowledge Check
 
-* Name three customer-side layers this lab checked before concluding the issue is platform-side.
+* Name three customer-side layers checked before escalation. Why is escalation not proof of a platform RCA?
 * Why is "the portal shows the role assigned" not sufficient — what did Exercise 7.2 add on top of that?
 * What single piece of evidence in Exercise 7.6 most strongly points away from an RBAC-configuration cause?
 

@@ -1,0 +1,7 @@
+{
+  "eval_id": "eval_f708080efbd241d084b193491b429367",
+  "run_id": "evalrun_2a3ce819337e44d29130876c13fc6ff4",
+  "endpoint": "https://aif-air-canada-threat-assessment-staging.services.ai.azure.com/api/projects/proj-air-canada-threat-assessment-staging",
+  "agent": "threat-assessment-agent",
+  "version": "6"
+}

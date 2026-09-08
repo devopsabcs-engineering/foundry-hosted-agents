@@ -70,16 +70,24 @@ rubric only for what the catalog doesn't cover**.
 | Allowed tool calls / policy constraints | Deterministic |
 | Coherence / fluency | Built-in: `builtin.coherence` |
 | Groundedness (report matches evidence) | Built-in: `builtin.groundedness` |
-| Task adherence (specialist stayed in its lane) | Built-in: `builtin.task_adherence` |
-| Tool selection / argument accuracy | Built-in: `builtin.tool_call_accuracy` |
-| Triage correctness (true/false positive, severity) | Custom: `triage-correctness.rubric.yaml` |
-| Evidence citation *quality* | Custom: `evidence-citation.rubric.yaml` |
-| Conflicting-signal handling | Custom: `conflict-handling.rubric.yaml` |
+| Final report task adherence | Executed: `builtin.task_adherence`, using the Composer prompt and context |
+| Tool selection / argument accuracy | Catalog option, not executed by this release: `builtin.tool_call_accuracy` |
+| Triage correctness (true/false positive, severity) | Proposed custom rubric: `triage-correctness.rubric.yaml` |
+| Evidence citation *quality* | Proposed custom rubric: `evidence-citation.rubric.yaml` |
+| Conflicting-signal handling | Proposed custom rubric: `conflict-handling.rubric.yaml` |
 
-Open `eval/rubrics/evaluator-mapping.yaml` and confirm which built-ins and
-custom rubrics apply to the `conflict-001` category — this is the same
-file `.github/workflows/deploy-and-evaluate.yml` references for its
-evaluation quality gate (see [Lab 06](lab-06-cicd.md)).
+Compare the proposed mapping in `eval/rubrics/evaluator-mapping.yaml` with
+`eval/run_hosted_evaluation.py`, which controls the actual gate. The runner
+executes coherence, groundedness and task adherence. Run 34178081808 captured
+all eight cases and passed 21/21 checks on seven reports, with zero policy
+failures. `inject-001` uses the verified safety-refusal policy instead of model
+judging. Runtime receipts, not model-written tool claims, establish execution.
+
+![21 successful model-judge checks rendered from saved results](../assets/images/release-evaluations.png)
+
+The [release evidence](https://github.com/devopsabcs-engineering/foundry-hosted-agents/wiki/Release-Evidence)
+preserves exact run IDs and source hashes. All eight cases use synthetic data;
+perfect scores on this small suite are not a security-efficacy benchmark.
 
 ### Exercise 5.4: Why Not "Just Use an LLM Judge for Everything"?
 
@@ -95,7 +103,7 @@ pass/fail every time — which is why the evaluation strategy splits
 
 * Which evaluation category tests that the agent doesn't fabricate having taken an action?
 * Name one gating criterion handled by a built-in evaluator and one handled by a custom rubric.
-* Why is `unauth-001` checked deterministically instead of by an LLM judge?
+* Why does `unauth-001` need deterministic policy checks in addition to model judging?
 
 ## Next Steps
 

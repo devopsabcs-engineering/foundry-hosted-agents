@@ -2,8 +2,29 @@
 # Production Decision Gate Scorecard
 
 **Related plan**: air-canada-foundry-hosted-agents-plan.instructions.md (Step 7.5)
-**Date**: 2026-09-03
-**Scope**: Synthesizes the research document's Evidence Confidence Register and Production Decision Gates against the actual measured/attempted outcomes from Phase 7 Steps 7.1-7.4 of this PoC. Every gate below distinguishes evidence produced by this PoC from evidence requiring a separate commercial, legal, or platform-support confirmation.
+**Date**: 2026-09-08
+**Scope**: Current engineering evidence, including the successful staging-to-production release and the separately gated Phase 7 experiments. The production environment is a PoC release target, not enterprise security certification.
+
+## Verified release
+
+[Run 34178081808](https://github.com/devopsabcs-engineering/foundry-hosted-agents/actions/runs/34178081808)
+passed all seven release jobs; recovery was skipped. Commit
+`f3da486497450d24d540c994839db2876936d22a` deployed staging version 6 and
+production version 34 (previously 33), with both required production approvals
+and no protection bypass. The exact-version production smoke passed.
+
+The release captured all eight cases, with zero deterministic policy failures,
+21/21 checks across seven model-judged reports, and 28 successful runtime tool
+receipts. `inject-001` passed the explicit deterministic safety-refusal policy
+with no tool calls; it was not model-scored. Thresholds remained at 100%.
+The MCP tools execute against synthetic fixtures, not live customer telemetry.
+
+![Verified evaluation results rendered from saved artifacts](../docs/assets/images/release-evaluations.png)
+
+[Release evidence and provenance](https://github.com/devopsabcs-engineering/foundry-hosted-agents/wiki/Release-Evidence)
+include the source artifacts and SHA-256 manifest. WI-11 is operationally
+resolved for this implementation. An internal Azure authorization cache remains
+an unconfirmed RCA hypothesis; support-case closure is not asserted.
 
 ## How to read this scorecard
 
@@ -17,13 +38,13 @@
 | Gate | Status | Owner | Evidence pointer |
 |---|---|---|---|
 | **Platform status** — GA status, SLA, regions, quotas, capacity, cold starts, disaster recovery | Not testable in this PoC | Microsoft Foundry account team | Research Evidence Confidence Register ("Hosted Agent pricing, quotas, and SLA — Insufficient current evidence"); this PoC observed cold-start p50 ≈18-23s (`experiments/load-testing/report.md`) but cannot confirm GA/SLA/DR commitments |
-| **Scale** — concurrent users, conversations per user, overlapping turns, long-running work, MCP fan-out, checkpoint size, downstream throttling | Conditional | Engineering lead | `experiments/load-testing/report.md`: no hard ceiling observed at 1-20 concurrent sessions (target range was 10-100; only 1-20 was actually exercised — see "Honest scope statement" in that report). Same-thread turn concurrency tested with n=2 only (not statistically robust). MCP fan-out throughput not tested (blocked on Phase 5 tool-calling platform gap, see WI-11 below). **Follow-up**: extend to 50-100 concurrent with a dedicated load-test budget; re-test MCP fan-out once WI-11 is resolved |
+| Scale: concurrency, fan-out, throttling | Conditional | Engineering lead | Earlier load tests exercised only 1-20 concurrent sessions and n=2 same-thread turns. They were not rerun after the MCP fixes. Extend to 50-100 sessions with a dedicated budget and measure real tool fan-out before claiming capacity. |
 | **Security** — private endpoint reachability, identity propagation, least privilege, tool authorization, egress controls, prompt injection, destructive-action approval | Conditional | Security architect | Prompt-injection and unauthorized-action refusal ARE covered by `eval/golden-dataset.jsonl` + `eval/deterministic-tests/` (Phase 6, passing). Private endpoint reachability tested for Cosmos DB only, and inconclusively — public access is confirmed blocked (`experiments/cosmos-checkpointer/report.md`), but whether a Hosted Agent sandbox can reach a *private* endpoint at all was not established. Identity propagation: Phase 7.3 found the platform auto-creates Entra `AgentIdentity`/`AgentIdentityBlueprint` objects natively (promising signal, unconfirmed). **Follow-up**: provision a private endpoint + VNet-resident test harness for Cosmos; confirm Hosted Agent sandbox VNet-injection support with the Foundry product team |
 | **Data** — classification, residency, retention, deletion, legal hold, checkpoint compatibility, telemetry redaction | Not testable in this PoC | Data governance / legal | No classification, residency, or legal-hold review was in scope for this engineering PoC. Checkpoint compatibility (Cosmos) is technically wired (bug found and fixed in `state.py`'s `get_checkpointer()`, see `experiments/cosmos-checkpointer/report.md`) but unbenchmarked due to the private-networking blocker above. Telemetry redaction policy for continuous evaluation was documented as a minimal synthetic-data policy only, not a real PII-redaction review (`experiments/continuous-evaluation/`) |
-| **Quality** — versioned golden dataset, deterministic checks, evaluator thresholds, human review, regression policy | Pass | Eng lead | Phase 6: `eval/golden-dataset.jsonl` (8 categories), `eval/deterministic-tests/` (12/12 pytest passing, provably fails a bad example), `eval/rubrics/` (built-in evaluator mapping + 3 custom rubrics). Regression policy embodied in `.github/workflows/deploy-and-evaluate.yml`'s staging-eval-before-promotion gate (not yet live-exercised — see WI-14) |
-| **Operations** — retry/idempotency, failure isolation, alerts, runbooks, rollback, recovery objectives, incident accountability | Conditional | SRE/on-call owner | `deploy-and-evaluate.yml` implements a rollback-on-breach job, but its version-switch mechanism falls back to a full redeploy rather than a confirmed true version-pointer switch (WI-12, unverified Azure CLI contract). No runbooks or alert thresholds authored beyond the workflow itself. Graceful degradation (Phase 5, v9) demonstrates one concrete failure-isolation pattern (tool-resolution 404 does not crash the whole request) |
+| Quality: versioned cases, deterministic policy, judge thresholds, regression gate | Pass for this synthetic release suite | Engineering lead | Run 34178081808: 8/8 captures, zero policy failures, 21/21 coherence/groundedness/task-adherence checks, verified injection refusal, 28 tool receipts. Strict staging gate ran before promotion. Category-specific custom rubrics and human review of real high-impact conclusions remain outside this automated pass. |
+| Operations: release controls, alerts, recovery, incident ownership | Conditional | SRE/on-call owner | Full release, normal approvals, previous-version discovery, exact-version production smoke and monitoring passed. The wiki now includes an operations runbook. Monitoring returned zero AppExceptions in a trailing-ten-minute window, not a ten-minute soak or proof of complete tracing. MCP image digests are promoted; the hosted agent is rebuilt from the same source, not the identical binary. Recovery remains manual, without automatic rollback, canary or rehearsed disaster recovery. |
 | **Cost** — model tokens, active session compute, idle window, Cosmos requests/storage, MCP hosting, telemetry, evaluation tokens, Agent 365 licensing, operations labor | Not testable in this PoC | Finance / commercial owner | Requires live Azure pricing/commercial confirmation per research's own Evidence Confidence Register entry ("Hosted Agent pricing, quotas, and SLA — Insufficient current evidence"). This tenant confirmed to lack Agent 365 licensing entirely (`experiments/agent365-onboarding/report.md`), which is itself a cost/procurement data point if Agent 365 governance is pursued |
-| **Preview acceptance** — explicit business approval for every preview capability retained in the production design | Conditional | Business/product sponsor | Preview capabilities in this design: Foundry Hosted Agents itself, Toolbox/MCP tool-resolution API (Phase 5 — see WI-11 below, currently broken for this account/region), `microsoft/ai-agent-evals@v3-beta`, continuous `EvaluationRule` (Phase 7.4 — blocked on an RBAC gap, not a preview-availability gap, see below). Each needs an explicit go/no-go from a business sponsor before production; none has been formally approved yet |
+| Preview acceptance: explicit approval for retained preview capabilities | Conditional | Business/product sponsor | Hosted-agent and Toolbox integrations work in the verified release, but technical success is not business acceptance of preview terms. The release uses the repository's custom evaluation runner, not `microsoft/ai-agent-evals`. Continuous EvaluationRule remains a separate blocked experiment. Obtain explicit approval for capabilities retained in a pilot. |
 
 ## Phase 7 experiment outcomes (source evidence)
 
@@ -36,11 +57,11 @@
 
 ## Explicitly flagged known gaps (from Phases 5-7)
 
-* **WI-11 (Phase 5)**: Foundry's preview `/agents/{agent}/tools/resolve` data-plane route 404s for this account/region — genuine tool invocation (MCP via Toolbox) has never been observed working end-to-end in this PoC. Mitigated with honest graceful degradation (v9), not resolved. **This is this PoC's single most significant open gap** and should weigh heavily against an unconditional production "go" decision until Azure confirms/enables this route.
+* WI-11 is resolved operationally: model calls recovered, the versioned MCP endpoint and RemoteTool connections work, and runtime receipts prove both specialists invoked their tools. The legacy resolver failure and v32 degraded response are historical evidence, not the current behavior.
 * **Continuous evaluation RBAC gap (Phase 7.4)**: fixable by granting the project's managed identity (`7e9de957-4dfe-412e-9894-fc33ac9c9b57`) the `Foundry User` role at the project scope, then re-running `experiments/continuous-evaluation/deploy_evaluation_rule.py`. Not yet applied in this session (a live RBAC change against production-adjacent infrastructure) — recommend applying and re-testing before this line item is closed.
 * **Cosmos private connectivity (Phase 7.2)**: whether a Hosted Agent's per-session sandbox can reach a private-endpoint-only resource at all is unconfirmed and requires a Foundry product-team answer, not just Azure-side Cosmos configuration.
-* **WI-12/WI-13/WI-14 (Phase 6)**: `deploy-and-evaluate.yml`'s Azure CLI output-contract assumptions, required GitHub Environments/variables, and a live `workflow_dispatch` dry-run are all still open (see planning log).
+* Earlier CI contract, environment and live-run gaps have been exercised successfully by run 34178081808. This does not close the separate manual-recovery rehearsal or reproducible hosted-agent binary-promotion gaps.
 
 ## Overall recommendation
 
-This PoC provides strong, honestly-evidenced support for the baseline architecture (LangGraph supervisor/specialist pattern hosted on Foundry, offline evaluation gate, CI/CD release-control shape) and demonstrates good failure-isolation discipline (graceful degradation under a real platform gap). It does **not** yet provide a clean, unconditional production "go": the tool-calling gap (WI-11) is unresolved, several gates require commercial/legal/platform confirmations outside engineering's control, and two of the four Phase 7 experiment tracks (Cosmos, Agent 365) hit real environmental blockers (tenant network policy, tenant licensing) rather than confirming their target capability. Recommend a **conditional go for continued PoC-to-pilot investment**, gated on: (1) Azure confirmation/resolution of WI-11, (2) the continuous-evaluation RBAC fix and re-test, (3) an extended load test to the full 10-100 range, and (4) formal commercial/SLA/pricing confirmation before any production commitment.
+Recommend a **conditional go for continued PoC-to-pilot investment**. The baseline now works end to end: hosted multi-agent execution, real MCP calls over synthetic data, strict evaluation, approved promotion, production smoke and monitoring. WI-11 is no longer a pilot blocker. Before a broader production commitment, establish named security/data/operations owners, review public MCP ingress and tool authorization, extend load testing, rehearse recovery, and obtain commercial/SLA/pricing and preview acceptance. Re-test continuous evaluation, Cosmos private connectivity and Agent 365 only if those optional capabilities are included in the target design.

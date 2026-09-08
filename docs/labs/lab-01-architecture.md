@@ -63,11 +63,12 @@ use.
 Open [`src/threat-assessment-agent/state.py`](https://github.com/devopsabcs-engineering/foundry-hosted-agents/blob/main/src/threat-assessment-agent/state.py)
 and find the `evidence_tool_unavailable` / `risk_tool_unavailable` flags.
 
-`main.py` wraps Foundry's tool-resolution step so that a known platform-side
-gap degrades to an honestly-labeled plain-LLM analysis instead of crashing
-the request. This is a real production-readiness pattern: when a dependency
-your graph relies on isn't available, fail *visibly and honestly* inside
-the output, not silently or with a hard crash.
+These flags retain explicit dependency-failure reporting; they are not the
+normal behavior of the verified release. The current transport uses the
+versioned Toolbox MCP endpoint, refreshed Entra authorization and RemoteTool
+connections. Both specialists successfully called their tools in run
+34178081808. Degraded output cannot pass the release gate when required tool
+receipts are absent. Keep availability fallback separate from quality approval.
 
 ### Exercise 1.3: The Four Tool Layers
 
