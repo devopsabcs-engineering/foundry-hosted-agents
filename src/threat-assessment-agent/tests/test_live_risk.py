@@ -11,8 +11,8 @@ pytestmark = pytest.mark.skipif(
 )
 
 
-@pytest.mark.parametrize("case_id", ["conflict-001", "unauth-001"])
-def test_risk_independently_verifies_supplied_inputs(case_id):
+@pytest.mark.parametrize("case_id", ["conflict-001", "unauth-001", "fp-001"])
+def test_specialists_verify_inputs_and_report_format(case_id):
     endpoint = os.environ["AZURE_AI_PROJECT_ENDPOINT"]
     assert "-staging.services.ai.azure.com/" in endpoint
     assert "-staging" in os.environ["AZURE_OPENAI_ENDPOINT"]
@@ -26,3 +26,6 @@ def test_risk_independently_verifies_supplied_inputs(case_id):
     expected_tool = "score_anomaly" if case_id == "conflict-001" else "detect_login_anomalies"
     assert any(item["tool"] == f"anomaly-conn___{expected_tool}" for item in receipts)
     assert all(item["connection"] == "anomaly-conn" for item in receipts)
+    report = graph.report_composer_node({**state, **evidence, **result})["final_report"]
+    assert "report" in report.lstrip().splitlines()[0].casefold()
+    assert not any(line.strip() in {"---", "***", "___", "```"} for line in report.splitlines())

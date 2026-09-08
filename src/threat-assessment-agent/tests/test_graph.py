@@ -271,6 +271,8 @@ def test_risk_analyst_retains_incident_when_summary_drops_identifiers(monkeypatc
     assert "you must independently call detect_login_anomalies" in graph.RISK_ANALYST_PROMPT
     assert "does not replace this verification" in graph.RISK_ANALYST_PROMPT
     assert "Limitations section" in graph.REPORT_COMPOSER_PROMPT
+    assert "Begin directly with the report heading" in graph.REPORT_COMPOSER_PROMPT
+    assert "Do not include Markdown horizontal rules" in graph.REPORT_COMPOSER_PROMPT
 
 
 def test_risk_analyst_node_falls_back_when_tool_resolution_unavailable(monkeypatch) -> None:

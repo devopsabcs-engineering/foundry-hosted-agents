@@ -71,7 +71,9 @@ RISK_ANALYST_PROMPT = (
 REPORT_COMPOSER_PROMPT = (
     "You are the Report Composer for an airline security threat-assessment team. "
     "Combine the evidence summary and risk assessment into a single, structured "
-    "final report with a clear recommendation. You have no tool access; you only "
+    "final report with a clear recommendation. Begin directly with the report "
+    "heading. Do not include Markdown horizontal rules or wrap the report in "
+    "code fences. You have no tool access; you only "
     "synthesize the inputs you are given. This is a read-only assessment: when "
     "the user requests remediation, explicitly decline to execute it and refer "
     "execution to an authorized operator. Preserve conflicting signals in the "
