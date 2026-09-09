@@ -1,5 +1,6 @@
 import json
 import time
+import uuid
 
 import pytest
 from fastapi import HTTPException
@@ -107,6 +108,41 @@ def test_busy_session_and_turn_limit(client):
     store.sessions[identifier].busy = False
     store.sessions[identifier].messages = [{}] * 40
     assert client.post(route, json={"text": "Hi"}).status_code == 409
+
+
+def test_successful_retry_replays_without_reinvocation_or_extra_turn(client):
+    client, agent, store = client
+    identifier = client.post("/api/conversations").json()["id"]
+    route = f"/api/conversations/{identifier}/messages"
+    headers = {"Idempotency-Key": str(uuid.uuid4())}
+    first = client.post(route, json={"text": "Hi"}, headers=headers)
+    store.sessions[identifier].messages = [{}] * 40
+    replay = client.post(route, json={"text": "Hi"}, headers=headers)
+    assert replay.status_code == 200
+    assert '"text": "Assessment complete."' in replay.text
+    assert replay.headers["X-Request-ID"] == first.headers["X-Request-ID"]
+    assert len(agent.inputs) == 1
+    assert len(store.sessions[identifier].messages) == 40
+    assert client.post(route, json={"text": "Changed"}, headers=headers).status_code == 409
+    client.headers["Authorization"] = "Bearer bob"
+    assert client.post(route, json={"text": "Hi"}, headers=headers).status_code == 404
+
+
+def test_failed_key_can_retry_and_keys_are_conversation_scoped(client):
+    client, agent, store = client
+    headers = {"Idempotency-Key": str(uuid.uuid4())}
+    identifier = client.post("/api/conversations").json()["id"]
+    route = f"/api/conversations/{identifier}/messages"
+    agent.fail = True
+    client.post(route, json={"text": "Hi"}, headers=headers)
+    assert store.sessions[identifier].completed == {}
+    agent.fail = False
+    assert '"type": "done"' in client.post(route, json={"text": "Hi"}, headers=headers).text
+    another = client.post("/api/conversations").json()["id"]
+    client.post(f"/api/conversations/{another}/messages", json={"text": "Hi"}, headers=headers)
+    assert len(agent.inputs) == 3
+    assert len(store.sessions[identifier].messages) == 2
+    assert client.post(route, json={"text": "Hi"}, headers={"Idempotency-Key": "invalid"}).status_code == 422
 
 
 def test_expired_session_and_capacity():

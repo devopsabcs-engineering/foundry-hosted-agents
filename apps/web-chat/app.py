@@ -53,6 +53,7 @@ class Conversation:
     touched: float = field(default_factory=time.monotonic)
     messages: list = field(default_factory=list)
     busy: bool = False
+    completed: dict[str, tuple[str, str]] = field(default_factory=dict)
 
 
 class SessionStore:
@@ -208,8 +209,20 @@ def create_app(settings=None, verifier=None, upstream=None):
         del store.sessions[str(identifier)]
 
     @application.post("/api/conversations/{identifier}/messages")
-    async def message(identifier: uuid.UUID, body: Message, owner: Identity = Depends(identity)):
+    async def message(identifier: uuid.UUID, body: Message, owner: Identity = Depends(identity),
+                      idempotency_key: uuid.UUID | None = Header(default=None)):
         session = store.get(str(identifier), owner)
+        request_id = str(idempotency_key or uuid.uuid4())
+        if request_id in session.completed:
+            original, answer = session.completed[request_id]
+            if original != body.text:
+                raise HTTPException(409, "This request key was already used for a different message.")
+            return StreamingResponse(iter([
+                sse({"type": "status", "text": "Complete", "requestId": request_id}),
+                sse({"type": "answer", "text": answer, "requestId": request_id}),
+                sse({"type": "done"}),
+            ]), media_type="text/event-stream",
+                headers={"X-Accel-Buffering": "no", "X-Request-ID": request_id})
         if session.busy:
             raise HTTPException(409, "A response is already in progress.")
         if len(session.messages) >= settings.max_turns * 2:
@@ -218,7 +231,6 @@ def create_app(settings=None, verifier=None, upstream=None):
             raise HTTPException(429, "The pilot is busy. Try again shortly.")
         session.busy = True
         await slots.acquire()
-        request_id = str(uuid.uuid4())
 
         async def generate():
             started = time.monotonic()
@@ -245,6 +257,7 @@ def create_app(settings=None, verifier=None, upstream=None):
                         yield ": keepalive\n\n"
                 answer = task.result()
                 session.messages = messages + [{"role": "assistant", "content": answer}]
+                session.completed[request_id] = (body.text, answer)
                 yield sse({"type": "answer", "text": answer, "requestId": request_id})
                 yield sse({"type": "done"})
                 outcome = "success"

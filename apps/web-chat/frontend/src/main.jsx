@@ -8,6 +8,7 @@ import '@fontsource-variable/dm-sans';
 import '@fontsource-variable/newsreader';
 import './style.css';
 import { consumeResponse } from './stream';
+import { messageRequest } from './request';
 
 function ToolButton({ label, children, ...props }) {
   return <button className="tool" title={label} aria-label={label} {...props}>{children}</button>;
@@ -31,6 +32,7 @@ function Chat({ auth, config, initialAccount }) {
   const [draft, setDraft] = useState('');
   const [busy, setBusy] = useState(false);
   const abort = useRef(null);
+  const pendingRequest = useRef(null);
   const end = useRef(null);
   const current = sessions.find(session => session.id === active);
   const messages = current?.messages ?? [];
@@ -49,6 +51,7 @@ function Chat({ auth, config, initialAccount }) {
   async function api(path, options = {}) {
     const accessToken = await token();
     const response = await fetch(path, { ...options, headers: {
+      ...options.headers,
       'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}`,
     } });
     if (!response.ok) {
@@ -79,6 +82,7 @@ function Chat({ auth, config, initialAccount }) {
 
   async function signOut() {
     abort.current?.abort();
+    pendingRequest.current = null;
     setSessions([]); setActive(null); setAllowed(false); setAccount(null);
     await auth.logoutRedirect({ account, postLogoutRedirectUri: window.location.origin });
   }
@@ -112,12 +116,15 @@ function Chat({ auth, config, initialAccount }) {
       setSessions(previous => previous.map(session => session.id === identifier
         ? { ...session, messages: [...session.messages, { role: 'user', text }] } : session));
       appended = true;
+      pendingRequest.current = messageRequest(pendingRequest.current, identifier, text);
       const response = await api(`/api/conversations/${identifier}/messages`, {
         method: 'POST', body: JSON.stringify({ text }), signal: controller.signal,
+        headers: { 'Idempotency-Key': pendingRequest.current.key },
       });
       await consumeResponse(response.body, payload => {
         if (payload.type === 'answer') {
           answered = true;
+          pendingRequest.current = null;
           setSessions(previous => previous.map(session => session.id === identifier
             ? { ...session, messages: [...session.messages, { role: 'assistant', text: payload.text }] } : session));
         }
