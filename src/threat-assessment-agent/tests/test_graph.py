@@ -474,6 +474,21 @@ def test_report_format_is_idempotent_and_preserves_content(monkeypatch, marker, 
     assert marker not in report.splitlines()
 
 
+def test_report_discloses_application_provenance_despite_model_error(monkeypatch):
+    captured = []
+
+    def fake_chat(_prompt, content):
+        captured.append(content)
+        return "# Final report\nNo synthetic data was used."
+
+    monkeypatch.setattr(graph, "_chat", fake_chat)
+    result = graph.report_composer_node(_base_state(tool_calls=[{"status": "success"}]))
+    assert "recorded tool receipts: 1" in captured[0]
+    assert "synthetic MCP fixtures, not live security telemetry" in result["final_report"]
+    assert "Any model-generated statement to the contrary is incorrect." in result["final_report"]
+    assert result["messages"][0].content == result["final_report"]
+
+
 def test_report_composer_node_combines_both_reports(monkeypatch) -> None:
     captured: dict[str, str] = {}
 

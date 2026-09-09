@@ -53,9 +53,16 @@ This verifies the pilot path, not real Defender telemetry or enterprise readines
 | [Web Chat Build workflow](https://github.com/devopsabcs-engineering/foundry-hosted-agents/actions/workflows/web-chat-build.yml) | Hosted dependency installation, tests and frontend artifacts |
 | [Continuous Test Trends](https://github.com/devopsabcs-engineering/foundry-hosted-agents/wiki/Continuous-Test-Trends) | Agent evaluation and load evidence, separate from web UI verification |
 
-Try: `Using your available tools, check the device risk for device-001 and list its vulnerabilities.`
+Try: `Assess device ID: device-001 and list its vulnerabilities.`
 Use synthetic or approved pilot data only. Responses contain simulated security findings,
 not an instruction to perform remediation.
+
+Tool lookups require explicit fields: `device ID: device-001`, `account ID: jsmith`,
+or `data_egress_mb_per_hour=900` / `failed_logins_per_hour=10`. Device IDs trigger both
+Defender lookups; account IDs trigger login analysis; supported numeric metrics trigger
+anomaly scoring. Assistant text cannot supply identifiers. Later explicit user fields
+replace earlier fields of the same category; follow-ups without new fields retain them.
+Free-form names without these labels do not trigger lookups, and percentages are not raw metrics.
 
 Conversations are session-only: one backend process and one replica, five conversations
 per user, a one-hour idle expiry, and at most 20 successful turns per conversation.
@@ -64,12 +71,17 @@ conversation state. Do not scale out until a shared, owner-bound session store i
 The UI shows progress while the agent runs, then the completed answer, not token-by-token text.
 Teams is not deployed; see the wiki for the tab and native-bot options and their security gates.
 
-> [!WARNING]
-> Single-turn assessments are verified, but context-dependent follow-ups are not working
-> end to end. A live two-turn check failed to recall an earlier synthetic reference.
-> The web backend sends history, but the hosted graph currently uses only the last message
-> as incident context. Restate the complete incident in each request until the agent is
-> corrected and re-evaluated. See the [known blocker](https://github.com/devopsabcs-engineering/foundry-hosted-agents/wiki/Web-Chat-Pilot#known-blocker-conversation-context).
+The graph now carries user/assistant history to all three specialists. Staging version 7
+passed the three-check hosted conversation gate in
+[run 34294086899](https://github.com/devopsabcs-engineering/foundry-hosted-agents/actions/runs/34294086899),
+but that release stopped on a separate missing-tool-receipt failure. Deterministic read-only
+lookups replace model-selected calls in the subsequent candidate; its full release evidence
+must pass before production promotion. See the [pilot verification record](https://github.com/devopsabcs-engineering/foundry-hosted-agents/wiki/Web-Chat-Pilot#verification-record).
+
+Completed web message retries use a conversation-scoped `Idempotency-Key`: the same key and
+text replay the stored answer without another agent call or turn. Changed text with a used
+key returns 409. This guarantee lasts only for the in-memory session, not across restarts;
+failed remote calls may still consume compute, and creating a new conversation is not deduplicated.
 
 ## Architecture
 
@@ -123,7 +135,7 @@ flowchart LR
 | [`mcp/anomaly-server/`](mcp/anomaly-server) | Mocked anomaly-detection MCP tool server (`score_anomaly`, `detect_login_anomalies`). |
 | [`infra/`](infra) | Bicep infrastructure: `main.bicep` composes `modules/ai-foundry.bicep`, `modules/monitoring.bicep`, `modules/rbac.bicep`, and `modules/mcp-container-apps.bicep`. `modules/cosmos-db.bicep` is a standalone, optional module used only by the Cosmos checkpointer experiment. |
 | [`eval/`](eval) | Evaluation suite gated against `golden-dataset.jsonl`: `deterministic-tests/` (non-LLM schema/policy checks) and `rubrics/` (built-in Foundry evaluators plus custom LLM-as-judge rubrics — see [`eval/rubrics/README.md`](eval/rubrics/README.md)). |
-| [`.github/workflows/`](.github/workflows) | `hosted-agent-cd.yml` (manual provision/deploy/smoke-test straight to the PoC environment) and `deploy-and-evaluate.yml` (lint → Bicep validate → staging deploy → smoke/contract/streaming tests → offline evaluation quality gate → manual production promotion). |
+| [`.github/workflows/`](.github/workflows) | Shared protected release, compatibility release entry point, continuous validation, web build and test-trend publication. |
 | [`experiments/`](experiments) | Phase 7 production-readiness probes: `load-testing/` (concurrent-session and cold-start measurements), `cosmos-checkpointer/` (optional persistent-state extension validation), `agent365-onboarding/` (Entra Agent ID / Agent 365 licensing probe), `continuous-evaluation/` (scheduled evaluation rule deployment). |
 | [`deliverables/`](deliverables) | Decision materials for the engagement: `production-decision-gate-scorecard.md`, `deck-outline.md`, and the compiled `air-canada-foundry-hosted-agents-decision.pptx`. |
 | [`docs/`](docs) | Bilingual (EN/FR) GitHub Pages workshop built from this PoC: `index.md` + `labs/` (English), `fr/` (French mirror), and `assets/decks/` (companion PPTX decks, generated by `scripts/build-workshop-deck.js`). |
@@ -183,16 +195,20 @@ Passing these fixtures demonstrates workflow behavior, not real Defender detecti
 
 ## CI/CD
 
-* **`hosted-agent-cd.yml`** — manual-dispatch pipeline that provisions and deploys straight to the shared PoC environment, then runs a smoke-test invoke.
-* **`deploy-and-evaluate.yml`** — manual-dispatch, eval-gated release flow: lint and unit tests → Bicep validate/what-if → deploy an immutable candidate to staging → smoke/contract/streaming tests → offline evaluation quality gate → manual production approval → promote.
+* [Hosted Agent CI/CD](.github/workflows/hosted-agent-cd.yml) is a manual compatibility entry point that calls the shared protected release. It no longer deploys directly to production.
+* [Deploy and Evaluate](.github/workflows/deploy-and-evaluate.yml) supports manual dispatch and reusable calls: lint and unit tests, Bicep validation, immutable staging deployment, smoke/contract/conversation tests, golden evaluation, production approval, promotion and monitoring.
 
 Both workflows authenticate via secretless OIDC federation (no stored client secrets).
+The called workflow owns the shared deployment queue, preventing overlapping releases.
+Repeat provisioning targets existing resources and role assignments, but each deployment
+can create a new immutable agent version. Model wording, timing and telemetry are not
+deterministic. Trend publication replaces the same run/attempt record instead of adding duplicates.
 
 [Web Chat Build](.github/workflows/web-chat-build.yml) is separate: scoped push/PR checks
 and manual dispatch run backend tests, frontend stream tests and `npm ci`/Vite compilation
 on GitHub-hosted runners. It does **not** deploy to Azure. The wiki records the operator-run
 ACR remote build and digest-pinned Bicep deployment; no local npm policy bypass is required.
-The web build, continuous validation, release, direct-deploy and trend-publishing workflows
+The web build, continuous validation, both release entry points and trend-publishing workflows
 include a **Deployment Links** section in their summaries. Links identify existing targets;
 they do not certify that a particular run deployed or tested those targets.
 
