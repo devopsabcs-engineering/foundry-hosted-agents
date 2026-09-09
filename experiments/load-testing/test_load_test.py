@@ -59,6 +59,20 @@ def test_errors_are_not_successful_latency_samples(status, events):
     assert result["error"] is not None
 
 
+def test_failure_retains_codes_without_prompt_or_error_message():
+    events = [{"type": "error", "error": {
+        "code": "rate_limit_exceeded", "request_id": "request-123",
+        "message": "potentially sensitive prompt body",
+    }}]
+    result = asyncio.run(
+        probe._invoke_once(Session(Response(200, events)), "https://example.test", "test", None)
+    )
+    assert result["error"] is not None
+    assert result["failure_code"] == "rate_limit_exceeded"
+    assert result["failure_request_id"] == "request-123"
+    assert "potentially sensitive" not in json.dumps(result)
+
+
 def test_completed_text_is_successful():
     events = [
         {"type": "response.output_text.delta", "delta": "Ready"},

@@ -103,6 +103,13 @@ async def _invoke_once(
                     event_type in {"error", "response.failed", "response.incomplete", "response.error"}
                     or parsed.get("error") or response.get("error")
                 ):
+                    error = parsed.get("error") or response.get("error") or parsed
+                    result["failure_event"] = event_type
+                    if isinstance(error, dict):
+                        for key in ("code", "type", "request_id"):
+                            value = error.get(key)
+                            if isinstance(value, str):
+                                result[f"failure_{key}"] = value[:200]
                     raise RuntimeError(f"Failed SSE event: {event_type}")
                 if response.get("status") in {"failed", "incomplete", "cancelled"}:
                     raise RuntimeError("Response did not complete")
