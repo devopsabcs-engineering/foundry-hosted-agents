@@ -610,6 +610,33 @@ jobs:
             --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
             --workspace-name "${{ vars.LOG_ANALYTICS_WORKSPACE_NAME }}" \
             --query customerId -o tsv)
+          RESPONSE_ID=$(jq -Rse '
+            split("\n") | map(select(startswith("data: ")) | .[6:] | fromjson?)
+            | map(select(.type == "response.completed")) | last | .response.id
+            | select(type == "string" and test("^resp_[A-Za-z0-9_-]+$"))
+          ' /tmp/prod-smoke-response.sse)
+          TRACE_COUNT=0
+          for attempt in $(seq 1 10); do
+            TRACE_COUNT=$(az monitor log-analytics query \
+              --workspace "$WORKSPACE_ID" \
+              --analytics-query "AppTraces | where TimeGenerated > ago(30m) | where Message contains '$RESPONSE_ID' | count" \
+              --query "[0].Count" -o tsv)
+            if ! [[ "$TRACE_COUNT" =~ ^[0-9]+$ ]]; then
+              echo "::error::Telemetry query returned no valid trace count. Health is unknown."
+              exit 1
+            fi
+            if [ "$TRACE_COUNT" -gt "0" ]; then
+              break
+            fi
+            if [ "$attempt" -lt "10" ]; then
+              sleep 30
+            fi
+          done
+          if [ "$TRACE_COUNT" -eq "0" ]; then
+            echo "::error::No ingested telemetry for smoke response $RESPONSE_ID. Health is unknown."
+            exit 1
+          fi
+          echo "Verified ingested telemetry for smoke response $RESPONSE_ID: $TRACE_COUNT row(s)."
           EXCEPTION_COUNT=$(az monitor log-analytics query \
             --workspace "$WORKSPACE_ID" \
             --analytics-query "AppExceptions | where TimeGenerated > ago(10m) | count" \

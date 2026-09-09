@@ -1,5 +1,8 @@
 from pathlib import Path
+import shutil
+import subprocess
 
+import pytest
 import yaml
 
 from scripts.ci_results import run_label
@@ -42,3 +45,35 @@ def test_hosted_telemetry_uses_environment_specific_monitoring_output():
     assert "category: 'AppInsights'" in connection
     assert "target: applicationInsightsResourceId" in connection
     assert "key: applicationInsightsConnectionString" in connection
+
+
+@pytest.mark.parametrize("trace_count,exception_count,expected", [
+    ("0", "0", 1),
+    ("", "0", 1),
+    ("invalid", "0", 1),
+    ("1", "0", 0),
+    ("1", "1", 1),
+    ("1", "", 1),
+])
+def test_monitoring_gate_requires_ingestion(trace_count, exception_count, expected):
+    git_bash = Path("C:/Program Files/Git/bin/bash.exe")
+    bash = str(git_bash) if git_bash.exists() else shutil.which("bash")
+    assert bash, "Bash is required for workflow behavior checks"
+    steps = workflow("deploy-and-evaluate.yml")["jobs"]["post-deploy-monitoring"]["steps"]
+    gate = next(step["run"] for step in steps if step["name"].startswith("Check Application Insights"))
+    gate = gate.replace("${{ vars.AZURE_RESOURCE_GROUP }}", "test-group")
+    gate = gate.replace("${{ vars.LOG_ANALYTICS_WORKSPACE_NAME }}", "test-workspace")
+    gate = gate.replace("/tmp/prod-smoke-response.sse", "/dev/null")
+    stubs = f"""
+az() {{
+    case "$*" in
+        *"workspace show"*) echo test-workspace ;;
+        *"AppTraces"*) printf '%s\\n' '{trace_count}' ;;
+        *) printf '%s\\n' '{exception_count}' ;;
+    esac
+}}
+jq() {{ echo resp_probe; }}
+sleep() {{ :; }}
+"""
+    result = subprocess.run([bash, "-c", stubs + gate], capture_output=True, text=True, timeout=10, check=False)
+    assert result.returncode == expected, result.stdout + result.stderr
