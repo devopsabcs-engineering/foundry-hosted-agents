@@ -223,16 +223,24 @@ manual recovery; missing or ambiguous routing blocks promotion.
 
 ## Verified release and WI-11 resolution
 
-[Run 34178081808](https://github.com/devopsabcs-engineering/foundry-hosted-agents/actions/runs/34178081808)
-passed the entire staging-to-production pipeline on 2026-09-08 UTC. Staging version 6
-completed eight captures, zero deterministic policy failures, and 21 of 21 model-judge
-checks. Production version 34 is active; its smoke test passed and the exception query
-returned 0. WI-11 is resolved for this implementation, without claiming a confirmed
+[Run 34300982257](https://github.com/devopsabcs-engineering/foundry-hosted-agents/actions/runs/34300982257)
+passed the protected staging-to-production pipeline on source `4b6f8d2`. Staging
+version 10 completed eight captures, zero deterministic policy failures, and 21 of 21
+model-judge checks. Production advanced from version 34 to 35 and passed monitoring.
+The compatibility entry point repeated the full protected release successfully in
+[run 34302149559](https://github.com/devopsabcs-engineering/foundry-hosted-agents/actions/runs/34302149559),
+including its separate production monitoring approval and checks.
+
+The release preserves conversation context, executes read-only tool plans from explicit
+user fields, labels synthetic tool findings, and retains omitted user references in an
+unverified section. It does not promote those references to verified security evidence.
+WI-11 is resolved for this implementation, without claiming a confirmed
 server-side root cause or closure of support request `2609040400007027`.
 
 See the wiki's [Release Evidence](../../wiki/Release-Evidence),
 [Operations](../../wiki/Operations), and [WI-11 history](../../wiki/RBAC-401-Investigation).
 The [evidence report](assets/release-evidence/index.html) and
-[hashed source artifacts](assets/release-evidence/manifest.json) retain the proof.
+[hashed source artifacts](assets/release-evidence/manifest.json) retain historical
+proof for run 34178081808; the wiki links the newer workflow evidence separately.
 These are synthetic security fixtures: a green PoC release is not enterprise production
 certification, a sustained-load test, or evidence of complete distributed tracing.
