@@ -81,6 +81,65 @@ def test_oversized_evidence_fails_closed():
     assert evidence_metadata({"final_report": "x" * 131073})["runtime_evidence"].startswith("unavailable")
 
 
+def test_history_lookup_failure_is_not_silently_discarded(monkeypatch):
+    import httpx
+    from openai import NotFoundError
+    from openai.resources.conversations.items import AsyncItems
+
+    async def missing(*_args, **_kwargs):
+        raise NotFoundError("Missing conversation", response=httpx.Response(
+            404, request=httpx.Request("GET", "https://example.test")), body={})
+        yield
+
+    monkeypatch.setenv("AZURE_AI_PROJECT_ENDPOINT", "https://example.test")
+    monkeypatch.setenv("AGENT_NAME", "test-agent")
+    monkeypatch.setattr(AsyncItems, "list", missing)
+    import pytest
+    with pytest.raises(NotFoundError):
+        asyncio.run(EvidenceConverter(graph.build_graph())._fetch_historical_items("conv_missing"))
+
+
+def test_history_uses_agent_route_and_closes_clients(monkeypatch):
+    import runtime_evidence
+
+    calls = []
+
+    class Credential:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *_args):
+            calls.append("credential closed")
+
+    class Client(Credential):
+        def __init__(self, **kwargs):
+            assert kwargs["base_url"] == "https://example.test/project/agents/test-agent/endpoint/protocols/openai"
+            assert kwargs["default_query"] == {"api-version": "v1"}
+            self.conversations = SimpleNamespace(items=self)
+
+        async def __aexit__(self, *_args):
+            calls.append("client closed")
+
+        async def list(self, conversation_id, *, order):
+            assert order == "asc"
+            if conversation_id == "conv_empty":
+                return
+            assert conversation_id == "conv_history"
+            for role, text in [("user", "PILOT-4827"), ("assistant", "Confirmed")]:
+                yield {"type": "message", "role": role, "content": text}
+
+    monkeypatch.setenv("AZURE_AI_PROJECT_ENDPOINT", "https://example.test/project/")
+    monkeypatch.setenv("AGENT_NAME", "test-agent")
+    monkeypatch.setattr(runtime_evidence, "DefaultAzureCredential", Credential)
+    monkeypatch.setattr(runtime_evidence, "AsyncOpenAI", Client)
+    monkeypatch.setattr(runtime_evidence, "get_bearer_token_provider", lambda *_args: "test-token")
+    converter = EvidenceConverter(graph.build_graph())
+    history = asyncio.run(converter._fetch_historical_items("conv_history"))
+    assert [message.content for message in history] == ["PILOT-4827", "Confirmed"]
+    assert asyncio.run(converter._fetch_historical_items("conv_empty")) == []
+    assert calls == ["client closed", "credential closed"] * 2
+
+
 def test_receipts_require_successful_tool_messages():
     messages = [AIMessage(content='{"tool_calls": [{"connection": "defender-conn"}]}'),
                 ToolMessage(content="failed", tool_call_id="bad", status="error"),

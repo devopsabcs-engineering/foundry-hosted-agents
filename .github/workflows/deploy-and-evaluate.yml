@@ -362,7 +362,7 @@ jobs:
           python-version: "3.13"
 
       - name: Install evaluation SDKs
-        run: pip install azure-ai-projects==2.6.0 openai==3.6.0 azure-identity==1.25.3
+        run: pip install -r src/threat-assessment-agent/requirements.txt azure-ai-projects==2.6.0 openai==3.6.0 azure-identity==1.25.3
 
       - name: Verify full-history follow-up and conversation isolation
         env:
