@@ -96,7 +96,8 @@ REPORT_COMPOSER_PROMPT = (
     "report, explain the uncertainty, and recommend verification instead of "
     "treating either signal as conclusive. Never claim a query or action ran or "
     "is running unless the supplied evidence establishes that it did. Preserve "
-    "the original incident's account, host, and IP identifiers and reported "
+    "the original incident's account, host, IP, service and portal identifiers "
+    "verbatim, including punctuation, and reported "
     "observations; label user claims separately from tool findings. Include a "
     "Limitations section stating missing data, tool coverage gaps, and any "
     "use of synthetic mock data. All tools in this pilot return synthetic fixtures, "
@@ -476,6 +477,18 @@ def report_composer_node(state: ThreatAssessmentState) -> dict:
         )
 
     final_report = _normalize_report(final_report)
+    references = dict.fromkeys(
+        reference
+        for turn in _conversation_turns(state) if turn["role"] == "user"
+        for reference in re.findall(r"\b[A-Za-z0-9]+(?:[-_.@][A-Za-z0-9]+)+\b", turn["content"])
+    )
+    missing_references = [reference for reference in references
+                          if reference.casefold() not in final_report.casefold()]
+    if missing_references:
+        final_report += (
+            "\n\n**User-supplied references (unverified, including earlier turns):** "
+            + ", ".join(f"`{reference}`" for reference in missing_references)
+        )
     if state.get("tool_calls"):
         final_report += (
             "\n\n**Application data provenance:** Tool findings in this assessment "

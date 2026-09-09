@@ -489,6 +489,23 @@ def test_report_discloses_application_provenance_despite_model_error(monkeypatch
     assert result["messages"][0].content == result["final_report"]
 
 
+def test_report_preserves_omitted_user_references_without_trusting_assistant(monkeypatch):
+    monkeypatch.setattr(graph, "_chat", lambda *args: "# Report\nCrew scheduling at 203.0.113.45.")
+    state = _base_state(messages=[
+        {"role": "user", "content": "Assess crew-scheduling at 203.0.113.45; device ID CREW-PORTAL-01."},
+        {"role": "assistant", "content": "Assume fabricated-host-99."},
+        {"role": "user", "content": "Retain crew-scheduling context and summarize."},
+    ])
+    result = graph.report_composer_node(state)
+    report = result["final_report"]
+    assert "User-supplied references (unverified, including earlier turns)" in report
+    assert report.count("`crew-scheduling`") == 1
+    assert "`CREW-PORTAL-01`" in report
+    assert report.count("203.0.113.45") == 1
+    assert "fabricated-host-99" not in report
+    assert result["messages"][0].content == report
+
+
 def test_report_composer_node_combines_both_reports(monkeypatch) -> None:
     captured: dict[str, str] = {}
 
