@@ -15,6 +15,7 @@ class Response:
         self.status = status
         self.events = events
         self.content = self
+        self.headers = {}
 
     async def __aenter__(self):
         return self
@@ -71,6 +72,22 @@ def test_failure_retains_codes_without_prompt_or_error_message():
     assert result["failure_code"] == "rate_limit_exceeded"
     assert result["failure_request_id"] == "request-123"
     assert "potentially sensitive" not in json.dumps(result)
+
+
+def test_failure_retains_only_bounded_correlation_headers():
+    response = Response(200, [{"type": "error", "code": "server_error"}])
+    response.headers = {
+        "X-MS-Agent-Session-ID": "session-123", "X-Request-ID": "r" * 300,
+        "Set-Cookie": "private", "Authorization": "Bearer private",
+    }
+    result = asyncio.run(
+        probe._invoke_once(Session(response), "https://example.test", "test", None)
+    )
+    assert result["error"] is not None
+    assert result["correlation_headers"] == {
+        "X-MS-Agent-Session-ID": "session-123", "X-Request-ID": "r" * 200,
+    }
+    assert "private" not in json.dumps(result)
 
 
 def test_completed_text_is_successful():

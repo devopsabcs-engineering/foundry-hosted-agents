@@ -26,3 +26,12 @@ def test_legacy_entrypoint_cannot_bypass_release_gates():
 
 def test_legacy_release_has_release_trend_label():
     assert run_label({"workflow": "Hosted Agent CI/CD", "run_number": 12, "attempt": 2}) == "R12.2"
+
+
+def test_hosted_telemetry_uses_environment_specific_monitoring_output():
+    config = yaml.safe_load((ROOT / "azure.yaml").read_text(encoding="utf-8"))
+    settings = {item["name"]: item["value"] for item in
+                config["services"]["threat-assessment-agent"]["environmentVariables"]}
+    assert settings["APPLICATIONINSIGHTS_CONNECTION_STRING"] == "${applicationInsightsConnectionString}"
+    assert "output applicationInsightsConnectionString string = monitoring.outputs.applicationInsightsConnectionString" in (
+        ROOT / "infra/main.bicep").read_text(encoding="utf-8")

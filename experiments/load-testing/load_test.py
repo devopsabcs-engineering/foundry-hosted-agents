@@ -78,6 +78,13 @@ async def _invoke_once(
     try:
         async with session.post(endpoint, json=body) as resp:
             result["status"] = resp.status
+            result["correlation_headers"] = {
+                name: value[:200] for name, value in resp.headers.items()
+                if name.lower() in {
+                    "x-request-id", "x-ms-request-id", "apim-request-id",
+                    "x-ms-agent-session-id", "x-agent-session-id", "traceparent",
+                }
+            }
             if resp.status != 200:
                 raise RuntimeError(f"HTTP {resp.status}")
             event_count = 0
