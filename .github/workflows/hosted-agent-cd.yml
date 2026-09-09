@@ -120,3 +120,7 @@ jobs:
           fi
 
           echo "Smoke test passed."
+
+      - name: Deployment links
+        if: always()
+        run: python3 scripts/deployment_summary.py

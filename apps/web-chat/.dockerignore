@@ -1,0 +1,14 @@
+**
+!Dockerfile
+!requirements.txt
+!app.py
+!auth.py
+!frontend/
+!frontend/package.json
+!frontend/package-lock.json
+!frontend/index.html
+!frontend/vite.config.js
+!frontend/src/
+!frontend/src/**
+!frontend/tests/
+!frontend/tests/**

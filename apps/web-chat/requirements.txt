@@ -4,3 +4,4 @@ httpx==0.28.1
 httpx-sse==0.4.3
 PyJWT[crypto]==2.12.1
 azure-identity==1.25.3
+aiohttp>=3.13.3,<4

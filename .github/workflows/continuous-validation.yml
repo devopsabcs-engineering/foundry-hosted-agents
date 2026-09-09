@@ -36,7 +36,7 @@ jobs:
         run: pytest eval/deterministic-tests/ -v --junitxml=evidence/deterministic.xml
       - name: Reporting and load contract tests
         if: ${{ !cancelled() }}
-        run: pytest scripts/tests/test_ci_results.py experiments/load-testing/test_load_test.py -v --junitxml=evidence/reporting.xml
+        run: pytest scripts/tests/test_ci_results.py scripts/tests/test_deployment_summary.py experiments/load-testing/test_load_test.py -v --junitxml=evidence/reporting.xml
       - name: Responses stream contract
         if: ${{ !cancelled() }}
         run: bash scripts/test-agent-response.sh
@@ -48,7 +48,9 @@ jobs:
         run: bash scripts/test-production-version.sh
       - name: Publish offline summary
         if: always()
-        run: python scripts/ci_results.py --junit evidence
+        run: |
+          python scripts/ci_results.py --junit evidence
+          python scripts/deployment_summary.py
       - name: Retain offline results
         if: always()
         uses: actions/upload-artifact@v6
@@ -159,6 +161,7 @@ jobs:
             echo 'Existing staging only; no deployment. Full aggregate measurements and wiki publication are in the linked Publish Test Trends workflow.'
             echo '[Test trends](https://github.com/devopsabcs-engineering/foundry-hosted-agents/wiki/Continuous-Test-Trends)'
           } >> "$GITHUB_STEP_SUMMARY"
+          python scripts/deployment_summary.py
       - name: Retain evaluation evidence
         if: always()
         uses: actions/upload-artifact@v6

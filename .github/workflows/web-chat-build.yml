@@ -2,6 +2,11 @@ name: Web Chat Build
 
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['apps/web-chat/**', '.github/workflows/web-chat-build.yml', 'scripts/deployment_summary.py']
+  pull_request:
+    paths: ['apps/web-chat/**', '.github/workflows/web-chat-build.yml', 'scripts/deployment_summary.py']
 
 permissions:
   contents: read
@@ -38,7 +43,7 @@ jobs:
           fi
       - name: Frontend stream contract tests
         working-directory: apps/web-chat/frontend
-        run: npm test
+        run: node --test --test-reporter=spec --test-reporter=junit --test-reporter-destination=stdout --test-reporter-destination=../../../web-chat-evidence/frontend.xml tests/*.test.js
       - name: Compile frontend
         working-directory: apps/web-chat/frontend
         run: npm run build
@@ -51,7 +56,7 @@ jobs:
             apps/web-chat/frontend/package-lock.json
           if-no-files-found: error
           retention-days: 14
-      - name: Retain backend test results
+      - name: Retain backend and frontend test results
         if: always()
         uses: actions/upload-artifact@v6
         with:
@@ -59,10 +64,15 @@ jobs:
           path: web-chat-evidence/
           retention-days: 14
       - name: Build summary
+        if: always()
+        env:
+          BUILD_STATUS: ${{ job.status }}
         run: |
+          python scripts/ci_results.py --junit web-chat-evidence
           {
             echo '## Web Chat Build'
-            echo 'Dependencies, tests, and compilation ran on a GitHub-hosted runner.'
-            echo 'The frontend artifact contains dist/ and the dependency lockfile.'
+            echo "Build result: **$BUILD_STATUS**. See individual steps and artifacts for test results."
+            echo 'Successful builds retain dist/ and the dependency lockfile as an artifact.'
             echo 'No Azure deployment or local npm policy changes were performed.'
           } >> "$GITHUB_STEP_SUMMARY"
+          python scripts/deployment_summary.py

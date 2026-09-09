@@ -12,6 +12,65 @@ A proof of concept that hosts a LangGraph multi-agent threat-assessment workflow
 [devopsabcs-engineering.github.io/foundry-hosted-agents](https://vigilant-guacamole-y8qe3rw.pages.github.io/)**
 (source in [`docs/`](docs); requires sign-in since this repo is internal).
 
+## Try the web chatbot
+
+[Open the staging chatbot](https://foundry-threat-chat-staging.wonderfulpebble-ce861678.eastus2.azurecontainerapps.io)
+and sign in with an approved member of **Foundry Threat Assessment Pilot** in the
+`MngEnvMCAP675646.onmicrosoft.com` tenant. The initial approved member is the tenant
+administrator. A same-tenant account without pilot membership is not sufficient.
+
+The pilot is a React chat frontend and FastAPI backend in a separate Azure Container App.
+It calls the existing staging hosted agent using a dedicated managed identity. It does
+not redeploy the agent, expose Azure credentials to the browser, or provide a production
+web frontend. Public HTTPS ingress is protected by application authentication; it is
+**not a network-private deployment**. The landing page and health endpoint are public.
+
+```mermaid
+flowchart LR
+    User[Approved pilot user] --> Browser[React web chat]
+    Browser <-->|Authorization code with PKCE| Entra[Single-tenant Microsoft Entra ID]
+    Browser -->|Bearer token and same-origin HTTPS| API[FastAPI backend]
+    API --> Gate[Validate JWT, delegated scope and pilot group]
+    Gate --> History[Owner-bound in-memory conversation]
+    History -->|Managed identity token| Agent[Staging Foundry hosted agent]
+    Agent --> Graph[LangGraph supervisor and specialists]
+    Graph --> Toolbox[Foundry Toolbox]
+    Toolbox --> MCP[Synthetic Defender and anomaly MCP servers]
+    Agent -->|Completed assistant text| API
+    API -->|SSE status, answer and completion| Browser
+```
+
+On 2026-09-08, the pilot administrator signed in and received a device-risk report
+for the synthetic `device-001` fixture through the web UI. The startup-fixed image
+also passed its real managed-identity construction check and 23 backend tests.
+This verifies the pilot path, not real Defender telemetry or enterprise readiness.
+
+| Destination | Purpose |
+| --- | --- |
+| [Web chatbot](https://foundry-threat-chat-staging.wonderfulpebble-ce861678.eastus2.azurecontainerapps.io) | Try the signed-in staging pilot |
+| [Health check](https://foundry-threat-chat-staging.wonderfulpebble-ce861678.eastus2.azurecontainerapps.io/healthz) | Process health only; does not invoke the agent |
+| [Web Chat Pilot wiki](https://github.com/devopsabcs-engineering/foundry-hosted-agents/wiki/Web-Chat-Pilot) | Identity, diagrams, deployment, recovery, verification and Teams roadmap |
+| [Web Chat Build workflow](https://github.com/devopsabcs-engineering/foundry-hosted-agents/actions/workflows/web-chat-build.yml) | Hosted dependency installation, tests and frontend artifacts |
+| [Continuous Test Trends](https://github.com/devopsabcs-engineering/foundry-hosted-agents/wiki/Continuous-Test-Trends) | Agent evaluation and load evidence, separate from web UI verification |
+
+Try: `Using your available tools, check the device risk for device-001 and list its vulnerabilities.`
+Use synthetic or approved pilot data only. Responses contain simulated security findings,
+not an instruction to perform remediation.
+
+Conversations are session-only: one backend process and one replica, five conversations
+per user, a one-hour idle expiry, and at most 20 successful turns per conversation.
+Reloading the page loses its local conversation list; restarting the backend loses all
+conversation state. Do not scale out until a shared, owner-bound session store is implemented.
+The UI shows progress while the agent runs, then the completed answer, not token-by-token text.
+Teams is not deployed; see the wiki for the tab and native-bot options and their security gates.
+
+> [!WARNING]
+> Single-turn assessments are verified, but context-dependent follow-ups are not working
+> end to end. A live two-turn check failed to recall an earlier synthetic reference.
+> The web backend sends history, but the hosted graph currently uses only the last message
+> as incident context. Restate the complete incident in each request until the agent is
+> corrected and re-evaluated. See the [known blocker](https://github.com/devopsabcs-engineering/foundry-hosted-agents/wiki/Web-Chat-Pilot#known-blocker-conversation-context).
+
 ## Architecture
 
 ```mermaid
@@ -53,8 +112,12 @@ flowchart LR
 ## Repository layout
 
 | Path | Purpose |
-|---|---|
+| --- | --- |
 | [`azure.yaml`](azure.yaml) | `azd` project manifest: Foundry project, model deployment, Toolbox connections, and the hosted agent service definition. |
+| [apps/web-chat/](apps/web-chat/) | React/MSAL frontend, authenticated FastAPI backend, Docker image and authorization/session/stream tests. |
+| [infra/web-chat.bicep](infra/web-chat.bicep) | Separate staging web Container App and managed identity, registry pull and project-scoped Foundry roles. |
+| [scripts/setup-web-chat-identity.ps1](scripts/setup-web-chat-identity.ps1) | Administrator-run Entra app registration, SPA callbacks, delegated consent and pilot-group assignment. |
+| [scripts/deployment_summary.py](scripts/deployment_summary.py) | Shared clickable deployment inventory for Actions summaries. |
 | [`src/threat-assessment-agent/`](src/threat-assessment-agent) | The LangGraph agent: `graph.py` (supervisor + specialist nodes), `state.py` (graph state schema, optional Cosmos DB checkpointer extension point), `main.py` (Foundry Responses-protocol host entry point), `tests/`. |
 | [`mcp/defender-server/`](mcp/defender-server) | Mocked Microsoft Defender MCP tool server (`get_device_risk`, `list_vulnerabilities`). |
 | [`mcp/anomaly-server/`](mcp/anomaly-server) | Mocked anomaly-detection MCP tool server (`score_anomaly`, `detect_login_anomalies`). |
@@ -125,6 +188,14 @@ Passing these fixtures demonstrates workflow behavior, not real Defender detecti
 
 Both workflows authenticate via secretless OIDC federation (no stored client secrets).
 
+[Web Chat Build](.github/workflows/web-chat-build.yml) is separate: scoped push/PR checks
+and manual dispatch run backend tests, frontend stream tests and `npm ci`/Vite compilation
+on GitHub-hosted runners. It does **not** deploy to Azure. The wiki records the operator-run
+ACR remote build and digest-pinned Bicep deployment; no local npm policy bypass is required.
+The web build, continuous validation, release, direct-deploy and trend-publishing workflows
+include a **Deployment Links** section in their summaries. Links identify existing targets;
+they do not certify that a particular run deployed or tested those targets.
+
 The staging release workflow builds MCP images from the selected commit and pins them by digest.
 Staging uses dedicated `mcp-staging-*` Container Apps and an image-pull identity, leaving the
 existing `mcp-*` production apps unchanged. It rejects shared MCP URLs before deploying the agent.
@@ -149,4 +220,3 @@ The [evidence report](assets/release-evidence/index.html) and
 [hashed source artifacts](assets/release-evidence/manifest.json) retain the proof.
 These are synthetic security fixtures: a green PoC release is not enterprise production
 certification, a sustained-load test, or evidence of complete distributed tracing.
-

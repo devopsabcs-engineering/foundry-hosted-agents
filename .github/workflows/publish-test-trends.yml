@@ -41,6 +41,9 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: '3.13'
+      - name: Deployment links
+        if: always()
+        run: python scripts/deployment_summary.py
       - name: Verify source run provenance
         run: |
           set -euo pipefail

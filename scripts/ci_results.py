@@ -35,6 +35,8 @@ def junit_totals(directory):
             "agent": "Agent graph",
             "deterministic": "Deterministic evaluation",
             "reporting": "Reporting and load contracts",
+            "backend": "Web chat backend",
+            "frontend": "Web chat frontend",
         }.get(path.stem, "Other JUnit")
         by_type.setdefault(label, 0)
         for case in root.iter("testcase"):

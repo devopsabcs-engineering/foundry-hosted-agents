@@ -82,7 +82,9 @@ jobs:
 
       - name: Publish offline test summary
         if: always()
-        run: python scripts/ci_results.py --junit offline-evidence
+        run: |
+          python scripts/ci_results.py --junit offline-evidence
+          python scripts/deployment_summary.py
 
       - name: Retain offline test measurements
         if: always()

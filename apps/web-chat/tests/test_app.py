@@ -5,7 +5,7 @@ import pytest
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
-from app import SessionStore, Settings, create_app
+from app import FoundryClient, SessionStore, Settings, create_app
 from auth import Identity
 
 SETTINGS = Settings("tenant", "client", "pilot", "https://test.services.ai.azure.com/responses")
@@ -37,6 +37,16 @@ def client():
     with TestClient(app) as client:
         client.headers["Authorization"] = "Bearer alice"
         yield client, agent, app.state.store
+
+
+def test_real_client_lifespan_with_managed_identity(monkeypatch):
+    monkeypatch.setenv("IDENTITY_ENDPOINT", "http://localhost/identity")
+    monkeypatch.setenv("IDENTITY_HEADER", "test-only")
+    application = create_app(SETTINGS, TestAuth())
+    with TestClient(application) as startup_client:
+        assert isinstance(application.state.upstream, FoundryClient)
+        assert startup_client.get("/healthz").json() == {"status": "ok"}
+    assert application.state.upstream.http.is_closed
 
 
 def test_anonymous_denied(client):
