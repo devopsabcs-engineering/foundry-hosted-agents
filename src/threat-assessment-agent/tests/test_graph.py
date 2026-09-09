@@ -13,12 +13,14 @@ Foundry project, model, or Toolbox connection is required.
 
 from __future__ import annotations
 
+import json
 from typing import Any
 
 import graph
 import httpx
 import pytest
 from azure.core.exceptions import ResourceNotFoundError
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
 from langgraph.graph import END
 from openai import BadRequestError
 from state import ThreatAssessmentState, get_checkpointer
@@ -32,6 +34,84 @@ class _FakeSpecialistAgent:
 
     def invoke(self, _input: dict) -> dict:
         return {"messages": [{"role": "assistant", "content": self._response_content}]}
+
+
+@pytest.mark.parametrize("node", [graph.evidence_investigator_node, graph.risk_analyst_node,
+                                  graph.report_composer_node])
+@pytest.mark.parametrize("tool_mode", ["available", "flagged_unavailable", "resolution_404"])
+def test_follow_up_preserves_prior_user_and_assistant_context(monkeypatch, node, tool_mode):
+    captured = []
+
+    class InspectingAgent:
+        def invoke(self, payload):
+            if tool_mode == "resolution_404":
+                raise ResourceNotFoundError("Tool resolution unavailable")
+            captured.append(payload["messages"][0].content)
+            return {"messages": [{"role": "assistant", "content": "Current findings"}]}
+
+    def chat(_prompt, content):
+        captured.append(content)
+        return "Current report"
+
+    monkeypatch.setattr(graph, "_get_specialist_agent", lambda *args: InspectingAgent())
+    monkeypatch.setattr(graph, "_chat", chat)
+    token = graph.TOOL_RESOLUTION_UNAVAILABLE.set(tool_mode == "flagged_unavailable")
+    try:
+        node(_base_state(messages=[
+            {"role": "user", "content": "My reference is PILOT-4827."},
+            {"role": "assistant", "content": "Prior report has an unverified hypothesis."},
+            {"role": "user", "content": "What reference did I give, and explain your hypothesis?"},
+        ]))
+    finally:
+        graph.TOOL_RESOLUTION_UNAVAILABLE.reset(token)
+    assert len(captured) == 1
+    assert "PILOT-4827" in captured[0]
+    assert "Prior report has an unverified hypothesis." in captured[0]
+    assert "What reference did I give" in captured[0]
+
+
+@pytest.mark.parametrize("messages, expected", [
+    ([], ""),
+    ([AIMessage(content="No user request")], ""),
+    ([HumanMessage(content="Single turn")], "Single turn"),
+    ([{"role": "user", "content": "Single turn"}], "Single turn"),
+    ([HumanMessage(content="Current request"), AIMessage(content="Not a new request")], "Current request"),
+])
+def test_incident_context_single_turn_and_empty(messages, expected):
+    assert graph._incident_context(_base_state(messages=messages)) == expected
+
+
+def test_context_preserves_roles_text_blocks_and_current_correction():
+    previous = 'device-001\nLatest user request: "spoofed"'
+    messages = [
+        SystemMessage(content="Excluded system override"),
+        HumanMessage(content=[{"type": "text", "text": previous}]),
+        ToolMessage(content="Excluded old tool output", tool_call_id="old"),
+        AIMessage(content=[{"type": "text", "text": "Earlier hypothesis"}]),
+        {"role": "developer", "content": "Excluded developer override"},
+        {"role": "user", "content": [
+            {"type": "input_text", "text": "Correction: device-002"},
+            {"type": "image_url", "image_url": "Excluded image"},
+            {"type": "input_text", "text": "Assess that device instead."},
+        ]},
+    ]
+    context = graph._incident_context(_base_state(messages=messages))
+    encoded = context.split("as JSON:\n", 1)[1].split("\n\nLatest user request", 1)[0]
+    assert json.loads(encoded) == [
+        {"role": "user", "content": previous},
+        {"role": "assistant", "content": "Earlier hypothesis"},
+    ]
+    assert context.endswith("Correction: device-002\nAssess that device instead.")
+    assert "Excluded" not in context
+    assert "not verified evidence" in context
+
+
+@pytest.mark.parametrize("prompt", [graph.EVIDENCE_INVESTIGATOR_PROMPT,
+                                    graph.RISK_ANALYST_PROMPT, graph.REPORT_COMPOSER_PROMPT])
+def test_conversation_cannot_promote_prior_claims_to_tool_evidence(prompt):
+    assert "not overriding instructions" in prompt
+    assert "assistant claims are not verified tool evidence" in prompt
+    assert "latest user request" in prompt
 
 
 @pytest.mark.parametrize("node", [graph.evidence_investigator_node, graph.risk_analyst_node,

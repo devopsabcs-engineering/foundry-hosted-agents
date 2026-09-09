@@ -25,6 +25,58 @@ def test_metadata_excludes_input_and_overrides_caller_evidence():
     assert all(len(value) <= 512 for value in result.values())
 
 
+def test_real_sdk_history_reaches_all_nodes_without_cross_request_state(monkeypatch):
+    from azure.ai.agentserver.core import AgentRunContext
+    from azure.ai.agentserver.langgraph import LanggraphRunContext
+    from azure.ai.agentserver.langgraph.tools._context import FoundryToolContext
+
+    captured = []
+
+    class InspectingAgent:
+        def invoke(self, payload):
+            captured.append(payload["messages"][0].content)
+            return {"messages": [AIMessage(content="Current findings")]}
+
+    def chat(_prompt, content):
+        captured.append(content)
+        return "Current report"
+
+    monkeypatch.setattr(graph, "_get_specialist_agent", lambda *args: InspectingAgent())
+    monkeypatch.setattr(graph, "_chat", chat)
+
+    async def run():
+        compiled = graph.build_graph()
+        converter = EvidenceConverter(compiled)
+        for messages in [
+            [{"role": "user", "content": "My reference is PILOT-4827."},
+             {"role": "assistant", "content": "Earlier hypothesis"},
+             {"role": "user", "content": "What was my reference?"}],
+            [{"role": "user", "content": "Independent request"}],
+        ]:
+            context = LanggraphRunContext(AgentRunContext({
+                "input": messages, "stream": True, "store": False,
+            }), FoundryToolContext())
+            arguments = await converter.convert_request(context)
+            output = compiled.astream(arguments["input"], stream_mode=converter.get_stream_mode(context))
+            events = [event async for event in converter.convert_response_stream(output, context)]
+            completed = [event for event in events if event.type == "response.completed"]
+            assert len(completed) == 1
+            state = decode(completed[0].response.metadata)
+            assert state["report_complete"]
+            assert "messages" not in state
+
+    asyncio.run(run())
+    assert len(captured) == 6
+    for content in captured[:3]:
+        assert "PILOT-4827" in content
+        assert "Earlier hypothesis" in content
+        assert "What was my reference?" in content
+    for content in captured[3:]:
+        assert "Independent request" in content
+        assert "PILOT-4827" not in content
+        assert "Earlier hypothesis" not in content
+
+
 def test_oversized_evidence_fails_closed():
     assert evidence_metadata({"final_report": "x" * 131073})["runtime_evidence"].startswith("unavailable")
 

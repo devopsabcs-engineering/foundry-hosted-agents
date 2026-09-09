@@ -356,6 +356,23 @@ jobs:
       - name: Install evaluation SDKs
         run: pip install azure-ai-projects==2.6.0 openai==3.6.0 azure-identity==1.25.3
 
+      - name: Verify full-history follow-up and conversation isolation
+        env:
+          PROJECT_ENDPOINT: ${{ needs.deploy-staging.outputs.project_endpoint }}
+        run: |
+          python eval/check_conversation.py \
+            --endpoint "$PROJECT_ENDPOINT/agents/$AGENT_NAME/endpoint/protocols/openai/responses?api-version=v1" \
+            --output-dir "${{ runner.temp }}/conversation-evidence"
+
+      - name: Retain conversation regression evidence
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: conversation-evidence
+          path: ${{ runner.temp }}/conversation-evidence/
+          retention-days: 7
+          if-no-files-found: warn
+
       - name: Install Azure Developer CLI
         uses: Azure/setup-azd@v2
 
