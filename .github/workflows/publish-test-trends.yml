@@ -2,7 +2,7 @@ name: Publish Test Trends
 
 on:
   workflow_run:
-    workflows: [Continuous Validation, 'Deploy and Evaluate (Staging -> Production)']
+    workflows: [Continuous Validation, 'Deploy and Evaluate (Staging -> Production)', Hosted Agent CI/CD]
     types: [completed]
     branches: [main]
   workflow_dispatch:
@@ -54,7 +54,7 @@ jobs:
             .repository.full_name == $repo and .head_repository.full_name == $repo
             and .head_branch == "main" and .status == "completed"
             and (.event == "push" or .event == "workflow_dispatch")
-            and (.path == ".github/workflows/continuous-validation.yml" or .path == ".github/workflows/deploy-and-evaluate.yml")
+            and (.path == ".github/workflows/continuous-validation.yml" or .path == ".github/workflows/deploy-and-evaluate.yml" or .path == ".github/workflows/hosted-agent-cd.yml")
           ' source-run.json
           gh api "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN/attempts/$SOURCE_ATTEMPT/jobs?per_page=100" > source-jobs.json
       - name: Download only this attempt's known evidence artifacts

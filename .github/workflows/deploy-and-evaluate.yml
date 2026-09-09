@@ -1,7 +1,6 @@
 name: Deploy and Evaluate (Staging -> Production)
 
-# Separate from hosted-agent-cd.yml (which provisions/deploys a single
-# environment straight to `main`). This workflow implements the full
+# Shared by both manual release entry points. This workflow implements the full
 # eval-gated release-control flow from the research CI/CD mermaid diagram
 # (air-canada-foundry-hosted-agents-research.md, "CI/CD and Release
 # Control", lines 518-533): lint -> Bicep validate/what-if -> deploy an
@@ -10,6 +9,12 @@ name: Deploy and Evaluate (Staging -> Production)
 # promote -> post-deploy monitoring -> rollback on breach.
 
 on:
+  workflow_call:
+    inputs:
+      golden_dataset_path:
+        type: string
+        required: false
+        default: eval/golden-dataset.jsonl
   workflow_dispatch:
     inputs:
       golden_dataset_path:
@@ -70,6 +75,9 @@ jobs:
 
       - name: Deterministic evaluation checks (must fail on the injected bad example)
         run: pytest eval/deterministic-tests/ -v --junitxml=offline-evidence/deterministic.xml
+
+      - name: Reporting and workflow contract tests
+        run: pytest scripts/tests/ -v --junitxml=offline-evidence/reporting.xml
 
       - name: Responses contract validator regression tests
         run: bash scripts/test-agent-response.sh

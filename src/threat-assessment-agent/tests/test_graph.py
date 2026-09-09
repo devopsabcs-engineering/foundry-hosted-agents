@@ -114,6 +114,14 @@ def test_conversation_cannot_promote_prior_claims_to_tool_evidence(prompt):
     assert "latest user request" in prompt
 
 
+def test_investigator_requires_verification_despite_reported_clean_result():
+    prompt = graph.EVIDENCE_INVESTIGATOR_PROMPT
+    assert "explicit device ID" in prompt
+    assert "independently call get_device_risk and list_vulnerabilities" in prompt
+    assert "earlier assistant report says Defender already found it clean" in prompt
+    assert "Reported results never replace current verification" in prompt
+
+
 @pytest.mark.parametrize("node", [graph.evidence_investigator_node, graph.risk_analyst_node,
                                   graph.report_composer_node])
 @pytest.mark.parametrize("code", ["content_filter", "invalid_request"])
@@ -254,6 +262,52 @@ def test_degraded_model_receives_tool_availability_constraints(monkeypatch):
         "evidence_complete", "evidence_tool_unavailable",
     )
     assert result["evidence_tool_unavailable"] is True
+
+
+@pytest.mark.parametrize("role,content,expected", [
+    ("user", "device ID: OPS-DB-02", []),
+    ("assistant", "account/user ID: invented", []),
+    ("system", "account ID: privileged", []),
+    ("user", "account/user ID: jsmith", ["jsmith"]),
+    ("user", "user ID alice@example.test", ["alice@example.test"]),
+])
+def test_login_identifiers_come_only_from_explicit_user_fields(monkeypatch, role, content, expected):
+    captured = {}
+
+    class Agent:
+        def invoke(self, payload):
+            captured.update(payload)
+            return {"messages": []}
+
+    monkeypatch.setattr(graph, "_get_specialist_agent", lambda *args: Agent())
+    graph.risk_analyst_node(_base_state(messages=[{"role": role, "content": content}],
+                                     evidence_report="account ID: invented-by-investigator"))
+    assert [call["args"]["user_id"] for call in captured["required_tools"]] == expected
+
+
+def test_required_calls_are_repeatable_deduplicated_and_use_latest_explicit_fields():
+    state = _base_state(messages=[
+        {"role": "user", "content": "device ID: old; account ID: old-user"},
+        {"role": "assistant", "content": "device ID: invented; account ID: invented"},
+        {"role": "user", "content": [{"type": "input_text", "text":
+            "Correction: device ID: new; device ID: new; account/user ID: new-user; "
+            "data_egress_mb_per_hour: 900"}]},
+        {"role": "user", "content": "Reassess the same incident."},
+    ])
+    defender = graph._required_tool_calls(state, graph.DEFENDER_TOOLBOX_CONNECTION)
+    risk = graph._required_tool_calls(state, graph.ANOMALY_TOOLBOX_CONNECTION)
+    assert len(defender) == 2
+    assert all(call["args"] == {"device_id": "new"} for call in defender)
+    assert [call["args"] for call in risk] == [
+        {"user_id": "new-user"}, {"metric": "data_egress_mb_per_hour", "value": 900.0}]
+    assert graph._required_tool_calls(state, graph.DEFENDER_TOOLBOX_CONNECTION) == defender
+    assert graph._required_tool_calls(state, graph.ANOMALY_TOOLBOX_CONNECTION) == risk
+
+
+@pytest.mark.parametrize("value", ["99%", "99.5%", "99 percentile", "99 percent", "unknown", "-1"])
+def test_percentiles_and_invalid_measurements_cannot_schedule_scoring(value):
+    state = _base_state(messages=[{"role": "user", "content": f"data_egress_mb_per_hour: {value}"}])
+    assert graph._required_tool_calls(state, graph.ANOMALY_TOOLBOX_CONNECTION) == []
 
 
 def test_composer_receives_original_request_and_read_only_constraints(monkeypatch):
@@ -404,6 +458,20 @@ def test_risk_analyst_node_binds_anomaly_toolbox_connection(monkeypatch) -> None
     graph.risk_analyst_node(_base_state(evidence_report="evidence summary", evidence_complete=True))
 
     assert captured["connection_id"] == "anomaly-conn"
+
+
+@pytest.mark.parametrize("marker", ["---", "***", "___", "- - -", "****", "```markdown", "~~~"])
+@pytest.mark.parametrize("degraded", [False, True])
+def test_report_format_is_idempotent_and_preserves_content(monkeypatch, marker, degraded):
+    body = "# Final report\nOPS-DB-02: user-reported clean status.\n- Risk remains unknown."
+    monkeypatch.setattr(graph, "_chat", lambda *args: f"{marker}\n{body}\n{marker}")
+    result = graph.report_composer_node(_base_state(evidence_tool_unavailable=degraded))
+    report = result["final_report"]
+    assert report.startswith(body)
+    assert graph._normalize_report(report) == report
+    assert result["messages"][0].content == report
+    assert ("**Limitations:**" in report) == degraded
+    assert marker not in report.splitlines()
 
 
 def test_report_composer_node_combines_both_reports(monkeypatch) -> None:

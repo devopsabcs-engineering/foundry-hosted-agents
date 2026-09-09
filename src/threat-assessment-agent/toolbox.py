@@ -4,10 +4,12 @@ import asyncio
 import os
 from contextlib import asynccontextmanager
 from urllib.parse import quote
+from uuid import uuid4
 
 import httpx
 from azure.identity.aio import DefaultAzureCredential
 from langchain.agents import create_agent
+from langchain_core.messages import AIMessage
 from langchain_mcp_adapters.tools import load_mcp_tools
 from mcp.client.streamable_http import streamable_http_client
 
@@ -60,9 +62,23 @@ class ToolboxSpecialist:
 
     async def ainvoke(self, payload):
         async with toolbox_tools(self.connection) as tools:
-            agent = create_agent(model=self.model_factory(), tools=tools,
-                                 system_prompt=self.system_prompt)
-            return await agent.ainvoke(payload)
+            messages = list(payload["messages"])
+            available = {tool.name: tool for tool in tools}
+            for planned in payload.get("required_tools", []):
+                if planned["name"] not in ALLOWED_TOOLS[self.connection]:
+                    raise ValueError("Tool call is outside the specialist allowlist")
+                call = {**planned, "id": f"call_{uuid4().hex}", "type": "tool_call"}
+                messages.append(AIMessage(content="", tool_calls=[call]))
+                messages.append(await available[planned["name"]].ainvoke(call))
+            model = self.model_factory()
+            async with model.root_async_client:
+                with model.root_client:
+                    agent = create_agent(model=model, tools=[], system_prompt=(self.system_prompt
+                        + " Required read-only lookups have already been executed when explicit input fields "
+                        "were available. Summarize the supplied ToolMessages; do not issue additional calls. "
+                        "If no ToolMessages are present, say verification is unavailable and request explicit "
+                        "device ID, account/user ID, or a supported metric: measured-value field as applicable."))
+                    return await agent.ainvoke({"messages": messages})
 
     def invoke(self, payload):
         try:

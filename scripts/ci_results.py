@@ -302,7 +302,7 @@ def summary(record):
 
 
 def run_label(record):
-    prefix = "R" if record["workflow"].startswith("Deploy") else "V"
+    prefix = "R" if record["workflow"].startswith("Deploy") or record["workflow"] == "Hosted Agent CI/CD" else "V"
     return f"{prefix}{record.get('run_number') or record['run_id']}.{record['attempt']}"
 
 

@@ -36,7 +36,7 @@ jobs:
         run: pytest eval/deterministic-tests/ -v --junitxml=evidence/deterministic.xml
       - name: Reporting and load contract tests
         if: ${{ !cancelled() }}
-        run: pytest scripts/tests/test_ci_results.py scripts/tests/test_deployment_summary.py experiments/load-testing/test_load_test.py -v --junitxml=evidence/reporting.xml
+        run: pytest scripts/tests/ experiments/load-testing/test_load_test.py -v --junitxml=evidence/reporting.xml
       - name: Responses stream contract
         if: ${{ !cancelled() }}
         run: bash scripts/test-agent-response.sh
