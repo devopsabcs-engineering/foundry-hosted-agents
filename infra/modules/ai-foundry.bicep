@@ -37,6 +37,13 @@ param defenderMcpUrl string = ''
 @description('MCP endpoint URL for the Anomaly tool server. Leave empty to skip creating the connection.')
 param anomalyMcpUrl string = ''
 
+@description('Application Insights resource associated with this project')
+param applicationInsightsResourceId string
+
+@secure()
+@description('Application Insights ingestion connection string')
+param applicationInsightsConnectionString string
+
 // Basic Agent Setup: Microsoft-managed conversation/file/vector storage — no capabilityHosts.
 resource account 'Microsoft.CognitiveServices/accounts@2025-06-01' = {
   name: accountName
@@ -82,6 +89,23 @@ resource project 'Microsoft.CognitiveServices/accounts/projects@2025-04-01-previ
   properties: {
     displayName: projectDisplayName
     description: projectDescription
+  }
+}
+
+resource telemetryConnection 'Microsoft.CognitiveServices/accounts/projects/connections@2025-04-01-preview' = {
+  parent: project
+  name: 'application-insights'
+  properties: {
+    category: 'AppInsights'
+    target: applicationInsightsResourceId
+    authType: 'ApiKey'
+    credentials: {
+      key: applicationInsightsConnectionString
+    }
+    isSharedToAll: true
+    metadata: {
+      ResourceId: applicationInsightsResourceId
+    }
   }
 }
 

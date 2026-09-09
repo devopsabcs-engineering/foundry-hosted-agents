@@ -74,6 +74,8 @@ module aiFoundry 'modules/ai-foundry.bicep' = {
     location: location
     accountName: accountName
     projectName: projectName
+    applicationInsightsResourceId: monitoring.outputs.applicationInsightsId
+    applicationInsightsConnectionString: monitoring.outputs.applicationInsightsConnectionString
     modelDeploymentName: modelDeploymentName
     modelName: modelName
     modelFormat: modelFormat

@@ -35,3 +35,10 @@ def test_hosted_telemetry_uses_environment_specific_monitoring_output():
     assert settings["APPLICATIONINSIGHTS_CONNECTION_STRING"] == "${applicationInsightsConnectionString}"
     assert "output applicationInsightsConnectionString string = monitoring.outputs.applicationInsightsConnectionString" in (
         ROOT / "infra/main.bicep").read_text(encoding="utf-8")
+    infrastructure = (ROOT / "infra/main.bicep").read_text(encoding="utf-8")
+    connection = (ROOT / "infra/modules/ai-foundry.bicep").read_text(encoding="utf-8")
+    assert "applicationInsightsResourceId: monitoring.outputs.applicationInsightsId" in infrastructure
+    assert "applicationInsightsConnectionString: monitoring.outputs.applicationInsightsConnectionString" in infrastructure
+    assert "category: 'AppInsights'" in connection
+    assert "target: applicationInsightsResourceId" in connection
+    assert "key: applicationInsightsConnectionString" in connection
