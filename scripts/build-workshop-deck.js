@@ -154,14 +154,14 @@ const SLIDES = [
         'kind: hosted \u2014 Foundry operates the session compute; you own only the graph code',
         'dependencyResolution: remote_build \u2014 Foundry builds your Python dependencies server-side',
         'protocol: responses \u2014 OpenAI-compatible Responses protocol with streaming support',
-        'azd provision creates infrastructure; azd deploy publishes a new agent version — separate lifecycles',
+        'azd provision manages infrastructure; azd deploy publishes or reuses an unchanged agent version. Separate lifecycles; verify remote route before and after',
       ],
       fr: [
         'azure.yaml câble le projet Foundry, le déploiement de modèle, les connexions Toolbox et le service d\u2019agent hébergé',
         'kind: hosted — Foundry exploite le calcul de session ; vous ne possédez que le code du graphe',
         'dependencyResolution: remote_build — Foundry construit vos dépendances Python côté serveur',
         'protocol: responses — protocole Responses compatible OpenAI avec support du streaming',
-        'azd provision crée l\u2019infrastructure ; azd deploy publie une nouvelle version d\u2019agent — cycles de vie séparés',
+        'azd provision gère l’infrastructure ; azd deploy publie ou réutilise une version inchangée. Cycles distincts ; vérifier la route avant et après',
       ],
     },
   },
@@ -190,18 +190,18 @@ const SLIDES = [
     title: { en: 'Evaluation-Gated Release Pipeline', fr: 'Pipeline de mise en production contrôlé par évaluation' },
     bullets: {
       en: [
-        'Two manual pipelines: direct PoC deployment, or deploy-and-evaluate.yml with isolated staging and production accounts/projects',
+        'One protected release path: deploy-and-evaluate.yml; hosted-agent-cd.yml delegates to it. Separate staging/production accounts and MCP apps',
         'Full flow: lint/tests \u2192 Bicep validate \u2192 deploy immutable candidate to staging \u2192 smoke/contract/streaming tests',
         'Offline evaluation quality gate runs against the staging candidate before any manual production approval',
         'Secretless OIDC federation — no stored client secrets in either pipeline',
-        'Run 34178081808 passed end to end: staging 6, production 34, exact evaluated MCP digests, normal approvals. Manual recovery; no automatic rollback or canary',
+        'Run 34427432731 passed end to end; Continuous Validation 34427429700 passed unchanged five-stream load. Normal approvals and manual recovery; no automatic rollback or canary',
       ],
       fr: [
-        'Deux pipelines manuels : déploiement direct PoC, ou deploy-and-evaluate.yml avec comptes et projets staging/production séparés',
+        'Un chemin protégé : deploy-and-evaluate.yml ; hosted-agent-cd.yml y délègue. Comptes et applications MCP staging/production séparés',
         'Flux complet : lint/tests \u2192 validation Bicep \u2192 déploiement d\u2019un candidat immuable en staging \u2192 tests de fumée/contrat/streaming',
         'La porte de qualité d\u2019évaluation hors ligne s\u2019exécute contre le candidat de staging avant toute approbation manuelle de production',
         'Fédération OIDC sans secret — aucun secret client stocké dans les deux pipelines',
-        'Exécution 34178081808 réussie : staging 6, production 34, mêmes condensats MCP évalués, approbations normales. Récupération manuelle, sans rollback automatique ni canary',
+        'Exécution 34427432731 réussie ; validation 34427429700 avec cinq flux inchangés réussie. Approbations normales, récupération manuelle ; sans rollback automatique ni canary',
       ],
     },
   },
@@ -211,7 +211,7 @@ const SLIDES = [
     accent: C.green,
     bullets: {
       en: [
-        'Historical model 401 recovered on v32; the same runtime principal now passes the complete v34 production release',
+        'Historical model 401 recovered on v32; subsequent protected releases passed. Recovery evidence does not prove the original Azure-internal root cause',
         'Validate the actual runtime principal, role dataActions, scope, conditions, network policy and token audience',
         'Separate MCP failures were fixed with the supported versioned endpoint, RemoteTool connections and current protocol negotiation',
         'Original incident propagation and independent specialist lookups restored required evidence; strict evaluation thresholds were unchanged',
@@ -219,7 +219,7 @@ const SLIDES = [
         'Support request 2609040400007027 is a historical reference; no support-ticket closure is claimed',
       ],
       fr: [
-        'Le 401 modèle a disparu en v32 ; le même principal réussit maintenant la mise en production complète v34',
+        'Le 401 modèle a disparu en v32 ; les mises en production protégées suivantes ont réussi. Le rétablissement ne prouve pas la cause interne à Azure',
         'Vérifier le principal effectif, les dataActions, la portée, les conditions, les politiques réseau et l’audience du jeton',
         'Les erreurs MCP distinctes ont été corrigées : point de terminaison versionné, connexions RemoteTool, négociation du protocole actuel',
         'Le contexte original et les recherches indépendantes des spécialistes rétablissent les preuves ; seuils qualité inchangés',
@@ -257,14 +257,14 @@ const SLIDES = [
         'Repository: github.com/devopsabcs-engineering/foundry-hosted-agents',
         'Wiki: current architecture, verified release artifacts, operational runbook, and resolved WI-11 history',
         'Full bilingual step-by-step labs: this deck\u2019s companion GitHub Pages site',
-        'Production v34 smoke passed; zero trailing-window exceptions is not a soak test or proof of complete distributed tracing',
+        'Production smoke and response-correlated ingestion passed; this is not a soak test or complete trace-coverage proof. Teams and durable history are not implemented',
       ],
       fr: [
         'Le déploiement et l’évaluation sont réels ; la télémétrie de sécurité MCP est synthétique, pas une donnée client réelle',
         'Dépôt : github.com/devopsabcs-engineering/foundry-hosted-agents',
         'Wiki : architecture actuelle, artefacts vérifiés, guide opérationnel et historique WI-11 résolu',
         'Labs complets, bilingues, pas à pas : le site GitHub Pages compagnon de ce deck',
-        'Test de production v34 réussi ; zéro exception récente ne prouve ni l’endurance ni le traçage distribué complet',
+        'Test de production et ingestion corrélée réussis ; ni endurance ni couverture complète des traces prouvées. Teams et historique durable non implémentés',
       ],
     },
   },
@@ -288,13 +288,13 @@ function buildDeck(lang) {
       s.addText(lang === 'en' ? 'devopsabcs-engineering/foundry-hosted-agents' : 'devopsabcs-engineering/foundry-hosted-agents', {
         x: 0.8, y: 6.7, w: 11.7, h: 0.4, fontSize: 12, color: '8AB4E0', fontFace: 'Segoe UI',
       });
-      s.addNotes('Verified release 34178081808, 2026-09-08 UTC. WI-11 resolved for this implementation. Synthetic fixtures; production readiness remains conditional.');
+      s.addNotes('Current snapshot: release 34427432731 and Continuous Validation 34427429700 succeeded, 2026-09-10 UTC. Full-history pilot; synthetic fixtures. Four explicitly historical proof slides retain run 34178081808.');
       addReleaseSlides(pptx, lang);
       return;
     }
     header(s, { kicker: def.kicker[lang], title: def.title[lang], accent: def.accent });
     bullets(s, def.bullets[lang]);
-    s.addNotes(`${def.bullets[lang].join('\n')}\nSources: repository code and wiki Release-Evidence / Operations. Verified release 34178081808; historical experiments retain their original limits.`);
+    s.addNotes(`${def.bullets[lang].join('\n')}\nSources: repository code, labs 04/06 and release 34427432731; Continuous Validation 34427429700. Historical experiments retain their original limits.`);
     footer(s, lang === 'en' ? 'Foundry Hosted Agents Workshop' : 'Atelier Foundry Hosted Agents');
   });
   pptx.slides.forEach((slide, index) => slide.addText(`${index + 1} / ${pptx.slides.length}`, { x: 12.4, y: 7.14, w: 0.6, h: 0.24, fontSize: 9, color: C.textLight, align: 'right' }));

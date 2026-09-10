@@ -1,7 +1,8 @@
 ---
 permalink: /labs/lab-06-cicd
 title: "Lab 06 - CI/CD: Evaluation-Gated Release Pipeline"
-description: "Walk both GitHub Actions pipelines: the direct PoC pipeline and the full staging-to-production, evaluation-gated release flow."
+description: "Walk the shared protected release, continuous validation, approval order, telemetry and capacity gates."
+ms.date: 2026-09-10
 ---
 
 > 🇫🇷 **[Version française](../fr/labs/lab-06-cicd)**
@@ -9,7 +10,7 @@ description: "Walk both GitHub Actions pipelines: the direct PoC pipeline and th
 ## Overview
 
 | | |
-|---|---|
+| --- | --- |
 | **Duration** | 35 minutes |
 | **Level** | Advanced |
 | **Prerequisites** | [Lab 05](lab-05-evaluations.md) |
@@ -25,14 +26,16 @@ By the end of this lab, you will be able to:
 
 ## Exercises
 
-### Exercise 6.1: Two Pipelines, Two Purposes
+### Exercise 6.1: One Protected Release Path
 
 Open [`.github/workflows/`](https://github.com/devopsabcs-engineering/foundry-hosted-agents/tree/main/.github/workflows):
 
 | Pipeline | Trigger | What it does |
-|---|---|---|
-| `hosted-agent-cd.yml` | Manual (`workflow_dispatch`) | Provisions and deploys **straight to the shared PoC environment**, then runs one smoke-test invoke. No staging, no evaluation gate. |
+| --- | --- | --- |
+| `hosted-agent-cd.yml` | Manual (`workflow_dispatch`) | Compatibility entry point that delegates to `deploy-and-evaluate.yml`, retaining all evaluation and approval gates. |
 | `deploy-and-evaluate.yml` | Manual (`workflow_dispatch`) | Lint/unit tests → Bicep validate/what-if → staging deployment → smoke/contract tests → evaluation gate → manual production approval → source rebuild → monitoring → manual recovery on failure. |
+| `continuous-validation.yml` | Push, pull request, manual | Offline regressions; on main, existing staging evaluations and five concurrent streams without deployment. |
+| `web-chat-build.yml` | Scoped push, pull request, manual | Authorization/session tests, frontend tests and compiled artifact. Does not deploy Azure resources. |
 
 Both are **manual-dispatch only** — read the comment block at the top of
 each file. This wasn't the original design; it's a lesson learned:
@@ -82,11 +85,12 @@ these role assignments; the workflow does not silently skip permission errors.
 
 The corrected workflow selects the staging project explicitly, verifies its
 endpoint before deploying, and passes that actual endpoint to evaluation.
-It reads `.version` from `azd ai agent show --output json`; unknown versions
-fail instead of becoming timestamp placeholders. Each smoke attempt uses
-`--version`, `--new-session`, and `--new-conversation`.
+It resolves the active remote route; unknown or ambiguous versions fail instead
+of becoming timestamp placeholders. Each smoke attempt uses
+`scripts/invoke-agent.sh` to create a fresh version-pinned agent session and
+send full input with `store:false`, without native conversation identifiers.
 
-The contract gate uses `azd ai agent invoke --output raw`, which returns SSE,
+The contract gate validates the helper's raw Responses SSE,
 not JSON. It requires a non-empty text delta and a completed assistant text
 response, and rejects error, failed, incomplete, malformed, and empty streams.
 There is no non-empty-console-output fallback. Staging response evidence is
@@ -196,6 +200,35 @@ receiving 100% traffic from remote state; a fresh CI runner cannot rely on local
 azd state. Missing or ambiguous routing fails closed. The
 [operations runbook](https://github.com/devopsabcs-engineering/foundry-hosted-agents/wiki/Operations)
 documents this contract and manual recovery.
+
+### Exercise 6.8: Current Release, Load, and Telemetry Gates
+
+Open [release 34427432731](https://github.com/devopsabcs-engineering/foundry-hosted-agents/actions/runs/34427432731)
+and [Continuous Validation 34427429700](https://github.com/devopsabcs-engineering/foundry-hosted-agents/actions/runs/34427429700).
+Both succeeded on `15098b7`. The earlier images in this lab remain historical.
+
+1. Inspect `hosted-agent-cd.yml`: it delegates to the same protected release workflow, not a direct bypass of evaluation or approval.
+2. Follow the approval order: **Promote to production**, then **Post-deploy monitoring check** when it requests approval. **Continuous Validation** needs no manual approval; its live job queues behind the shared `foundry-shared-environments` lock. Do not dispatch duplicates to clear it.
+3. Inspect conversation evidence: same-assessment recall, independent assessment isolation, and `store:false`. Capture, smoke and load callers must share the supported request contract.
+4. Download `load-test-evidence-1` and `evaluation-evidence-1` from Continuous Validation. Verify five successful completed streams, no errors, unchanged 100% quality gates, and stable route versions.
+5. Inspect monitoring: a raw response ID extracted with `jq -Rser` must match ingested `AppTraces` before the trailing-window `AppExceptions` check. Missing telemetry and invalid queries fail closed.
+
+Run `34424723263` previously completed only two of five load requests. Three
+correlated operations showed upstream model HTTP 429 errors. The approved
+fix changes only staging from 10,000 to 50,000 TPM (100 to 500 RPM); production
+remains 10,000 TPM. `infra/main.bicep` uses the existing `-staging` suffix to
+choose the default. Evaluation and load share that model quota. The unchanged
+five-stream test passed afterward; this does not establish an SLA, maximum
+capacity, or the cause of every older intermittent error.
+
+Compare `prod-agent-before.json` and the retained after-state in the release
+artifacts: repeat deployment may reuse an unchanged version. Do not define
+idempotence as "every run creates a new version". MCP image digests are
+preserved; the hosted agent is rebuilt from source. Recovery remains manual.
+
+The [Lab 04 demo](lab-04-invoke-agent.md) uses the same reviewed scenarios as
+the evaluation suite. Sample selection changes the composer only; Send uses
+the normal authenticated, owner-bound request path.
 
 ## Knowledge Check
 

@@ -201,7 +201,7 @@ coreSlide(pptx, {
   bullets: [
     { tag: 'confirmed', text: 'Decision framing: adopt, validate, or defer a hosting blueprint for future LangGraph agents.' },
     { tag: 'confirmed', text: 'Foundry Hosted Agents is the leading PoC candidate — not yet an unconditional production selection.' },
-    { tag: 'confirmed', text: 'The complete release passed: 8 captures, 21/21 judge checks, production v34 smoke. WI-11 is resolved; pilot security, capacity, cost, and recovery gates remain.' },
+    { tag: 'confirmed', text: 'Release 34427432731 and Continuous Validation 34427429700 passed. Authenticated web pilot, full-history context, real MCP receipts and positive telemetry are implemented; live-data security, capacity, cost and recovery gates remain.' },
   ],
   source: 'research.md (Lines 535-537, 5, 420, 27-32)',
 });
@@ -271,14 +271,14 @@ coreSlide(pptx, {
 
 coreSlide(pptx, {
   title: 'State and History',
-  objective: 'Choose one runtime source of truth; compare Responses history, application-owned Cosmos checkpoints, and Standard Agent Setup capability hosts.',
+  objective: 'Use the implemented full-history contract; distinguish bounded pilot memory from optional durable persistence.',
   bullets: [
-    { tag: 'confirmed', text: 'Option 1 — Foundry Responses history: platform-managed conversation history; sufficient for basic multi-turn interaction; no Cosmos DB required.' },
+    { tag: 'confirmed', text: 'Implemented baseline: backend-owned full user/assistant history sent on each request with store:false; no native conversation or previous_response_id. All three specialists receive context.' },
     { tag: 'confirmed', text: 'Option 2 package (langchain-azure-cosmosdb, CosmosDBSaver) is co-maintained by LangChain and Microsoft.' },
     { tag: 'inferred', text: 'Option 2 becomes authoritative graph state only when durable checkpoints, human-in-the-loop pause/resume, time travel, or app-controlled state are required — Hosted Agent pairing is untested.' },
     { tag: 'confirmed', text: 'Option 3 — Standard Agent Setup via capabilityHosts (BYO Cosmos DB / Storage / AI Search): needed only for data-residency/compliance, a separate Bicep tier from Basic Agent Setup.' },
-    { tag: 'requires-validation', text: 'No user-scoped conversation-list API was found in the researched documentation — an evidence gap, not proof of absence.' },
-    { tag: 'confirmed', text: 'A sidebar can store metadata/identifiers without duplicating message bodies; duplicate-content compliance requirements need explicit retention/deletion/legal-hold design.' },
+    { tag: 'confirmed', text: 'Web sessions are owner-bound and in memory: one-hour TTL, 20 turns; browser reload loses the local list and backend restart loses session history.' },
+    { tag: 'requires-validation', text: 'Durable history, retention/deletion policy and resumable execution require separate design and approval. Completed-message replay is bounded to the live session, not durable exactly-once execution.' },
   ],
   source: 'research.md (Lines 313-320, 373-400, 556-557)',
 });
@@ -291,7 +291,7 @@ coreSlide(pptx, {
     { tag: 'confirmed', text: 'Billing model: vCPU-hour + GiB-hour of active session compute only — closest to Azure Container Apps consumption plan, not AKS always-on or App Service continuous billing.' },
     { tag: 'requires-validation', text: 'Unknown / TBD: exact $/vCPU-hr and $/GiB-hr rates (public pricing page showed "N/A"); maximum concurrent sessions; requests-per-second ceiling; same-thread turn concurrency; cold-start latency distribution.' },
     { tag: 'confirmed', text: 'Known cost drivers (formulas, not totals): model tokens, active session vCPU/memory, idle window, MCP hosting, telemetry, evaluation tokens, optional Cosmos DB and Agent 365 licensing, operations labor — amounts require validation.' },
-    { tag: 'confirmed', text: 'Full load-test matrix in Appendix E.' },
+    { tag: 'confirmed', text: 'Approved staging capacity: 50k TPM / 500 RPM; production remains 10k TPM / 100 RPM. Five concurrent streams passed after three correlated model-429 failures; this does not establish saturation capacity or SLA.' },
   ],
   source: 'research.md (Lines 388, 570, 576-579, 620)',
 });
@@ -301,11 +301,11 @@ coreSlide(pptx, {
   objective: 'Gate production releases on security-task outcomes, not generic fluency.',
   bullets: [
     { tag: 'confirmed', text: 'Baseline: offline evaluation of versioned candidate outputs against a human-reviewed golden dataset (true/false positives, ambiguous evidence, missing data, conflicting tools, prompt injection, unauthorized actions, unsupported conclusions).' },
-    { tag: 'confirmed', text: 'Verified capture: eight cases, zero deterministic policy failures, 28 runtime tool receipts; the injection case is an exact safety refusal with no tools.' },
+    { tag: 'confirmed', text: 'Eight reviewed scenarios, strict runtime receipt requirements and zero policy failures required; the injection case uses verified safety refusal with no tools, not a judge pass.' },
     { tag: 'confirmed', text: 'Executed model judges: coherence, groundedness, task adherence. Seven reports per metric, 21/21 passes; each threshold remains 100%.' },
     { tag: 'confirmed', text: 'Human review required for high-impact vulnerability conclusions and any recommendation triggering remediation or operational change.' },
     { tag: 'preview', text: 'Continuous evaluation of sampled production traffic is a separate preview and privacy decision — redaction and retention must be defined before enabling.' },
-    { tag: 'confirmed', text: 'Custom hosted capture/evaluation runner gates immutable staging version 6. Missing, duplicate, errored, or skipped results fail closed. No third-party evaluation Action is used.' },
+    { tag: 'confirmed', text: 'Custom hosted capture/evaluation runner targets the discovered staging version via scripts/invoke-agent.sh. Missing, duplicate, errored, or skipped results fail closed. No third-party evaluation Action is used.' },
   ],
   source: 'assets/release-evidence/source/results.json; eval/run_hosted_evaluation.py; eval/evaluation_gate.py',
 });
@@ -314,7 +314,7 @@ coreSlide(pptx, {
   title: 'Automation (CI/CD)',
   objective: 'Verified staging-to-production path, normal approvals, and explicit manual recovery boundaries.',
   bullets: [
-    { tag: 'confirmed', text: 'Passed run 34178081808: lint/tests -> Bicep/what-if -> isolated staging -> smoke/contract/streaming -> evaluation -> production approval/deploy -> approved smoke/monitoring.' },
+    { tag: 'confirmed', text: 'Passed run 34427432731: lint/tests -> Bicep/what-if -> isolated staging -> smoke/contract/history -> evaluation -> production approval/deploy -> approved smoke/monitoring. Compatibility workflow delegates to this same path.' },
     { tag: 'confirmed', text: 'MCP images use the evaluated SHA-256 digests. The agent is remotely rebuilt from the same source, not promoted as an identical runtime binary.' },
     { tag: 'requires-validation', text: 'No automatic rollback or canary. Recovery job signals manual action; rehearse route and infrastructure recovery before live-data production.' },
     { tag: 'confirmed', text: 'Bicep provisions infrastructure; azd or Foundry APIs deploy agent versions as a separate lifecycle from infrastructure changes.' },
@@ -328,7 +328,7 @@ coreSlide(pptx, {
   objective: 'Separate confirmed identity/RBAC controls from validation tracks and open blockers.',
   bullets: [
     { tag: 'confirmed', text: 'Runtime instance identity is distinct from CI OIDC and Blueprint identities. Checked account-scoped runtime roles: Foundry User and Cognitive Services OpenAI User.' },
-    { tag: 'confirmed', text: 'Production smoke passed; AppExceptions query returned 0. Full specialist/model/tool trace coverage is not established by an exception count.' },
+    { tag: 'confirmed', text: 'Production smoke and response-ID-correlated AppTraces ingestion passed before the zero-exception check. This proves ingestion, not complete span coverage or sustained health.' },
     { tag: 'inferred', text: 'Agent 365 governance/registry onboarding: Agent 365 and Entra Agent ID are GA; SDK packages exist for Foundry tooling and LangChain observability — but no dedicated Hosted Agent onboarding guide, no confirmed LangGraph-specific package, and no proof a platform-created identity can be migrated in place.' },
     { tag: 'requires-validation', text: 'Platform SLA / GA status / regions / quotas / capacity / cold starts / disaster recovery — first Production Decision Gate item.' },
   ],
@@ -339,7 +339,7 @@ coreSlide(pptx, {
   title: 'PoC Plan and Decision Gates',
   objective: 'Four increments produce a defensible production decision, with owners, exit criteria, and a decision date.',
   bullets: [
-    { tag: 'confirmed', text: 'Increment 1 — Baseline Hosted Agent & LangGraph Multi-Agent Runtime: supervisor graph + 3 specialist nodes; azure-ai-agentserver-langgraph wrapper on Responses protocol (port 8088); validate local run, Responses SSE, built-in conversation history; provision via Bicep, deploy via azd.' },
+    { tag: 'confirmed', text: 'Increment 1 delivered: supervisor + 3 specialists, Responses SSE, full caller-supplied history with store:false, authenticated web pilot; Bicep provisioning and azd deployment. Native persisted history is not the pilot contract.' },
     { tag: 'confirmed', text: 'Increment 2 delivered: separate staging/production MCP apps, RemoteTool connections, versioned MCP transport, strict specialist allowlists. Public PoC ingress; private/authenticated upstream access remains a gate.' },
     { tag: 'confirmed', text: 'Increment 3 — Offline Security Evaluation Suite & Automated CI/CD Gates: versioned golden dataset; deterministic schema checks + LLM-as-judge rubrics; GitHub Actions gate with threshold-gated promotion.' },
     { tag: 'confirmed', text: 'Increment 4 — Validation Tracks, Load Testing & Production Decision Gates: Load & Scale Gate, State Experiment Track, Governance Validation Track, Continuous Evaluation Track, Deliverable Synthesis — plan of record; individual track outcomes require validation.' },
@@ -361,7 +361,7 @@ coreSlide(pptx, {
     ['Tools and MCP', 'Customer builds hosting, auth, registry, reuse', 'LangGraph and custom MCP patterns', 'Same as Cloud but customer-operated', 'External MCP runtime plus Foundry connection and Toolbox aggregation', 'Same as baseline'],
     ['Multi-agent', 'Native LangGraph supervisor, subgraphs, handoffs', 'Same plus Agent Server services', 'Same plus self-hosted Agent Server services', 'Native LangGraph supervisor and specialist agents in one deployment', 'Optional A2A split after preview and boundary gates'],
     ['Streaming', 'Implement/operate selected LangGraph stream modes', 'Agent Server streaming', 'Agent Server streaming, customer-operated', 'Responses SSE confirmed; full LangGraph event parity unverified', 'Same as baseline'],
-    ['State and history', 'Customer selects/operates checkpointer and conversation index', 'Native Agent Server threads and runs', 'Native Agent Server storage, customer-operated', 'Foundry Responses history baseline', 'Optional Cosmos graph checkpoints or Standard platform dependencies'],
+    ['State and history', 'Customer selects/operates checkpointer and conversation index', 'Native Agent Server threads and runs', 'Native Agent Server storage, customer-operated', 'Full input history; in-memory app sessions', 'Optional Cosmos graph checkpoints or Standard platform dependencies'],
     ['Evaluations', 'Customer-authored pipeline; Foundry batch evaluation can still score outputs', 'LangSmith evaluation stack', 'LangSmith evaluation stack', 'Hosted capture plus Foundry judges: 21/21 passed', 'Optional continuous evaluation after privacy and identity validation'],
     ['Governance', 'Azure-native controls designed by customer', 'LangSmith Enterprise controls', 'LangSmith controls plus Azure infra controls', 'Per-agent Entra identity, Foundry RBAC, Application Insights', 'Optional Agent 365 onboarding after tenant validation'],
     ['Operational burden', 'High', 'Low to medium', 'Highest', 'Lowest candidate', 'Medium, proportional to selected extensions'],
@@ -389,7 +389,7 @@ coreSlide(pptx, {
     ['External MCP plus connection and Toolbox aggregation', 'Documented pattern; private path untested', 'Recommended decoupling design, subject to network and auth validation'],
     ['Supervisor and specialist agents in one graph', 'Confirmed LangGraph pattern', 'Production baseline for genuine multi-agent behavior'],
     ['Cross-deployment A2A delegation', 'Sampled but preview', 'Optional experiment, not a baseline dependency'],
-    ['Foundry Responses conversation history', 'Confirmed for basic multi-turn use', 'Baseline state option; sidebar and retention requirements need testing'],
+    ['Pilot conversation contract', 'Full supplied history verified', 'store:false; no native IDs; owner-bound in-memory sessions, not durable persistence'],
     ['Cosmos DB LangGraph checkpointer', 'Package confirmed; Hosted Agent pairing untested', 'Conditional state experiment'],
     ['Offline and batch evaluation of LangGraph outputs', 'Confirmed', 'Baseline release-gate mechanism'],
     ['Continuous evaluation', 'Documented but preview', 'Optional production-monitoring experiment'],
@@ -513,7 +513,7 @@ appendixTableSlide(pptx, {
     { tag: 'confirmed', text: 'Staging evaluation, approvals, production deployment and monitoring passed. Infrastructure and agent versions have separate lifecycles; recovery remains manual.' },
     { tag: 'confirmed', text: 'Streaming: Responses SSE supports progressive output events.' },
     { tag: 'requires-validation', text: 'Parity with all required LangGraph events, reconnection, cancellation, and the existing UI contract must be tested.' },
-    { tag: 'confirmed', text: 'Conversation state: Responses history is the baseline source of truth; adopt Cosmos checkpointer only for a documented durable-state requirement.' },
+    { tag: 'confirmed', text: 'Conversation state: application-owned full history is the pilot source of truth, store:false. Durable persistence is not implemented; Cosmos remains a separate experiment.' },
     { tag: 'requires-validation', text: 'No user-scoped conversation-list API was found — an evidence gap.' },
     { tag: 'confirmed', text: 'Governance: per-agent Entra identity, Foundry RBAC, and Application Insights are supported baseline controls.' },
     { tag: 'inferred', text: 'Agent 365 is a validation track because the exact Hosted Agent identity onboarding and LangGraph instrumentation path was not found.' },
@@ -537,6 +537,6 @@ allSlides.forEach((slide, i) => {
 await pptx.writeFile({ fileName: OUTPUT_PATH });
 
 console.log(`Wrote ${OUTPUT_PATH}`);
-console.log(`Total slides: ${total} (1 title + 4 release proofs + ${CORE_SLIDE_TOTAL} core + ${appendixLog.length} appendix)`);
+console.log(`Total slides: ${total} (1 title + 5 implementation updates + 4 historical proofs + ${CORE_SLIDE_TOTAL} core + ${appendixLog.length} appendix)`);
 console.log('Appendix slide list:');
 for (const label of appendixLog) console.log(`  - ${label}`);

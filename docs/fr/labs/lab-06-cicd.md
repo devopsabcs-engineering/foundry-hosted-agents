@@ -2,7 +2,8 @@
 permalink: /fr/labs/lab-06-cicd
 lang: fr
 title: "Lab 06 - CI/CD : pipeline de mise en production contrôlé par évaluation"
-description: "Parcourir les deux pipelines GitHub Actions : le pipeline direct du PoC et le flux complet de staging vers la production, contrôlé par évaluation."
+description: "Parcourir le chemin protégé commun, la validation continue, les approbations, la télémétrie et les limites de capacité."
+ms.date: 2026-09-10
 ---
 
 > 🇬🇧 **[English version](../../labs/lab-06-cicd)**
@@ -10,7 +11,7 @@ description: "Parcourir les deux pipelines GitHub Actions : le pipeline direct d
 ## Aperçu
 
 | | |
-|---|---|
+| --- | --- |
 | **Durée** | 35 minutes |
 | **Niveau** | Avancé |
 | **Prérequis** | [Lab 05](lab-05-evaluations.md) |
@@ -26,14 +27,16 @@ description: "Parcourir les deux pipelines GitHub Actions : le pipeline direct d
 
 ## Exercices
 
-### Exercice 6.1 : Deux pipelines, deux objectifs
+### Exercice 6.1 : Un chemin de mise en production protégé
 
 Ouvrez [`.github/workflows/`](https://github.com/devopsabcs-engineering/foundry-hosted-agents/tree/main/.github/workflows) :
 
 | Pipeline | Déclencheur | Ce qu'il fait |
-|---|---|---|
-| `hosted-agent-cd.yml` | Manuel (`workflow_dispatch`) | Provisionne et déploie **directement vers l'environnement PoC partagé**, puis exécute un test de fumée. Pas de staging, pas de porte d'évaluation. |
+| --- | --- | --- |
+| `hosted-agent-cd.yml` | Manuel (`workflow_dispatch`) | Entrée de compatibilité déléguant à `deploy-and-evaluate.yml`, avec toutes les évaluations et approbations. |
 | `deploy-and-evaluate.yml` | Manuel (`workflow_dispatch`) | Lint/tests → validation Bicep/what-if → staging → tests de fumée/contrat → évaluation → approbation manuelle → reconstruction du code → surveillance → récupération manuelle en cas d'échec. |
+| `continuous-validation.yml` | Push, pull request, manuel | Régressions hors ligne ; sur main, évaluations staging et cinq flux simultanés sans déploiement. |
+| `web-chat-build.yml` | Push ciblé, pull request, manuel | Tests d'autorisation/sessions, tests frontend, artefact compilé. Aucun déploiement Azure. |
 
 Les deux sont **en déclenchement manuel uniquement** — lisez le bloc de
 commentaires en haut de chaque fichier. Ce n'était pas la conception
@@ -84,12 +87,13 @@ créer ces attributions ; les erreurs de permission ne sont pas ignorées.
 
 Le workflow corrigé sélectionne explicitement le projet staging, vérifie son
 point de terminaison avant le déploiement et le transmet à l'évaluation.
-Il lit `.version` dans `azd ai agent show --output json` ; une version inconnue
-provoque un échec plutôt qu'un identifiant horodaté fictif. Chaque tentative
-utilise `--version`, `--new-session` et `--new-conversation`.
+Il résout la route active à distance ; version inconnue ou ambiguë : échec,
+pas d'identifiant horodaté fictif. Chaque tentative utilise
+`scripts/invoke-agent.sh` pour créer une session liée à la version et envoyer
+l'historique fourni avec `store:false`, sans identifiants de conversation natifs.
 
-Le contrôle de contrat utilise `azd ai agent invoke --output raw`, qui
-retourne du SSE et non du JSON. Il exige un delta de texte non vide et une
+Le contrôle valide le flux Responses SSE brut du script, pas du JSON seul.
+Il exige un delta de texte non vide et une
 réponse textuelle complète de l'assistant. Il rejette les flux en erreur,
 échoués, incomplets, mal formés ou vides, sans se rabattre sur une sortie
 console non vide. Les preuves staging sont conservées dans l'artefact
@@ -201,6 +205,35 @@ numérique qui reçoit 100 % du trafic. L'état local azd d'un runner neuf ne
 suffit pas ; toute route absente ou ambiguë bloque le déploiement. Le
 [guide opérationnel](https://github.com/devopsabcs-engineering/foundry-hosted-agents/wiki/Operations)
 décrit ce contrat et la récupération manuelle.
+
+### Exercice 6.8 : Portes actuelles de publication, charge et télémétrie
+
+Ouvrez la [mise en production 34427432731](https://github.com/devopsabcs-engineering/foundry-hosted-agents/actions/runs/34427432731)
+et la [validation continue 34427429700](https://github.com/devopsabcs-engineering/foundry-hosted-agents/actions/runs/34427429700).
+Les deux ont réussi sur `15098b7`. Les images précédentes restent historiques.
+
+1. Examinez `hosted-agent-cd.yml` : délégation au même workflow protégé, sans contourner les évaluations ou approbations.
+2. Ordre des approbations : **Promote to production**, puis **Post-deploy monitoring check** à sa demande. **Continuous Validation** n'a pas besoin d'approbation manuelle ; elle attend le verrou partagé `foundry-shared-environments`. Ne dupliquez pas les exécutions en attente.
+3. Vérifiez les preuves de rappel, d'isolation et de `store:false`. Capture, test de fumée et charge doivent partager le contrat supporté.
+4. Téléchargez `load-test-evidence-1` et `evaluation-evidence-1` : cinq flux terminés sans erreur, seuils qualité inchangés à 100 %, route stable avant/après.
+5. Vérifiez la surveillance : identifiant brut extrait avec `jq -Rser`, trace `AppTraces` correspondante, puis contrôle glissant `AppExceptions`. Télémétrie absente ou requête invalide : échec, pas faux succès.
+
+L'exécution `34424723263` n'avait terminé que deux requêtes sur cinq. Trois
+opérations corrélées montraient des HTTP 429 du modèle. La correction approuvée
+augmente uniquement staging de 10 000 à 50 000 TPM (100 à 500 RPM) ; production
+reste à 10 000 TPM. `infra/main.bicep` utilise le suffixe `-staging` existant.
+Évaluations et charge partagent ce quota. Le contrôle inchangé à cinq flux a
+réussi ensuite ; ni SLA, ni capacité maximale, ni cause de toutes les anciennes
+erreurs intermittentes ne sont ainsi établis.
+
+Comparez `prod-agent-before.json` et l'état après déploiement conservé dans les
+artefacts. Une version inchangée peut être réutilisée : l'idempotence ne signifie
+pas créer une nouvelle version à chaque exécution. Les condensats MCP sont
+conservés ; l'agent est reconstruit depuis le code. Récupération toujours manuelle.
+
+La [démo du Lab 04](lab-04-invoke-agent.md) utilise les scénarios vérifiés de
+la suite d'évaluation. La sélection remplit seulement le brouillon ; Send
+utilise le chemin normal authentifié, lié au propriétaire.
 
 ## Vérification des connaissances
 

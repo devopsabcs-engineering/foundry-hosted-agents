@@ -9,6 +9,7 @@ import '@fontsource-variable/newsreader';
 import './style.css';
 import { consumeResponse } from './stream';
 import { messageRequest } from './request';
+import { sampleQueries } from './samples';
 
 function ToolButton({ label, children, ...props }) {
   return <button className="tool" title={label} aria-label={label} {...props}>{children}</button>;
@@ -33,6 +34,7 @@ function Chat({ auth, config, initialAccount }) {
   const [busy, setBusy] = useState(false);
   const abort = useRef(null);
   const pendingRequest = useRef(null);
+  const composer = useRef(null);
   const end = useRef(null);
   const current = sessions.find(session => session.id === active);
   const messages = current?.messages ?? [];
@@ -176,8 +178,17 @@ function Chat({ auth, config, initialAccount }) {
       </div>
       <footer className="composer-area">
         {error && <div className="error" role="alert">{error}</div>}
+        {allowed && <details className="demo-queries" open={!messages.length}>
+          <summary>Synthetic demo queries</summary>
+          <div className="demo-query-list">
+            {sampleQueries.map(sample => <button key={sample.id} type="button" disabled={busy || Boolean(draft)}
+              title={sample.prompt} onClick={() => { setDraft(sample.prompt); composer.current?.focus(); }}>
+              <MessageSquare size={16} aria-hidden="true" /><span>{sample.title}</span>
+            </button>)}
+          </div>
+        </details>}
         <form className="composer" onSubmit={send}>
-          <textarea aria-label="Assessment message" placeholder="Describe the incident or ask a follow-up..." value={draft} maxLength={8000} rows={3} disabled={!allowed || busy}
+          <textarea ref={composer} aria-label="Assessment message" placeholder="Describe the incident or ask a follow-up..." value={draft} maxLength={8000} rows={3} disabled={!allowed || busy}
             onChange={event => setDraft(event.target.value)} onKeyDown={event => { if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); send(event); } }} />
           <div className="composer-bottom"><span>{draft.length.toLocaleString()} / 8,000</span>{busy
             ? <ToolButton label="Stop response" onClick={() => abort.current?.abort()} type="button"><Square size={18} /></ToolButton>
