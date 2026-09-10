@@ -44,6 +44,9 @@ try {
             Write-Output "$name : $($presentation.Slides.Count) slides rendered"
         } finally { $presentation.Close() }
     }
-} finally { $powerPoint.Quit() }
+} finally {
+    if ($powerPoint.Presentations.Count -eq 0) { $powerPoint.Quit() }
+    [void][Runtime.InteropServices.Marshal]::ReleaseComObject($powerPoint)
+}
 $findings | ConvertTo-Json -Depth 4 | Set-Content (Join-Path $OutputDirectory 'text-bounds.json')
 Write-Output "Potential text-bound issues: $($findings.Count). Review: $OutputDirectory"
