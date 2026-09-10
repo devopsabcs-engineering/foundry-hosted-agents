@@ -63,6 +63,12 @@ def test_hosted_telemetry_uses_environment_specific_monitoring_output():
     assert "key: applicationInsightsConnectionString" in connection
 
 
+def test_capacity_increase_is_staging_only():
+    infrastructure = (ROOT / "infra/main.bicep").read_text(encoding="utf-8")
+    assert "param modelSkuCapacity int = endsWith(environmentName, '-staging') ? 50 : 10" in infrastructure
+    assert "modelSkuCapacity: modelSkuCapacity" in infrastructure
+
+
 @pytest.mark.parametrize("trace_count,exception_count,expected", [
     ("0", "0", 1),
     ("", "0", 1),

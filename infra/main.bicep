@@ -28,7 +28,7 @@ param modelVersion string = '2024-07-18'
 param modelSkuName string = 'GlobalStandard'
 
 @description('Model deployment SKU capacity (thousands of tokens-per-minute)')
-param modelSkuCapacity int = 10
+param modelSkuCapacity int = endsWith(environmentName, '-staging') ? 50 : 10
 
 @description('Principal IDs to receive Foundry RBAC roles (e.g. the CI/CD identity). Leave empty to skip role assignment.')
 param principalIds array = []
