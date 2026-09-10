@@ -610,7 +610,7 @@ jobs:
             --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
             --workspace-name "${{ vars.LOG_ANALYTICS_WORKSPACE_NAME }}" \
             --query customerId -o tsv)
-          RESPONSE_ID=$(jq -Rse '
+          RESPONSE_ID=$(jq -Rser '
             split("\n") | map(select(startswith("data: ")) | .[6:] | fromjson?)
             | map(select(.type == "response.completed")) | last | .response.id
             | select(type == "string" and test("^resp_[A-Za-z0-9_-]+$"))

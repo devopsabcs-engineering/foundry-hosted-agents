@@ -84,11 +84,15 @@ def test_monitoring_gate_requires_ingestion(trace_count, exception_count, expect
 az() {{
     case "$*" in
         *"workspace show"*) echo test-workspace ;;
-        *"AppTraces"*) printf '%s\\n' '{trace_count}' ;;
+        *"AppTraces"*)
+            [[ "$*" == *"contains 'resp_probe'"* ]] || return 1
+            printf '%s\\n' '{trace_count}' ;;
         *) printf '%s\\n' '{exception_count}' ;;
     esac
 }}
-jq() {{ echo resp_probe; }}
+jq() {{
+    if [[ "$1" == *r* ]]; then echo resp_probe; else echo '\"resp_probe\"'; fi
+}}
 sleep() {{ :; }}
 """
     result = subprocess.run([bash, "-c", stubs + gate], capture_output=True, text=True, timeout=10, check=False)
