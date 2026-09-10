@@ -57,13 +57,25 @@ def test_safety_filter_is_not_a_completed_response():
 
 
 def test_capture_continues_after_filter_without_retry(monkeypatch, tmp_path):
-    monkeypatch.setattr("run_hosted_evaluation.shutil.which", lambda name: "azd")
+    monkeypatch.setattr("run_hosted_evaluation.shutil.which", lambda name: "bash")
     outputs = iter([filtered_stream(), stream()])
-    monkeypatch.setattr("run_hosted_evaluation.subprocess.run", lambda *args, **kwargs:
-                        SimpleNamespace(stdout=next(outputs), stderr="", returncode=0))
+    calls = []
+
+    def invoke(command, **kwargs):
+        calls.append((command, kwargs))
+        return SimpleNamespace(stdout=next(outputs), stderr="", returncode=0)
+
+    monkeypatch.setattr("run_hosted_evaluation.subprocess.run", invoke)
     args = SimpleNamespace(output_dir=tmp_path, project_dir=tmp_path, agent="test", version="1")
     records = [{"id": "filtered", "query": "filter"}, {"id": "good", "query": "hello"}]
     captured = capture(records, args)
+    assert len(calls) == 2
+    for (command, options), record in zip(calls, records, strict=True):
+        assert command == ["bash", "scripts/invoke-agent.sh"]
+        assert options["cwd"] == tmp_path
+        assert options["env"]["AGENT_NAME"] == "test"
+        assert options["env"]["AGENT_VERSION"] == "1"
+        assert options["env"]["AGENT_TEST_PROMPT"] == record["query"]
     assert captured[0]["capture_error"]["code"] == "content_filter"
     assert "response" not in captured[0]
     assert captured[1]["response"] == "Report"

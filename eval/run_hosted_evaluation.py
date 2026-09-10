@@ -94,9 +94,9 @@ def runtime_state(metadata) -> dict | None:
 
 
 def capture(records: list[dict], args) -> list[dict]:
-    executable = shutil.which("azd")
+    executable = shutil.which("bash")
     if not executable:
-        raise RuntimeError("azd is required to capture hosted responses")
+        raise RuntimeError("bash is required to capture hosted responses")
     captured = []
     for index, record in enumerate(records, 1):
         query = record.get("query")
@@ -108,21 +108,10 @@ def capture(records: list[dict], args) -> list[dict]:
             prefix = args.output_dir / f"case-{index}-attempt-{attempt}"
             try:
                 result = subprocess.run(
-                [
-                    executable,
-                    "ai",
-                    "agent",
-                    "invoke",
-                    args.agent,
-                    query,
-                    "--version",
-                    args.version,
-                    "--new-session",
-                    "--new-conversation",
-                    "--output",
-                    "raw",
-                ],
+                [executable, "scripts/invoke-agent.sh"],
                 cwd=args.project_dir,
+                env={**os.environ, "AGENT_NAME": args.agent, "AGENT_VERSION": args.version,
+                     "AGENT_TEST_PROMPT": query},
                 capture_output=True,
                 text=True,
                 encoding="utf-8",
@@ -140,7 +129,7 @@ def capture(records: list[dict], args) -> list[dict]:
             prefix.with_suffix(".stderr").write_text(result.stderr, encoding="utf-8")
             try:
                 if result.returncode:
-                    raise ValueError(f"azd exited with {result.returncode}")
+                    raise ValueError(f"Hosted invocation exited with {result.returncode}")
                 response = completed_response(result.stdout)
                 failure = None
                 break

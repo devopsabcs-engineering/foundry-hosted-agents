@@ -69,6 +69,7 @@ async def _invoke_once(
     body: dict[str, Any] = {
         "input": [{"role": "user", "content": [{"type": "input_text", "text": message}]}],
         "stream": True,
+        "store": False,
     }
     if conversation_id:
         body["conversation"] = conversation_id

@@ -36,6 +36,8 @@ class Session:
         self.response = response
 
     def post(self, *args, **kwargs):
+        assert kwargs["json"]["store"] is False
+        assert "conversation" not in kwargs["json"]
         return self.response
 
 
