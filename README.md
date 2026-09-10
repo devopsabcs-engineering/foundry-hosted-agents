@@ -226,6 +226,24 @@ manual recovery; missing or ambiguous routing blocks promotion.
 
 ## Verified release and WI-11 resolution
 
+[Run 34424741660](https://github.com/devopsabcs-engineering/foundry-hosted-agents/actions/runs/34424741660)
+passed all seven protected release jobs on source `20a5a35`. Staging version 13 passed
+all three conversation checks, eight captures, zero deterministic policy failures, and
+21 of 21 model-judge checks. Production version 36 was active before and after this
+repeat deployment. Its smoke response produced one correlated telemetry row and zero
+exceptions in the checked ten-minute window. Both deployment approvals used the configured
+reviewer gate; no manual approval remains for this run.
+
+[Continuous validation 34422212544](https://github.com/devopsabcs-engineering/foundry-hosted-agents/actions/runs/34422212544)
+also passed on source `a7149db`: 198 offline tests, eight hosted captures, and five
+concurrent streams with zero errors (p95 23.489 seconds). This bounded result does not
+establish the cause or resolution of older intermittent SSE failures.
+
+The preceding release `34422215632` promoted version 35 to 36 and passed smoke but
+failed monitoring because the response-ID extractor retained JSON quotes. Direct queries
+confirmed ingestion and zero exceptions. The successful repeat fixes raw-ID extraction
+without relaxing either gate; the preceding run remains recorded as failed.
+
 [Run 34300982257](https://github.com/devopsabcs-engineering/foundry-hosted-agents/actions/runs/34300982257)
 passed the protected staging-to-production pipeline on source `4b6f8d2`. Staging
 version 10 completed eight captures, zero deterministic policy failures, and 21 of 21
