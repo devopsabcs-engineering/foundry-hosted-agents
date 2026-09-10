@@ -55,8 +55,6 @@ services:
             - protocol: responses
               version: 2.0.0
         environmentVariables:
-            - name: AGENT_NAME
-              value: threat-assessment-agent
             - name: APPLICATIONINSIGHTS_CONNECTION_STRING
               value: ${applicationInsightsConnectionString}
             - name: FOUNDRY_TOOLBOX_VERSION

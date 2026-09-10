@@ -31,6 +31,22 @@ def test_legacy_release_has_release_trend_label():
     assert run_label({"workflow": "Hosted Agent CI/CD", "run_number": 12, "attempt": 2}) == "R12.2"
 
 
+def test_smoke_uses_pinned_session_without_persisted_conversation():
+    release = workflow("deploy-and-evaluate.yml")
+    invocations = [step["run"] for job in release["jobs"].values() for step in job.get("steps", [])
+                   if "bash scripts/invoke-agent.sh" in step.get("run", "")]
+    assert len(invocations) == 2
+    assert all("validate-agent-response.jq" in script for script in invocations)
+    helper = (ROOT / "scripts/invoke-agent.sh").read_text(encoding="utf-8")
+    assert 'agent_version:$version' in helper
+    assert '/endpoint/sessions?api-version=v1' in helper
+    assert 'agent_session_id:$session' in helper
+    assert 'stream:true,store:false' in helper
+    assert 'conversation' not in helper
+    assert '--fail-with-body' in helper
+    assert '--new-conversation' not in (ROOT / '.github/workflows/deploy-and-evaluate.yml').read_text()
+
+
 def test_hosted_telemetry_uses_environment_specific_monitoring_output():
     config = yaml.safe_load((ROOT / "azure.yaml").read_text(encoding="utf-8"))
     settings = {item["name"]: item["value"] for item in

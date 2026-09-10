@@ -2,15 +2,9 @@
 
 import base64
 import json
-import os
 import zlib
-from urllib.parse import quote
 
 from azure.ai.agentserver.langgraph.models.response_api_default_converter import ResponseAPIDefaultConverter
-from azure.ai.agentserver.langgraph.models.response_api_request_converter import convert_item_resource_to_message
-from azure.ai.agentserver.core.logger import get_project_endpoint
-from azure.identity.aio import DefaultAzureCredential, get_bearer_token_provider
-from openai import AsyncOpenAI
 
 STATE_FIELDS = (
     "evidence_report", "risk_report", "final_report", "evidence_complete",
@@ -35,28 +29,13 @@ def evidence_metadata(state, metadata=None):
 
 
 class EvidenceConverter(ResponseAPIDefaultConverter):
-    async def _fetch_historical_items(self, conversation_id):
-        endpoint = get_project_endpoint()
-        if not endpoint:
-            raise RuntimeError("Conversation history requires a configured project endpoint")
-        agent_name = os.environ.get("AGENT_NAME")
-        if not agent_name:
-            raise RuntimeError("Conversation history requires a configured agent name")
-        async with DefaultAzureCredential() as credential:
-            token_provider = get_bearer_token_provider(credential, "https://ai.azure.com/.default")
-            async with AsyncOpenAI(
-                base_url=f"{endpoint.rstrip('/')}/agents/{quote(agent_name, safe='')}/endpoint/protocols/openai",
-                api_key=token_provider,
-                default_query={"api-version": "v1"},
-            ) as client:
-                items = [item async for item in client.conversations.items.list(conversation_id, order="asc")]
-        messages = []
-        for item in items:
-            item_data = item.model_dump() if hasattr(item, "model_dump") else dict(item)
-            message = convert_item_resource_to_message(item_data)
-            if message is not None:
-                messages.append(message)
-        return self._filter_incomplete_tool_calls(messages)
+    async def convert_request(self, context):
+        if context.agent_run.conversation_id or context.agent_run.request.get("previous_response_id"):
+            raise ValueError("This pilot requires full user/assistant history in input, store=false, "
+                             "and no conversation or previous_response_id.")
+        if context.agent_run.request.get("store") is True:
+            raise ValueError("This pilot does not persist responses; send store=false.")
+        return await super().convert_request(context)
 
     def get_stream_mode(self, context):
         return ["messages", "values"] if context.agent_run.stream else "updates"

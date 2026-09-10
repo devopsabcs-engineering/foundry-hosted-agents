@@ -304,7 +304,7 @@ jobs:
           MAX_ATTEMPTS=3
           for attempt in $(seq 1 "$MAX_ATTEMPTS"); do
             set +e
-            azd ai agent invoke "$AGENT_NAME" "$AGENT_TEST_PROMPT" --version "$AGENT_VERSION" --new-session --new-conversation --output raw > "/tmp/agent-response-attempt-$attempt.sse" 2> "/tmp/agent-response-attempt-$attempt.txt"
+            bash scripts/invoke-agent.sh > "/tmp/agent-response-attempt-$attempt.sse" 2> "/tmp/agent-response-attempt-$attempt.txt"
             INVOKE_EXIT=$?
             set -e
             echo "--- Agent response (attempt $attempt/$MAX_ATTEMPTS) ---"
@@ -362,7 +362,7 @@ jobs:
           python-version: "3.13"
 
       - name: Install evaluation SDKs
-        run: pip install -r src/threat-assessment-agent/requirements.txt azure-ai-projects==2.6.0 openai==3.6.0 azure-identity==1.25.3
+        run: pip install azure-ai-projects==2.6.0 openai==3.6.0 azure-identity==1.25.3
 
       - name: Verify full-history follow-up and conversation isolation
         env:
@@ -583,7 +583,7 @@ jobs:
           MAX_ATTEMPTS=3
           for attempt in $(seq 1 "$MAX_ATTEMPTS"); do
             set +e
-            azd ai agent invoke "$AGENT_NAME" "$AGENT_TEST_PROMPT" --version "$AGENT_VERSION" --new-session --new-conversation --output raw > /tmp/prod-smoke-response.sse 2>/tmp/prod-smoke-response.err
+            bash scripts/invoke-agent.sh > /tmp/prod-smoke-response.sse 2>/tmp/prod-smoke-response.err
             INVOKE_EXIT=$?
             set -e
             cat /tmp/prod-smoke-response.err

@@ -71,12 +71,15 @@ conversation state. Do not scale out until a shared, owner-bound session store i
 The UI shows progress while the agent runs, then the completed answer, not token-by-token text.
 Teams is not deployed; see the wiki for the tab and native-bot options and their security gates.
 
-The graph now carries user/assistant history to all three specialists. Staging version 7
-passed the three-check hosted conversation gate in
-[run 34294086899](https://github.com/devopsabcs-engineering/foundry-hosted-agents/actions/runs/34294086899),
-but that release stopped on a separate missing-tool-receipt failure. Deterministic read-only
-lookups replace model-selected calls in the subsequent candidate; its full release evidence
-must pass before production promotion. See the [pilot verification record](https://github.com/devopsabcs-engineering/foundry-hosted-agents/wiki/Web-Chat-Pilot#verification-record).
+The graph carries user/assistant history to all three specialists. The web pilot submits
+the complete conversation on each request with `store: false`; it does not use Foundry
+conversation persistence. All callers must submit full user/assistant history in `input`,
+set `store: false`, and omit `conversation` and `previous_response_id`. The converter rejects
+unsupported persistence instead of silently losing context. The default `azd ai agent invoke`
+conversation mode is not supported; release smoke checks use `scripts/invoke-agent.sh`, which
+creates a fresh version-pinned session and sends a nonpersistent Responses request.
+The release gate checks reference retention, full-history follow-up, and independent-request isolation.
+See the [pilot verification record](https://github.com/devopsabcs-engineering/foundry-hosted-agents/wiki/Web-Chat-Pilot#verification-record).
 
 Completed web message retries use a conversation-scoped `Idempotency-Key`: the same key and
 text replay the stored answer without another agent call or turn. Changed text with a used
@@ -230,6 +233,20 @@ model-judge checks. Production advanced from version 34 to 35 and passed monitor
 The compatibility entry point repeated the full protected release successfully in
 [run 34302149559](https://github.com/devopsabcs-engineering/foundry-hosted-agents/actions/runs/34302149559),
 including its separate production monitoring approval and checks.
+
+Those historical monitoring checks did not prove telemetry ingestion. Subsequent staging
+investigation found that the hosting SDK could not discover an Application Insights connection.
+The infrastructure now creates the project connection, and the production monitoring gate
+requires a trace correlated to the smoke response before applying its zero-exception threshold.
+Missing telemetry fails the gate; it is not evidence of a healthy deployment.
+
+Investigation found two native-history blockers: the SDK used the project route for agent-scoped
+conversations, and the hosted agent identity could not read the caller's isolated conversation.
+The route-only experiment in
+[run 34418932490](https://github.com/devopsabcs-engineering/foundry-hosted-agents/actions/runs/34418932490)
+failed staging smoke and never reached production. The pilot therefore uses explicit full-history
+requests, verified live through a version-pinned staging session. Native persistence and durable
+web history remain out of scope. Intermittent concurrent SSE failures are not yet explained.
 
 The release preserves conversation context, executes read-only tool plans from explicit
 user fields, labels synthetic tool findings, and retains omitted user references in an
