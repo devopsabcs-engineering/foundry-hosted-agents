@@ -5,9 +5,9 @@
 <style>
   /* Left nav is built once for the whole site; hide the other language's links per page. */
   {%- if is_fr_page %}
-  #site-nav .nav-list-item:has(> a.nav-list-link:not([href^="/fr/"])) { display: none; }
+  #site-nav .nav-list-item:has(> a.nav-list-link[href]:not([href="/fr"]):not([href^="/fr/"])) { display: none; }
   {%- else %}
-  #site-nav .nav-list-item:has(> a.nav-list-link[href^="/fr/"]) { display: none; }
+  #site-nav .nav-list-item:has(> a.nav-list-link:is([href="/fr"], [href^="/fr/"])) { display: none; }
   {%- endif %}
   .nav-list-item.lang-hidden { display: none !important; }
 </style>
@@ -17,8 +17,9 @@
     var isFrPage = {{ is_fr_page }};
     document.querySelectorAll('#site-nav .nav-list-item').forEach(function (item) {
       var link = item.querySelector('a.nav-list-link');
-      if (!link) return;
-      var isFrLink = (link.getAttribute('href') || '').indexOf('/fr/') === 0;
+      if (!link || !link.hasAttribute('href')) return;
+      var href = link.getAttribute('href') || '';
+      var isFrLink = href === '/fr' || href.indexOf('/fr/') === 0;
       if (isFrPage !== isFrLink) item.classList.add('lang-hidden');
     });
   });

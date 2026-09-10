@@ -1,7 +1,11 @@
 ---
+lang: en
 title: Continuous Validation and Test Trends
 description: Run regression tests and staging probes in GitHub Actions and publish durable wiki trends.
+nav_order: 0.5
 ---
+
+> **[Version française](fr/continuous-validation.md)**
 
 ## Cadence
 
