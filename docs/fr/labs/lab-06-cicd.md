@@ -10,7 +10,7 @@ ms.date: 2026-09-10
 
 ## Aperçu
 
-| | |
+| Élément | Valeur |
 | --- | --- |
 | **Durée** | 35 minutes |
 | **Niveau** | Avancé |
@@ -27,6 +27,28 @@ ms.date: 2026-09-10
 
 ## Exercices
 
+Ce lab combine une répétition locale des contrôles et une inspection en lecture
+seule des preuves historiques GitHub Actions. **Ne déclenchez pas les workflows
+partagés de publication ou Continuous Validation, ne modifiez pas leurs
+environnements et ne poussez pas sur `main` en tant qu'apprenant.** Leurs jobs
+actifs ciblent des comptes partagés, pas votre environnement du Lab 02.
+Une répétition complète exige un dépôt approuvé distinct, une identité OIDC,
+des variables isolées et des approbateurs. L'atelier de base ne crée pas ces
+ressources GitHub et ne déploie pas en production.
+
+Exécutez les contrôles hors ligne, puis conservez vos artefacts du Lab 05 :
+
+```powershell
+bash scripts/test-agent-response.sh
+bash scripts/test-agent-rbac.sh
+bash scripts/test-production-version.sh
+python -m pytest eval/deterministic-tests/ scripts/tests/ -q
+```
+
+Réussite : les quatre commandes se terminent sans erreur. Une réussite locale
+ne vérifie ni OIDC GitHub, ni les approbations, ni la promotion ou la récupération
+en production ; notez ces éléments comme inspectés, pas exécutés.
+
 ### Exercice 6.1 : Un chemin de mise en production protégé
 
 Ouvrez [`.github/workflows/`](https://github.com/devopsabcs-engineering/foundry-hosted-agents/tree/main/.github/workflows) :
@@ -38,11 +60,10 @@ Ouvrez [`.github/workflows/`](https://github.com/devopsabcs-engineering/foundry-
 | `continuous-validation.yml` | Push, pull request, manuel | Régressions hors ligne ; sur main, évaluations staging et cinq flux simultanés sans déploiement. |
 | `web-chat-build.yml` | Push ciblé, pull request, manuel | Tests d'autorisation/sessions, tests frontend, artefact compilé. Aucun déploiement Azure. |
 
-Les deux sont **en déclenchement manuel uniquement** — lisez le bloc de
-commentaires en haut de chaque fichier. Ce n'était pas la conception
-initiale ; c'est une leçon apprise : déclencher automatiquement les deux
-pipelines à chaque push sur `main` les faisait entrer en concurrence sur
-le même compte Cognitive Services partagé.
+Les deux entrées de publication sont manuelles. Continuous Validation fonctionne
+aussi sur push/PR et son job actif sur main appelle le staging partagé.
+Le verrou commun évite les exécutions concurrentes ; il ne sécurise pas une
+cible d'environnement incorrecte.
 
 ### Exercice 6.2 : La porte d'évaluation
 
@@ -99,7 +120,7 @@ réponse textuelle complète de l'assistant. Il rejette les flux en erreur,
 console non vide. Les preuves staging sont conservées dans l'artefact
 `staging-smoke-evidence`.
 
-Exécutez les tests locaux avant de déclencher le workflow :
+Contrôle facultatif pour les mainteneurs (`actionlint` à installer séparément) :
 
 ```bash
 bash scripts/test-agent-response.sh
@@ -237,7 +258,7 @@ utilise le chemin normal authentifié, lié au propriétaire.
 
 ## Vérification des connaissances
 
-* Quel pipeline déclencheriez-vous pour tester un changement en toute sécurité avant qu'il n'atteigne l'environnement PoC partagé ?
+* Pourquoi un apprenant ne doit-il pas déclencher un pipeline partagé pour valider un déploiement d'atelier isolé ?
 * Que bloque réellement la porte d'évaluation pour la promotion ?
 * Quelle est l'hypothèse de concurrence pour les 401 intermittents, et comment la testeriez-vous ?
 

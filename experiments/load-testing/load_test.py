@@ -23,12 +23,7 @@ import sys
 import time
 from pathlib import Path
 from typing import Any
-
-DEFAULT_ENDPOINT = (
-    "https://aif-air-canada-threat-assessment-poc.services.ai.azure.com/api/projects/"
-    "proj-air-canada-threat-assessment-poc/agents/threat-assessment-agent/endpoint/"
-    "protocols/openai/responses?api-version=v1"
-)
+from urllib.parse import urlparse
 
 MESSAGE = (
     "A user reports their corporate laptop is running unusually slow and shows a "
@@ -203,11 +198,14 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("mode", choices=["concurrent-sessions", "same-thread-turns", "sequential-cold-start"])
     parser.add_argument("--count", type=int, default=5)
-    parser.add_argument("--endpoint", default=DEFAULT_ENDPOINT)
+    parser.add_argument("--endpoint", required=True, help="Explicit HTTPS Foundry Responses endpoint")
     parser.add_argument("--out", default=None, help="Path to write raw JSON results")
     args = parser.parse_args()
     if not 1 <= args.count <= 20:
         parser.error("--count must be between 1 and 20")
+    endpoint = urlparse(args.endpoint)
+    if endpoint.scheme != "https" or not (endpoint.hostname or "").endswith(".services.ai.azure.com") or endpoint.username or endpoint.password:
+        parser.error("--endpoint must be an HTTPS Foundry endpoint without credentials")
 
     token = _get_bearer_token()
 

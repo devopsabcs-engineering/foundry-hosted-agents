@@ -8,8 +8,8 @@ description: "Read the PoC's production decision-gate scorecard and understand h
 
 ## Overview
 
-| | |
-|---|---|
+| Item | Value |
+| --- | --- |
 | **Duration** | 30 minutes |
 | **Level** | Advanced |
 | **Prerequisites** | [Lab 07](lab-07-troubleshooting-rbac.md) |
@@ -25,12 +25,17 @@ By the end of this lab, you will be able to:
 
 ## Exercises
 
+The experiment outcomes below belong to the historical PoC, not automatically
+to your learner environment. Cosmos, Agent 365 and continuous monitoring are
+not provisioned by the base labs. Do not add licenses, tenant permissions or
+extra infrastructure to reproduce those optional tracks during this workshop.
+
 ### Exercise 8.1: The Four Experiment Tracks
 
 Open [`experiments/`](https://github.com/devopsabcs-engineering/foundry-hosted-agents/tree/main/experiments):
 
 | Track | Question it answers | Outcome |
-|---|---|---|
+| --- | --- | --- |
 | `load-testing/` | How many concurrent sessions before something breaks? | Partial — no ceiling observed at 1–20 concurrent, but the target range (10–100) wasn't fully exercised |
 | `cosmos-checkpointer/` | Can the agent use Cosmos DB as durable LangGraph state? | Partial — infra deployed and a real bug was found and fixed, but live benchmarking was blocked by tenant-enforced private-only networking |
 | `agent365-onboarding/` | Can this agent be registered under Entra Agent ID / Agent 365? | Blocked, but validly so — the tenant lacks Agent 365 licensing; the probe correctly stopped instead of faking success |
@@ -46,7 +51,7 @@ Open [`deliverables/production-decision-gate-scorecard.md`](https://github.com/d
 and find the status legend:
 
 | Status | Meaning |
-|---|---|
+| --- | --- |
 | **Pass** | Evidence collected in this PoC directly satisfies the gate |
 | **Conditional** | Partial evidence exists; a specific, named follow-up closes the gap |
 | **Fail** | Evidence collected contradicts or fails the gate as tested |
@@ -83,7 +88,7 @@ Open [`deliverables/deck-outline.md`](https://github.com/devopsabcs-engineering/
 and its **Confidence Tagging Legend**:
 
 | Tag | Meaning |
-|---|---|
+| --- | --- |
 | `confirmed` | Directly established by product documentation, samples, or this PoC's own testing |
 | `preview` | Documented but explicitly a preview/beta capability |
 | `inferred` | Synthesized from separately-confirmed facts not yet observed working together |
@@ -103,9 +108,26 @@ non-technical stakeholder audience without overstating certainty.
 
 ## Workshop Wrap-Up
 
-You've now taken one PoC from architecture, through deployment, invocation,
-evaluation, verified CI/CD, a resolved troubleshooting investigation, and finally
-to an honest production-readiness recommendation. The full source for
+Optionally run a bounded five-stream probe against your own endpoint. Stop
+other model calls first. This incurs usage and may expose 429 throttling at the
+small learner capacity; record failures rather than lowering the requested count
+and claiming the original test passed.
+
+```powershell
+python -m pip install aiohttp
+python experiments/load-testing/load_test.py concurrent-sessions --count 5 --endpoint $ResponsesEndpoint --out .azure/workshop-load.json
+```
+
+Compare `success_count`, `error_count` and latency with your quality results.
+Even 5/5 success is not an SLA, sustained-load test or maximum-capacity claim.
+Never omit `--endpoint`, and do not use the legacy `same-thread-turns` mode as
+proof of supported history; Lab 04 tests the actual full-history contract.
+
+You've deployed and evaluated your own agent, rehearsed local CI gates, inspected
+historical release and troubleshooting evidence, and identified readiness gaps.
+You have not promoted a production release. Finish by completing
+[Lab 09: Teardown](lab-09-teardown.md), including when an earlier lab fails.
+The full source for
 everything in this workshop lives in
 [`devopsabcs-engineering/foundry-hosted-agents`](https://github.com/devopsabcs-engineering/foundry-hosted-agents) —
 fork it, and the [wiki](https://github.com/devopsabcs-engineering/foundry-hosted-agents/wiki)

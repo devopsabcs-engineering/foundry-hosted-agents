@@ -3,6 +3,7 @@
 import argparse
 import json
 import os
+import re
 import uuid
 from pathlib import Path
 from urllib.parse import urlparse
@@ -35,18 +36,37 @@ def check_conversation(invoke, reference):
     return {"reference": reference, "checks": 3, "passed": 3}
 
 
+def validate_endpoint(value, workshop_account=None):
+    endpoint = urlparse(value)
+    hostname = endpoint.hostname or ""
+    if (
+        endpoint.scheme != "https" or not hostname.endswith(".services.ai.azure.com")
+        or endpoint.username or endpoint.password
+    ):
+        raise ValueError("Expected an HTTPS Foundry endpoint without credentials")
+    if workshop_account is not None:
+        if (
+            not re.fullmatch(r"aif-fha-learn-[a-z0-9-]+", workshop_account)
+            or hostname != f"{workshop_account}.services.ai.azure.com"
+        ):
+            raise ValueError("Workshop account must match the isolated learner endpoint")
+    elif "-staging" not in hostname:
+        raise ValueError(
+            "This regression targets staging only unless --workshop-account names an isolated learner account"
+        )
+
+
 def main():
     from azure.identity import AzureCliCredential
 
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--endpoint", required=True, help="Full staging Responses endpoint")
+    parser.add_argument("--endpoint", required=True, help="Full Responses endpoint")
+    parser.add_argument(
+        "--workshop-account", help="Explicit aif-fha-learn-* account for an isolated workshop"
+    )
     parser.add_argument("--output-dir", required=True, type=Path)
     args = parser.parse_args()
-    endpoint = urlparse(args.endpoint)
-    if endpoint.scheme != "https" or not (endpoint.hostname or "").endswith(".services.ai.azure.com"):
-        raise ValueError("Expected an HTTPS Foundry endpoint")
-    if "-staging" not in (endpoint.hostname or ""):
-        raise ValueError("This regression targets staging only")
+    validate_endpoint(args.endpoint, args.workshop_account)
     args.output_dir.mkdir(parents=True, exist_ok=True)
     credential = AzureCliCredential()
     responses = []
@@ -70,7 +90,7 @@ def main():
         print("Conversation regression: 3/3 passed (reference, follow-up, independent request).")
         if os.environ.get("GITHUB_STEP_SUMMARY"):
             with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as summary:
-                summary.write("\n## Conversation Regression\n\n3/3 passed on the staging routed endpoint: "
+                summary.write("\n## Conversation Regression\n\n3/3 passed on the selected routed endpoint: "
                               "reference retention, full-history follow-up, independent request. "
                               "Synthetic responses retained in conversation-evidence.\n")
     finally:

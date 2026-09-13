@@ -1,6 +1,11 @@
-# Load & Scale Gate — Step 7.1
+---
+title: "Load and Scale Gate"
+description: "Run a bounded load probe against an explicitly selected Foundry endpoint."
+---
 
-PoC-scale probe against the live deployed hosted agent
+## Scope
+
+Historical PoC-scale probe against the deployed hosted agent
 (`threat-assessment-agent` v9, `rg-air-canada-threat-assessment-poc`,
 eastus2). Not a production load-testing rig — a lightweight `asyncio`/
 `aiohttp` script hitting the agent's Responses REST endpoint directly,
@@ -37,19 +42,19 @@ same bearer-token mechanism already verified working in this repo for the
 
 ## Endpoint
 
-```text
-https://aif-air-canada-threat-assessment-poc.services.ai.azure.com/api/projects/proj-air-canada-threat-assessment-poc/agents/threat-assessment-agent/endpoint/protocols/openai/responses?api-version=v1
-```
-
-Confirmed via `azd ai agent show threat-assessment-agent --no-prompt`
-and the `.azure/air-canada-threat-assessment-poc/.env`
-`AGENT_THREAT_ASSESSMENT_AGENT_RESPONSES_ENDPOINT` value.
+There is no default endpoint. Supply the HTTPS Responses URL from your own
+approved learner environment, as prepared in [Lab 04](../../docs/labs/lab-04-invoke-agent.md).
+Never copy a historical customer endpoint to run a new load test.
 
 ## Run
 
 ```powershell
-$env:AGENT_ENDPOINT = "https://aif-air-canada-threat-assessment-poc.services.ai.azure.com/api/projects/proj-air-canada-threat-assessment-poc/agents/threat-assessment-agent/endpoint/protocols/openai/responses?api-version=v1"
-& "../../src/threat-assessment-agent/.venv-validate/Scripts/python.exe" load_test.py concurrent-sessions --count 5 --out results/concurrent-5.json
+python experiments/load-testing/load_test.py concurrent-sessions --count 5 --endpoint $ResponsesEndpoint --out .azure/workshop-load.json
 ```
 
-See `report.md` for the actual counts run and results.
+Run from the repository root with the learner virtual environment active.
+Failures produce evidence and a nonzero exit code. Five successful streams do
+not establish an SLA or capacity ceiling. The legacy `same-thread-turns` mode
+requires native conversation IDs and is not the supported full-history contract.
+
+See `report.md` for the historical counts and results, not your own run outcome.

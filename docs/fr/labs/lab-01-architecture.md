@@ -9,8 +9,8 @@ description: "Comprendre le patron superviseur/spécialistes de LangGraph, l'iso
 
 ## Aperçu
 
-| | |
-|---|---|
+| Élément | Valeur |
+| --- | --- |
 | **Durée** | 30 minutes |
 | **Niveau** | Débutant |
 | **Prérequis** | [Lab 00](lab-00-setup.md) |
@@ -47,7 +47,7 @@ n'autorise le graphe à passer à la rédaction du rapport que lorsque
 l'analyse des preuves et l'analyse de risque sont toutes deux terminées :
 
 | Nœud | Rôle | Accès aux outils |
-|---|---|---|
+| --- | --- | --- |
 | Enquêteur de preuves | Recueille le contexte des appareils/vulnérabilités | `defender-conn` uniquement |
 | Analyste de risque | Note les anomalies et les schémas de connexion | `anomaly-conn` uniquement |
 | Rédacteur de rapport | Synthétise le rapport final | Aucun — synthèse en lecture seule |
@@ -80,8 +80,8 @@ couches distinctes. Lisez `azure.yaml` à la racine du dépôt et associez
 chaque bloc à une couche :
 
 | Couche | Ce qu'elle fait | Bloc `azure.yaml` |
-|---|---|---|
-| 1. Implémentation | Le code réel du serveur MCP (outils Defender, outils anomalie) | `mcp/defender-server/`, `mcp/anomaly-server/` (pas dans `azure.yaml` — services `azd` séparés, voir Lab 02) |
+| --- | --- | --- |
+| 1. Implémentation | Le code réel du serveur MCP (outils Defender, outils anomalie) | `mcp/defender-server/`, `mcp/anomaly-server/` (dossiers sources, pas des services `azd` ; voir Lab 02) |
 | 2. Hébergement | Runtime Azure indépendant avec sa propre authentification, réseau, vérifications de santé | Déployé en tant qu'Azure Container Apps |
 | 3. Enregistrement | Définit le point de terminaison + la politique d'identifiants par serveur MCP | `anomaly-conn` / `defender-conn` (`host: azure.ai.connection`) |
 | 4. Consommation | Agrège les outils enregistrés pour réutilisation entre agents | `security-tools` (`host: azure.ai.toolbox`) |
@@ -94,19 +94,21 @@ chaque bloc à une couche :
 
 ### Exercice 1.4 : Faire correspondre les ressources au portail
 
-Ouvrez le groupe de ressources Azure Portal de cet atelier et trouvez les
-ressources ci-dessous. Comparez avec la capture d'écran.
+Examinez cette correspondance maintenant, puis revenez après la création des
+ressources aux Labs 02 et 03. Utilisez votre groupe dans le portail. Les captures
+sont historiques : Cosmos DB appartient à une expérience distincte et n'est pas
+créé par l'atelier de base.
 
 ![Vue d'ensemble du groupe de ressources Azure montrant le compte Foundry, les Container Apps, Cosmos DB et le registre de conteneurs](../../assets/images/01-azure-resource-group-overview.png)
 
 ![Liste complète des ressources du groupe de ressources](../../assets/images/02-azure-resource-group-resources-list.png)
 
 | Ressource | Type | Service `azure.yaml` |
-|---|---|---|
+| --- | --- | --- |
 | `aif-*` | Compte Cognitive Services (kind `AIServices`) | `ai-project` |
 | `aif-*/proj-*` | Projet Foundry (ressource imbriquée) | (implicite — le projet où l'agent se déploie) |
-| `mcp-defender-server` | Container App | `mcp/defender-server` |
-| `mcp-anomaly-server` | Container App | `mcp/anomaly-server` |
+| `mcp-learn-defender-server` | Container App | Module Bicep `mcp-container-apps.bicep`, pas un service azd |
+| `mcp-learn-anomaly-server` | Container App | Module Bicep `mcp-container-apps.bicep`, pas un service azd |
 | `acr*` | Registre de conteneurs | (alimente les images des Container Apps) |
 
 ## Vérification des connaissances

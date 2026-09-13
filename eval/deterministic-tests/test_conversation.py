@@ -4,7 +4,7 @@ from pathlib import Path
 import pytest
 
 sys.path.insert(0, str(Path(__file__).parents[1]))
-from check_conversation import check_conversation
+from check_conversation import check_conversation, validate_endpoint
 
 
 def test_conversation_resends_only_owned_history():
@@ -32,3 +32,22 @@ def test_conversation_gate_rejects_context_failures(responses, error):
     outputs = iter(responses)
     with pytest.raises(ValueError, match=error):
         check_conversation(lambda messages: next(outputs), "PILOT-4827")
+
+
+def test_endpoint_allows_staging_and_explicit_workshop():
+    validate_endpoint("https://example-staging.services.ai.azure.com/responses")
+    validate_endpoint("https://aif-fha-learn-test.services.ai.azure.com/responses", "aif-fha-learn-test")
+
+
+@pytest.mark.parametrize("endpoint,account", [
+    ("https://production.services.ai.azure.com/responses", None),
+    ("https://aif-fha-learn-test.services.ai.azure.com/responses", None),
+    ("https://production.services.ai.azure.com/responses", "production"),
+    ("https://aif-fha-learn-other.services.ai.azure.com/responses", "aif-fha-learn-test"),
+    ("https://example-staging.services.ai.azure.com/responses", "aif-fha-learn-test"),
+    ("http://aif-fha-learn-test.services.ai.azure.com/responses", "aif-fha-learn-test"),
+    ("https://user@aif-fha-learn-test.services.ai.azure.com/responses", "aif-fha-learn-test"),
+])
+def test_endpoint_rejects_unsafe_or_mismatched_targets(endpoint, account):
+    with pytest.raises(ValueError):
+        validate_endpoint(endpoint, account)

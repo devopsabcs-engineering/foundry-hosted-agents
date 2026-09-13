@@ -9,8 +9,8 @@ description: "Lire la grille de décision de mise en production du PoC et compre
 
 ## Aperçu
 
-| | |
-|---|---|
+| Élément | Valeur |
+| --- | --- |
 | **Durée** | 30 minutes |
 | **Niveau** | Avancé |
 | **Prérequis** | [Lab 07](lab-07-troubleshooting-rbac.md) |
@@ -26,12 +26,17 @@ description: "Lire la grille de décision de mise en production du PoC et compre
 
 ## Exercices
 
+Les résultats ci-dessous appartiennent au PoC historique, pas automatiquement
+à votre environnement apprenant. Cosmos, Agent 365 et la surveillance continue
+ne sont pas provisionnés par les labs de base. N'ajoutez pas de licences, de
+droits de tenant ou d'infrastructure pour reproduire ces pistes facultatives.
+
 ### Exercice 8.1 : Les quatre pistes d'expérimentation
 
 Ouvrez [`experiments/`](https://github.com/devopsabcs-engineering/foundry-hosted-agents/tree/main/experiments) :
 
 | Piste | Question à laquelle elle répond | Résultat |
-|---|---|---|
+| --- | --- | --- |
 | `load-testing/` | Combien de sessions concurrentes avant qu'un problème survienne ? | Partiel — aucun plafond observé à 1-20 concurrentes, mais la plage cible (10-100) n'a pas été entièrement testée |
 | `cosmos-checkpointer/` | L'agent peut-il utiliser Cosmos DB comme état LangGraph durable ? | Partiel — infra déployée et un vrai bogue trouvé et corrigé, mais le benchmark en direct a été bloqué par une politique réseau du tenant imposant un accès privé uniquement |
 | `agent365-onboarding/` | Cet agent peut-il être enregistré sous Entra Agent ID / Agent 365 ? | Bloqué, mais validement — le tenant n'a pas la licence Agent 365 ; la sonde s'est arrêtée correctement plutôt que de simuler un succès |
@@ -48,7 +53,7 @@ Ouvrez [`deliverables/production-decision-gate-scorecard.md`](https://github.com
 et trouvez sa légende de statuts :
 
 | Statut | Signification |
-|---|---|
+| --- | --- |
 | **Pass** | Les preuves recueillies dans ce PoC satisfont directement la porte |
 | **Conditional** | Des preuves partielles existent ; un suivi précis et nommé comble l'écart |
 | **Fail** | Les preuves recueillies contredisent ou échouent la porte telle que testée |
@@ -86,7 +91,7 @@ Ouvrez [`deliverables/deck-outline.md`](https://github.com/devopsabcs-engineerin
 et sa **légende de balisage de confiance** :
 
 | Tag | Signification |
-|---|---|
+| --- | --- |
 | `confirmed` | Établi directement par la documentation produit, des échantillons, ou les propres tests de ce PoC |
 | `preview` | Documenté mais explicitement une capacité preview/bêta |
 | `inferred` | Synthétisé à partir de faits confirmés séparément mais jamais observés fonctionner ensemble |
@@ -107,10 +112,26 @@ la certitude.
 
 ## Conclusion de l'atelier
 
-Vous venez de parcourir un PoC complet, de l'architecture au déploiement,
-à l'invocation, à l'évaluation, au CI/CD, à une véritable investigation de
-dépannage résolue, jusqu'à une recommandation honnête de
-préparation à la production. Le code source complet de tout ce qui figure
+Vous pouvez exécuter un test borné de cinq flux sur votre point de terminaison.
+Arrêtez les autres appels au modèle. Ce test entraîne une consommation et peut
+révéler une limitation 429 à faible capacité ; consignez les échecs au lieu de
+réduire le nombre demandé et de déclarer le test initial réussi.
+
+```powershell
+python -m pip install aiohttp
+python experiments/load-testing/load_test.py concurrent-sessions --count 5 --endpoint $ResponsesEndpoint --out .azure/workshop-load.json
+```
+
+Comparez `success_count`, `error_count` et la latence aux résultats qualité.
+Même 5/5 ne prouve ni un SLA, ni une charge soutenue, ni une capacité maximale.
+N'omettez jamais `--endpoint` et n'utilisez pas l'ancien mode `same-thread-turns`
+pour démontrer l'historique pris en charge ; le Lab 04 teste le contrat réel.
+
+Vous avez déployé et évalué votre agent, répété les contrôles CI locaux, examiné
+les preuves historiques de publication et de dépannage, et identifié les limites.
+Vous n'avez pas promu de version en production. Terminez par le
+[Lab 09 : Nettoyage](lab-09-teardown.md), même si un lab précédent a échoué.
+Le code source complet de tout ce qui figure
 dans cet atelier se trouve dans
 [`devopsabcs-engineering/foundry-hosted-agents`](https://github.com/devopsabcs-engineering/foundry-hosted-agents) —
 forkez-le, et le [wiki](https://github.com/devopsabcs-engineering/foundry-hosted-agents/wiki)

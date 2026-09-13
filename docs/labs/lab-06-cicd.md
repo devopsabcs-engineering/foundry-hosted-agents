@@ -9,7 +9,7 @@ ms.date: 2026-09-10
 
 ## Overview
 
-| | |
+| Item | Value |
 | --- | --- |
 | **Duration** | 35 minutes |
 | **Level** | Advanced |
@@ -26,6 +26,27 @@ By the end of this lab, you will be able to:
 
 ## Exercises
 
+This lab combines a local gate rehearsal with read-only inspection of historical
+GitHub Actions evidence. **Do not dispatch this repository's shared release or
+Continuous Validation workflows, edit its environments, or push to its `main`
+branch as a learner.** Their live jobs name shared accounts, not your Lab 02
+environment. A full release rehearsal requires a separately approved repository,
+OIDC identity, isolated environment variables and required reviewers. This base
+workshop does not create those GitHub resources or deploy production.
+
+Run the offline gates locally, then retain your own Lab 05 evaluation artifacts:
+
+```powershell
+bash scripts/test-agent-response.sh
+bash scripts/test-agent-rbac.sh
+bash scripts/test-production-version.sh
+python -m pytest eval/deterministic-tests/ scripts/tests/ -q
+```
+
+Pass condition: all four commands succeed. A local pass does not verify GitHub
+OIDC, approvals, production promotion or recovery; mark those as inspected, not
+executed, in your learner notes.
+
 ### Exercise 6.1: One Protected Release Path
 
 Open [`.github/workflows/`](https://github.com/devopsabcs-engineering/foundry-hosted-agents/tree/main/.github/workflows):
@@ -37,10 +58,10 @@ Open [`.github/workflows/`](https://github.com/devopsabcs-engineering/foundry-ho
 | `continuous-validation.yml` | Push, pull request, manual | Offline regressions; on main, existing staging evaluations and five concurrent streams without deployment. |
 | `web-chat-build.yml` | Scoped push, pull request, manual | Authorization/session tests, frontend tests and compiled artifact. Does not deploy Azure resources. |
 
-Both are **manual-dispatch only** — read the comment block at the top of
-each file. This wasn't the original design; it's a lesson learned:
-auto-firing both pipelines on every push to `main` caused them to race
-concurrently against the same shared Cognitive Services account.
+The two release entry points are manual-dispatch only. Continuous Validation
+also runs on push/PR and its main-branch live job calls shared staging.
+The shared concurrency lock prevents competing live work; it does not make an
+incorrect environment target safe.
 
 ### Exercise 6.2: The Evaluation Gate
 
@@ -96,7 +117,7 @@ response, and rejects error, failed, incomplete, malformed, and empty streams.
 There is no non-empty-console-output fallback. Staging response evidence is
 retained as the `staging-smoke-evidence` artifact.
 
-Run the local regression checks before dispatching:
+Optional maintainer check (requires a separately installed `actionlint`):
 
 ```bash
 bash scripts/test-agent-response.sh
@@ -232,7 +253,7 @@ the normal authenticated, owner-bound request path.
 
 ## Knowledge Check
 
-* Which pipeline would you dispatch to test a change safely before it reaches the shared PoC environment?
+* Why must a learner not dispatch a shared pipeline to validate an isolated workshop deployment?
 * What does the evaluation gate actually block from being promoted?
 * What's the concurrency hypothesis for the intermittent 401s, and how would you test it?
 

@@ -11,6 +11,9 @@
     "mcpAcrName": {
       "value": "${MCP_ACR_NAME}"
     },
+    "mcpNamePrefix": {
+      "value": "${MCP_NAME_PREFIX=}"
+    },
     "defenderMcpImage": {
       "value": "${DEFENDER_MCP_IMAGE}"
     },

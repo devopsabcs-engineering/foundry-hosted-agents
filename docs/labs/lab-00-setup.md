@@ -8,8 +8,8 @@ description: "Install required tools, clone the repository, create a Python virt
 
 ## Overview
 
-| | |
-|---|---|
+| Item | Value |
+| --- | --- |
 | **Duration** | 20 minutes |
 | **Level** | Beginner |
 | **Prerequisites** | None |
@@ -20,7 +20,7 @@ By the end of this lab, you will be able to:
 
 * Install the tools needed to provision and invoke a Foundry Hosted Agent
 * Clone the `foundry-hosted-agents` repository and set up a Python virtual environment
-* Sign in to Azure and confirm you can see the Foundry project used in this workshop
+* Sign in to Azure and select an approved subscription for your own isolated workshop resources
 * Run the repository's own test suites as a sanity check
 
 ## Exercises
@@ -47,6 +47,29 @@ By the end of this lab, you will be able to:
 
 4. **Visual Studio Code** — <https://code.visualstudio.com/>
 
+The commands in these labs use **PowerShell 7.3 or newer**. The invocation,
+RBAC and evaluation helpers also require **Git Bash, jq and curl**. On Windows,
+install Git for Windows and jq through your approved software channel (for
+example `winget install --id Git.Git --exact` and
+`winget install --id jqlang.jq --exact`). Restart your terminal after installing.
+Do not change corporate execution or network policies to install a dependency.
+
+In each new PowerShell session, activate Python as shown below and verify
+the shell helpers. Windows' `System32/bash.exe` launches WSL, not Git Bash.
+Adjust the Git path if your organization installs it elsewhere.
+
+```powershell
+$env:PATH = "C:\Program Files\Git\bin;$env:LOCALAPPDATA\Microsoft\WinGet\Links;$env:PATH"
+$env:MSYS_NO_PATHCONV = '1'
+Get-Command git, bash, jq, curl.exe, az, azd
+bash -lc 'command -v az azd jq curl && jq --version'
+```
+
+`MSYS_NO_PATHCONV` prevents Git Bash from rewriting Azure resource IDs into
+Windows paths. Keep the same session through Labs 02-08; its variables identify
+your disposable resources. If you lose the session, recover your own environment
+values, never substitute the resource names from historical screenshots.
+
 ### Exercise 0.2: Install the Foundry `azd` Extension
 
 Foundry Hosted Agents are provisioned through an `azd` extension:
@@ -62,7 +85,7 @@ git clone https://github.com/devopsabcs-engineering/foundry-hosted-agents.git
 cd foundry-hosted-agents
 python -m venv .venv
 ./.venv/Scripts/Activate.ps1
-pip install -r src/threat-assessment-agent/requirements.txt -r src/threat-assessment-agent/requirements-dev.txt
+python -m pip install -r src/threat-assessment-agent/requirements.txt -r src/threat-assessment-agent/requirements-dev.txt
 ```
 
 ### Exercise 0.4: Sign In to Azure
@@ -72,11 +95,13 @@ azd auth login
 az login
 ```
 
-Confirm you're pointed at the subscription that hosts this workshop's
-resources:
+Use a subscription where you are authorized to create billable resources and assign
+resource-scoped roles. Do not reuse the instructor's or an existing customer resource group.
+Sign in with your own approved identity; the security scenarios use synthetic fixtures,
+not employee or customer data. Confirm the subscription and tenant before continuing:
 
 ```powershell
-az account show --query "{name:name, id:id}" -o table
+az account show --query "{name:name, id:id, tenantId:tenantId}" -o table
 ```
 
 ### Exercise 0.5: Run the Existing Test Suites
@@ -85,13 +110,14 @@ Before touching any infrastructure, confirm the repository's own tests pass
 in your environment — this is the same command the CI pipeline runs.
 
 ```powershell
-pytest eval/deterministic-tests/ -v
-pytest src/threat-assessment-agent/tests/ -v
+python -m pytest eval/deterministic-tests/ -v
+python -m pytest src/threat-assessment-agent/tests/ -v
 ```
 
-Expected result: **12 passed** for the deterministic evaluation checks and
-**18 passed** for the agent's unit tests. If either suite fails, re-check
-Exercise 0.3 (dependency installation) before continuing.
+Expected result: both commands exit successfully with no failed tests. Counts grow as
+the workshop evolves; do not compare them with an old screenshot or release report.
+Some opt-in tests are skipped by default. Use `python -m pytest -rs` with the same test
+paths to see the skip reasons. If either suite fails, re-check Exercise 0.3 before continuing.
 
 > [!TIP]
 > These two test suites don't touch Azure at all — they run entirely

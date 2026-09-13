@@ -57,7 +57,9 @@ param defenderMcpImage string = 'mcr.microsoft.com/k8se/quickstart:latest'
 param anomalyMcpImage string = 'mcr.microsoft.com/k8se/quickstart:latest'
 
 @description('MCP resource prefix; staging must not share production tool apps.')
-param mcpNamePrefix string = endsWith(environmentName, '-staging') ? 'mcp-staging' : 'mcp'
+param mcpNamePrefix string = ''
+
+var effectiveMcpNamePrefix = !empty(mcpNamePrefix) ? mcpNamePrefix : (endsWith(environmentName, '-staging') ? 'mcp-staging' : 'mcp')
 
 module monitoring 'modules/monitoring.bicep' = {
   name: 'monitoring'
@@ -100,7 +102,7 @@ module mcpContainerApps 'modules/mcp-container-apps.bicep' = {
   name: 'mcp-container-apps'
   params: {
     location: location
-    namePrefix: mcpNamePrefix
+    namePrefix: effectiveMcpNamePrefix
     acrName: mcpAcrName
     defenderImage: defenderMcpImage
     anomalyImage: anomalyMcpImage

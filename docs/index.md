@@ -45,7 +45,7 @@ of complete distributed tracing.
 ## Who Is This For?
 
 | Audience | What You Will Learn |
-|---|---|
+| --- | --- |
 | **AI / platform engineers** | Deploy a multi-agent LangGraph system on Foundry Hosted Agents end to end |
 | **DevOps engineers** | Wire evaluation-gated CI/CD pipelines around an agent deployment |
 | **Solution architects** | Compare Foundry Hosted Agents against self-hosted LangGraph/LangSmith options |
@@ -65,7 +65,7 @@ Before starting Lab 00, ensure you have the following:
 ## Labs
 
 | # | Lab | Duration | Level |
-|---|-----|----------|-------|
+| --- | ----- | ---------- | ------- |
 | 00 | [Prerequisites and Environment Setup](labs/lab-00-setup.md) | 20 min | Beginner |
 | 01 | [Architecture Deep Dive](labs/lab-01-architecture.md) | 30 min | Beginner |
 | 02 | [Deploy the MCP Tool Servers](labs/lab-02-mcp-servers.md) | 30 min | Intermediate |
@@ -75,13 +75,14 @@ Before starting Lab 00, ensure you have the following:
 | 06 | [CI/CD: Evaluation-Gated Release Pipeline](labs/lab-06-cicd.md) | 35 min | Advanced |
 | 07 | [Real-World Troubleshooting: RBAC 401](labs/lab-07-troubleshooting-rbac.md) | 40 min | Advanced |
 | 08 | [Production Readiness and Decision Gates](labs/lab-08-production-readiness.md) | 30 min | Advanced |
+| 09 | [Teardown and Cost Cleanup](labs/lab-09-teardown.md) | 10-20 min | Beginner |
 
 ## Workshop Schedule
 
 ### Half-Day (3 hours)
 
 | Time | Activity |
-|------|----------|
+| ------ | ---------- |
 | 0:00 – 0:20 | Lab 00: Prerequisites |
 | 0:20 – 0:50 | Lab 01: Architecture Deep Dive |
 | 0:50 – 1:20 | Lab 02: Deploy the MCP Tool Servers |
@@ -93,7 +94,7 @@ Before starting Lab 00, ensure you have the following:
 ### Full-Day (6 hours)
 
 | Time | Activity |
-|------|----------|
+| ------ | ---------- |
 | 0:00 – 3:00 | Half-Day labs (as above) |
 | 3:00 – 3:15 | Break |
 | 3:15 – 3:40 | Lab 05: Evaluations (continued) |
@@ -101,14 +102,18 @@ Before starting Lab 00, ensure you have the following:
 | 4:15 – 4:55 | Lab 07: Real-World Troubleshooting: RBAC 401 |
 | 4:55 – 5:10 | Break |
 | 5:10 – 5:40 | Lab 08: Production Readiness and Decision Gates |
-| 5:40 – 6:00 | Wrap-up and Q&A |
+| 5:40 – 6:00 | Lab 09: Teardown, verification and Q&A |
 
 ## Delivery Tiers
 
 | Tier | Labs | Duration | Audience |
-|---|---|---|---|
-| **Half-Day** | Labs 00 – 05 (start) | ~3 hours | First exposure to Foundry Hosted Agents |
-| **Full-Day** | Labs 00 – 08 | ~6 hours | End-to-end deployment, evaluation, CI/CD, and troubleshooting |
+| --- | --- | --- | --- |
+| **Half-Day** | Labs 00 – 05 (start), then 09 | ~3 hours + cleanup | First exposure to Foundry Hosted Agents |
+| **Full-Day** | Labs 00 – 09 | ~6 hours | Deployment, evaluation, local CI gates, troubleshooting and cleanup |
+
+Times are planning estimates, not provisioning guarantees. Allow extra time for
+tool installation, image builds, quota or identity propagation. Reserve cleanup
+time even when an earlier step fails.
 
 ## Getting Started
 
@@ -116,10 +121,10 @@ Before starting Lab 00, ensure you have the following:
 2. Complete [Lab 00: Prerequisites](labs/lab-00-setup.md) to set up your environment.
 3. Work through the labs in order — each lab builds on the previous one.
 
-> **Tip**: Labs 02–04 use resources that are already deployed for this
-> workshop (MCP servers, Foundry project). If you're running your own
-> environment, Lab 03 shows you how to provision everything from scratch
-> with `azd`.
+> [!IMPORTANT]
+> Labs 02-04 create resources in your approved disposable learner group. Do not
+> use historical customer endpoints or shared GitHub environments. Complete
+> [Lab 09](labs/lab-09-teardown.md) before leaving, even if deployment failed.
 
 ## Slide Deck
 
@@ -132,7 +137,7 @@ delivery:
 ## Related Resources
 
 | Resource | Description |
-|------------|-------------|
+| ------------ | ------------- |
 | [`foundry-hosted-agents` repository](https://github.com/devopsabcs-engineering/foundry-hosted-agents) | Full PoC source code, infra, evaluation suite, and CI/CD pipelines |
 | [Project wiki](https://github.com/devopsabcs-engineering/foundry-hosted-agents/wiki) | Architecture notes, manual-agent workaround, RBAC 401 investigation log |
 | [Decision deliverables](https://github.com/devopsabcs-engineering/foundry-hosted-agents/tree/main/deliverables) | Production decision-gate scorecard and executive decision deck |

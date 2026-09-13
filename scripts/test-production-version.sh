@@ -2,6 +2,9 @@
 set -euo pipefail
 SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 TEMP_DIR=$(mktemp -d)
+if command -v cygpath >/dev/null 2>&1; then
+  TEMP_DIR=$(cygpath -m "$TEMP_DIR")
+fi
 trap 'rm -rf "$TEMP_DIR"' EXIT
 export TEMP_DIR
 jq() { command jq "$@" | tr -d '\r'; }

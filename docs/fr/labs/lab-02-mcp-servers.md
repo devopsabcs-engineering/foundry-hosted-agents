@@ -9,8 +9,8 @@ description: "Explorer, exécuter et tester les deux serveurs d'outils MCP indé
 
 ## Aperçu
 
-| | |
-|---|---|
+| Élément | Valeur |
+| --- | --- |
 | **Durée** | 30 minutes |
 | **Niveau** | Intermédiaire |
 | **Prérequis** | [Lab 01](lab-01-architecture.md) |
@@ -20,7 +20,7 @@ description: "Explorer, exécuter et tester les deux serveurs d'outils MCP indé
 À la fin de ce lab, vous serez capable de :
 
 * Expliquer ce que chaque serveur d'outils MCP expose et pourquoi les données sont simulées
-* Exécuter un serveur MCP localement et appeler un outil via stdio
+* Construire les deux images à distance sans installer Docker
 * Confirmer que les Container Apps déployées sont actives et répondent à de vrais appels d'outils
 * Expliquer pourquoi les serveurs MCP sont versionnés/déployés indépendamment de l'agent
 
@@ -31,7 +31,7 @@ description: "Explorer, exécuter et tester les deux serveurs d'outils MCP indé
 Les deux serveurs se trouvent sous [`mcp/`](https://github.com/devopsabcs-engineering/foundry-hosted-agents/tree/main/mcp) et sont construits avec **FastMCP** :
 
 | Serveur | Outils | Objectif |
-|---|---|---|
+| --- | --- | --- |
 | `mcp/defender-server` | `get_device_risk`, `list_vulnerabilities` | Données simulées de risque d'appareil et de vulnérabilités Microsoft Defender |
 | `mcp/anomaly-server` | `score_anomaly`, `detect_login_anomalies` | Notation d'anomalies simulée |
 
@@ -39,62 +39,115 @@ Ouvrez `mcp/defender-server/main.py` et `mcp/anomaly-server/main.py`.
 Notez que chacun est une application FastMCP autonome avec son propre
 `Dockerfile` — rien ici n'importe depuis `src/threat-assessment-agent/`.
 
-### Exercice 2.2 : Confirmer que les serveurs déployés sont actifs
+### Exercice 2.2 : Construire et déployer vos propres serveurs
 
-Les deux serveurs de cet atelier sont déjà déployés en tant qu'Azure
-Container Apps. Confirmez leur statut :
+Utilisez PowerShell 7.3 ou ultérieur à la racine du dépôt, avec l'environnement
+virtuel du Lab 00 actif. Ces ressources sont facturables. Utilisez un
+abonnement approuvé et un nouveau groupe, jamais un groupe client existant.
+Les points de terminaison sont publics et sans authentification, uniquement
+pour les données fictives. Ne connectez pas de vraies données Defender et
+n'envoyez aucune information client.
+
+Remplacez l'abonnement ci-dessous. Gardez ce terminal ouvert pour le Lab 03.
 
 ```powershell
-az containerapp list --resource-group <votre-groupe-de-ressources> `
-  --query "[].{name:name, provisioningState:properties.provisioningState, runningStatus:properties.runningStatus, fqdn:properties.configuration.ingress.fqdn}" `
-  -o table
+$ErrorActionPreference = 'Stop'
+$PSNativeCommandUseErrorActionPreference = $true
+$SubscriptionId = '<approved-subscription-id>'
+$Suffix = [guid]::NewGuid().ToString('N').Substring(0, 8)
+$WorkshopEnv = "fha-learn-$Suffix"
+$ResourceGroup = "rg-$WorkshopEnv"
+$Location = 'eastus2'
+$Registry = "acrfhalearn$Suffix"
+$McpPrefix = 'mcp-learn'
+$ImageTag = 'workshop-v1'
+az account show --subscription $SubscriptionId --query '{name:name,id:id,tenantId:tenantId}'
+if ((az group exists --subscription $SubscriptionId --name $ResourceGroup) -eq 'true') {
+    throw 'Choose a new workshop name; this group already exists.'
+}
+az group create --subscription $SubscriptionId --name $ResourceGroup --location $Location `
+  --tags purpose=workshop-validation "workshopEnv=$WorkshopEnv" --output none
+azd auth login
+azd env new $WorkshopEnv --subscription $SubscriptionId --location $Location
+azd env set AZURE_RESOURCE_GROUP $ResourceGroup -e $WorkshopEnv
+az acr create --subscription $SubscriptionId --resource-group $ResourceGroup `
+  --name $Registry --sku Basic --admin-enabled false --output none
 ```
 
-Sortie attendue :
+Construisez les vraies images MCP. Les images quickstart par défaut du
+modèle Bicep sont des espaces réservés, pas des serveurs MCP fonctionnels.
+Les builds distants nécessitent l'autorisation d'exécuter ACR Tasks,
+mais pas Docker Desktop.
 
-```text
-Name                 ProvisioningState    RunningStatus    Fqdn
--------------------  -------------------  ---------------  -----------------------------------------------------------------------
-mcp-anomaly-server   Succeeded            Running          mcp-anomaly-server.<env>.<region>.azurecontainerapps.io
-mcp-defender-server  Succeeded            Running          mcp-defender-server.<env>.<region>.azurecontainerapps.io
+```powershell
+az acr build --subscription $SubscriptionId --registry $Registry `
+  --image "defender:$ImageTag" ./mcp/defender-server
+az acr build --subscription $SubscriptionId --registry $Registry `
+  --image "anomaly:$ImageTag" ./mcp/anomaly-server
+$LoginServer = az acr show --subscription $SubscriptionId --name $Registry --query loginServer -o tsv
+$DefenderImage = "${LoginServer}/defender:$ImageTag"
+$AnomalyImage = "${LoginServer}/anomaly:$ImageTag"
+azd env set MCP_ACR_NAME $Registry -e $WorkshopEnv
+azd env set MCP_NAME_PREFIX $McpPrefix -e $WorkshopEnv
+azd env set DEFENDER_MCP_IMAGE $DefenderImage -e $WorkshopEnv
+azd env set ANOMALY_MCP_IMAGE $AnomalyImage -e $WorkshopEnv
+$McpParameters = @("namePrefix=$McpPrefix", "acrName=$Registry", "defenderImage=$DefenderImage", "anomalyImage=$AnomalyImage")
+az deployment group what-if --subscription $SubscriptionId --resource-group $ResourceGroup `
+  --template-file infra/modules/mcp-container-apps.bicep --parameters @McpParameters
 ```
+
+Vérifiez que l'aperçu cible uniquement votre nouveau groupe. Déployez, puis
+récupérez les URL dans les sorties, sans copier celles du formateur.
+Le préfixe `mcp-learn` active une identité dédiée au téléchargement des
+images, avec le rôle `AcrPull` limité à votre registre.
+
+```powershell
+az deployment group create --subscription $SubscriptionId --resource-group $ResourceGroup `
+  --name workshop-mcp --template-file infra/modules/mcp-container-apps.bicep `
+  --parameters @McpParameters --output none
+$McpOutputs = az deployment group show --subscription $SubscriptionId --resource-group $ResourceGroup `
+  --name workshop-mcp --query properties.outputs -o json | ConvertFrom-Json
+$env:DEFENDER_MCP_URL = "https://$($McpOutputs.defenderContainerAppFqdn.value)/mcp"
+$env:ANOMALY_MCP_URL = "https://$($McpOutputs.anomalyContainerAppFqdn.value)/mcp"
+az containerapp list --subscription $SubscriptionId --resource-group $ResourceGroup `
+  --query '[].{name:name,state:properties.provisioningState,fqdn:properties.configuration.ingress.fqdn}' -o table
+```
+
+Les deux applications doivent afficher `Succeeded`. Un conteneur actif ne
+prouve pas que MCP fonctionne : effectuez le test ci-dessous. En cas
+d'échec, examinez l'erreur avant de réessayer. Ne remplacez pas votre
+registre ou vos URL par ceux d'un client existant.
 
 ### Exercice 2.3 : Appeler un vrai outil sur le réseau
 
 Le dépôt fournit un script de test ad hoc,
 [`scripts/test_mcp_servers.py`](https://github.com/devopsabcs-engineering/foundry-hosted-agents/blob/main/scripts/test_mcp_servers.py),
-qui se connecte en **HTTP en streaming** à chaque Container App et appelle
-un outil — indépendamment de l'agent hébergé Foundry.
+qui se connecte en **HTTP en streaming** et appelle les quatre outils,
+indépendamment de Foundry. Vos URL sont obligatoires. Un outil absent,
+une réponse vide, une erreur de protocole ou d'application, ou un délai
+de 90 secondes dépassé fait échouer le test.
 
 ```powershell
-pip install mcp
-python scripts/test_mcp_servers.py
+python scripts/test_mcp_servers.py --defender-url $env:DEFENDER_MCP_URL --anomaly-url $env:ANOMALY_MCP_URL
 ```
 
-Sortie attendue (les valeurs peuvent différer) :
-
-```text
-=== mcp-defender-server (https://mcp-defender-server...azurecontainerapps.io/mcp) ===
-tools: ['get_device_risk', 'list_vulnerabilities']
-call_tool(get_device_risk, {'device_id': 'device-001'}) -> [TextContent(... "riskScore": "High" ...)]
-
-=== mcp-anomaly-server (https://mcp-anomaly-server...azurecontainerapps.io/mcp) ===
-tools: ['score_anomaly', 'detect_login_anomalies']
-call_tool(score_anomaly, {'metric': 'failed_logins_per_hour', 'value': 12.0}) -> [TextContent(... "severity": "high" ...)]
-```
+Attendez quatre appels réussis et un code de sortie zéro. Le test des
+vulnérabilités utilise `device-001`, qui possède des vulnérabilités fictives
+connues. D'autres scénarios représentent volontairement une télémétrie
+absente et ne servent pas à vérifier la disponibilité.
 
 > [!NOTE]
-> Ce script prouve que les serveurs MCP fonctionnent correctement **par
-> eux-mêmes** — utile pour isoler un bogue : si ce script échoue, le
-> problème est dans la Container App ; s'il réussit mais que l'agent ne
-> peut toujours pas atteindre un outil, le problème est dans la couche de
-> connexion Foundry Toolbox, pas dans le serveur d'outils.
+> Ce test vérifie le chemin réseau depuis votre poste, pas l'identité ou
+> le réseau de l'agent. En cas d'échec, vérifiez les URL, la connectivité,
+> les journaux des conteneurs et les données fictives. S'il réussit mais que
+> l'agent échoue, examinez la Toolbox, les permissions, l'accès au modèle
+> et les journaux de l'agent.
 
 ### Exercice 2.4 : Pourquoi un déploiement indépendant ?
 
-`mcp/defender-server` et `mcp/anomaly-server` sont chacun leur propre
-service `azd` avec leur propre `Dockerfile`, déployés sur leur propre
-Container App. Cela signifie :
+`mcp/defender-server` et `mcp/anomaly-server` possèdent leur propre
+`Dockerfile` et Container App. Bicep les déploie ; ce ne sont pas des
+services distincts dans le fichier `azure.yaml` racine. Cela signifie :
 
 * Chaque serveur d'outils peut être mis à jour, mis à l'échelle ou annulé
   **sans redéployer l'agent**.
@@ -113,3 +166,5 @@ Container App. Cela signifie :
 ## Prochaine étape
 
 Passez au [Lab 03 : Provisionner et déployer l'agent hébergé](lab-03-deploy-agent.md).
+
+Si vous arrêtez ici ou si le déploiement échoue, terminez le [Lab 09 : Nettoyage](lab-09-teardown.md).

@@ -47,7 +47,7 @@ l'endurance ni le traçage distribué complet.
 ## À qui s'adresse cet atelier ?
 
 | Public | Ce que vous apprendrez |
-|---|---|
+| --- | --- |
 | **Ingénieurs IA / plateforme** | Déployer un système multi-agent LangGraph sur Foundry Hosted Agents de bout en bout |
 | **Ingénieurs DevOps** | Câbler des pipelines CI/CD contrôlés par des évaluations autour d'un déploiement d'agent |
 | **Architectes de solutions** | Comparer Foundry Hosted Agents aux options LangGraph/LangSmith auto-hébergées |
@@ -68,7 +68,7 @@ suivants :
 ## Labs
 
 | # | Lab | Durée | Niveau |
-|---|-----|----------|-------|
+| --- | ----- | ---------- | ------- |
 | 00 | [Prérequis et configuration de l'environnement](labs/lab-00-setup.md) | 20 min | Débutant |
 | 01 | [Plongée dans l'architecture](labs/lab-01-architecture.md) | 30 min | Débutant |
 | 02 | [Déployer les serveurs d'outils MCP](labs/lab-02-mcp-servers.md) | 30 min | Intermédiaire |
@@ -78,13 +78,14 @@ suivants :
 | 06 | [CI/CD : pipeline de mise en production contrôlé par évaluation](labs/lab-06-cicd.md) | 35 min | Avancé |
 | 07 | [Dépannage réel : erreur RBAC 401](labs/lab-07-troubleshooting-rbac.md) | 40 min | Avancé |
 | 08 | [Préparation à la production et portes de décision](labs/lab-08-production-readiness.md) | 30 min | Avancé |
+| 09 | [Nettoyage et arrêt des coûts](labs/lab-09-teardown.md) | 10-20 min | Débutant |
 
 ## Horaire de l'atelier
 
 ### Demi-journée (3 heures)
 
 | Heure | Activité |
-|------|----------|
+| ------ | ---------- |
 | 0:00 – 0:20 | Lab 00 : Prérequis |
 | 0:20 – 0:50 | Lab 01 : Plongée dans l'architecture |
 | 0:50 – 1:20 | Lab 02 : Déployer les serveurs d'outils MCP |
@@ -96,7 +97,7 @@ suivants :
 ### Journée complète (6 heures)
 
 | Heure | Activité |
-|------|----------|
+| ------ | ---------- |
 | 0:00 – 3:00 | Labs de la demi-journée (ci-dessus) |
 | 3:00 – 3:15 | Pause |
 | 3:15 – 3:40 | Lab 05 : Évaluations (suite) |
@@ -104,14 +105,18 @@ suivants :
 | 4:15 – 4:55 | Lab 07 : Dépannage réel : erreur RBAC 401 |
 | 4:55 – 5:10 | Pause |
 | 5:10 – 5:40 | Lab 08 : Préparation à la production et portes de décision |
-| 5:40 – 6:00 | Conclusion et questions |
+| 5:40 – 6:00 | Lab 09 : Nettoyage, vérification et questions |
 
 ## Niveaux de livraison
 
 | Niveau | Labs | Durée | Public |
-|---|---|---|---|
-| **Demi-journée** | Labs 00 – 05 (début) | ~3 heures | Première exposition à Foundry Hosted Agents |
-| **Journée complète** | Labs 00 – 08 | ~6 heures | Déploiement, évaluation, CI/CD et dépannage de bout en bout |
+| --- | --- | --- | --- |
+| **Demi-journée** | Labs 00 – 05 (début), puis 09 | ~3 heures + nettoyage | Première exposition à Foundry Hosted Agents |
+| **Journée complète** | Labs 00 – 09 | ~6 heures | Déploiement, évaluation, contrôles CI locaux, dépannage et nettoyage |
+
+Les durées sont indicatives, pas des garanties de provisionnement. Prévoyez du
+temps pour installer les outils, construire les images et résoudre les délais
+de quota ou de propagation des identités. Réservez le nettoyage même en cas d'échec.
 
 ## Pour commencer
 
@@ -119,10 +124,11 @@ suivants :
 2. Complétez le [Lab 00 : Prérequis](labs/lab-00-setup.md) pour configurer votre environnement.
 3. Progressez dans les labs dans l'ordre — chaque lab s'appuie sur le précédent.
 
-> **Astuce** : Les Labs 02–04 utilisent des ressources déjà déployées pour
-> cet atelier (serveurs MCP, projet Foundry). Si vous exécutez votre propre
-> environnement, le Lab 03 vous montre comment tout provisionner depuis
-> zéro avec `azd`.
+> [!IMPORTANT]
+> Les Labs 02-04 créent les ressources dans votre groupe apprenant jetable
+> approuvé. N'utilisez pas les points de terminaison clients historiques ni les
+> environnements GitHub partagés. Terminez le [Lab 09](labs/lab-09-teardown.md)
+> avant de partir, même si le déploiement a échoué.
 
 ## Deck de présentation
 
@@ -135,7 +141,7 @@ une animation par un formateur :
 ## Ressources connexes
 
 | Ressource | Description |
-|------------|-------------|
+| ------------ | ------------- |
 | [Dépôt `foundry-hosted-agents`](https://github.com/devopsabcs-engineering/foundry-hosted-agents) | Code source complet du PoC, infra, suite d'évaluation et pipelines CI/CD |
 | [Wiki du projet](https://github.com/devopsabcs-engineering/foundry-hosted-agents/wiki) | Notes d'architecture, contournement manuel de l'agent, journal d'investigation RBAC 401 |
 | [Livrables de décision](https://github.com/devopsabcs-engineering/foundry-hosted-agents/tree/main/deliverables) | Grille de décision de mise en production et deck de décision exécutif |

@@ -8,8 +8,8 @@ description: "Understand the LangGraph supervisor/specialist pattern, MCP tool i
 
 ## Overview
 
-| | |
-|---|---|
+| Item | Value |
+| --- | --- |
 | **Duration** | 30 minutes |
 | **Level** | Beginner |
 | **Prerequisites** | [Lab 00](lab-00-setup.md) |
@@ -46,7 +46,7 @@ the graph to proceed to reporting once both evidence and risk analysis are
 complete:
 
 | Node | Role | Tool access |
-|---|---|---|
+| --- | --- | --- |
 | Evidence Investigator | Gathers device/vulnerability context | `defender-conn` only |
 | Risk Analyst | Scores anomalies and login patterns | `anomaly-conn` only |
 | Report Composer | Synthesizes the final report | None — read-only synthesis |
@@ -77,8 +77,8 @@ layers. Read `azure.yaml` at the repository root and match each block to a
 layer:
 
 | Layer | What it does | `azure.yaml` block |
-|---|---|---|
-| 1. Implementation | The actual MCP server code (Defender tools, anomaly tools) | `mcp/defender-server/`, `mcp/anomaly-server/` (not in `azure.yaml` — separate `azd` services, see Lab 02) |
+| --- | --- | --- |
+| 1. Implementation | The actual MCP server code (Defender tools, anomaly tools) | `mcp/defender-server/`, `mcp/anomaly-server/` (source folders, not `azd` services; see Lab 02) |
 | 2. Hosting | Independent Azure runtime with its own auth, networking, health checks | Deployed as Azure Container Apps |
 | 3. Registration | Defines endpoint + credential policy per MCP server | `anomaly-conn` / `defender-conn` (`host: azure.ai.connection`) |
 | 4. Consumption | Aggregates registered tools for reuse across agents | `security-tools` (`host: azure.ai.toolbox`) |
@@ -90,19 +90,20 @@ layer:
 
 ### Exercise 1.4: Match Resources to the Portal
 
-Open the Azure Portal resource group for this workshop and find the
-resources below. Compare against the screenshot.
+Preview this mapping now, then return after Labs 02 and 03 create your resources.
+Use your own resource group in the portal. Screenshots are historical: Cosmos DB
+belongs to a separate experiment and is not created by the base workshop.
 
 ![Azure resource group overview showing the Foundry account, Container Apps, Cosmos DB, and Container Registry](../assets/images/01-azure-resource-group-overview.png)
 
 ![Full resource list for the resource group](../assets/images/02-azure-resource-group-resources-list.png)
 
 | Resource | Type | `azure.yaml` service |
-|---|---|---|
+| --- | --- | --- |
 | `aif-*` | Cognitive Services account (kind `AIServices`) | `ai-project` |
 | `aif-*/proj-*` | Foundry project (nested resource) | (implicit — the project the agent deploys into) |
-| `mcp-defender-server` | Container App | `mcp/defender-server` |
-| `mcp-anomaly-server` | Container App | `mcp/anomaly-server` |
+| `mcp-learn-defender-server` | Container App | Bicep module `mcp-container-apps.bicep`, not an azd service |
+| `mcp-learn-anomaly-server` | Container App | Bicep module `mcp-container-apps.bicep`, not an azd service |
 | `acr*` | Container Registry | (backs the Container Apps' images) |
 
 ## Knowledge Check

@@ -8,8 +8,8 @@ description: "Run the deterministic evaluation suite, then walk the built-in and
 
 ## Overview
 
-| | |
-|---|---|
+| Item | Value |
+| --- | --- |
 | **Duration** | 40 minutes |
 | **Level** | Intermediate |
 | **Prerequisites** | [Lab 04](lab-04-invoke-agent.md) |
@@ -31,7 +31,7 @@ Open [`eval/golden-dataset.jsonl`](https://github.com/devopsabcs-engineering/fou
 Each line is one human-reviewed test case across eight categories:
 
 | Category | Example case | What it tests |
-|---|---|---|
+| --- | --- | --- |
 | `true_positive` | Credential-stuffing pattern | Correctly escalates a real threat |
 | `false_positive` | Approved business travel login | Doesn't cry wolf on benign activity |
 | `ambiguous_evidence` | Single failed login, no baseline | Doesn't over-commit to a label |
@@ -49,10 +49,10 @@ be a fabrication, not just an overreach.
 ### Exercise 5.2: Run the Deterministic Checks
 
 ```powershell
-pytest eval/deterministic-tests/ -v
+python -m pytest eval/deterministic-tests/ -v
 ```
 
-Expected: **12 passed**. Open `eval/deterministic-tests/checks.py` and find
+Expected: exit code zero and no failures; test counts evolve. Open `eval/deterministic-tests/checks.py` and find
 the check that would fail `unauth-001` if the final report ever included
 the phrase `"I have blocked"` — this is a plain string/schema check, not an
 LLM call, which is why it's fast and deterministic.
@@ -64,7 +64,7 @@ The strategy is: **use Foundry's built-in evaluators first, write a custom
 rubric only for what the catalog doesn't cover**.
 
 | Gating criterion | Mechanism |
-|---|---|
+| --- | --- |
 | Output-schema validity | Deterministic |
 | Required evidence citation (presence) | Deterministic |
 | Allowed tool calls / policy constraints | Deterministic |
@@ -89,7 +89,31 @@ The [release evidence](https://github.com/devopsabcs-engineering/foundry-hosted-
 preserves exact run IDs and source hashes. All eight cases use synthetic data;
 perfect scores on this small suite are not a security-efficacy benchmark.
 
-### Exercise 5.4: Why Not "Just Use an LLM Judge for Everything"?
+### Exercise 5.4: Evaluate Your Deployed Version
+
+Run from the same PowerShell session and activated Python environment as Lab 04.
+These calls incur model usage in your own project. Keep the original eight-case
+dataset; do not weaken expectations to obtain a pass.
+
+```powershell
+$ProjectEndpoint = azd env get-value FOUNDRY_PROJECT_ENDPOINT
+python eval/convert_for_ai_agent_evals.py eval/golden-dataset.jsonl .azure/workshop-dataset.json
+python eval/run_hosted_evaluation.py --endpoint $ProjectEndpoint --agent $env:AGENT_NAME --version $env:AGENT_VERSION --deployment gpt-4o-mini --dataset .azure/workshop-dataset.json --output-dir .azure/workshop-evaluation --project-dir .
+```
+
+The runner rejects a mismatch between the selected azd project and endpoint.
+Expect eight completed captures, zero deterministic policy failures, and passing
+coherence, groundedness and task-adherence checks on seven reports. The injection
+case is handled by the verified safety-refusal policy. Historical 21/21 scores
+are not your result: inspect `summary.md`, `candidate-policy.json` and the runtime
+receipts in `captured.json` under `.azure/workshop-evaluation/`.
+
+If a call fails, inspect its `.stderr` and `.sse` artifacts first. A 429 can mean
+the small learner model capacity is busy; stop concurrent invocations and retry
+later. Do not request a quota increase or relax the pass threshold as a shortcut.
+Keep failed-run artifacts in a different output directory before retrying.
+
+### Exercise 5.5: Why Not "Just Use an LLM Judge for Everything"?
 
 Discuss with your table: what would happen if `unauthorized_actions` were
 graded only by an LLM judge instead of a deterministic string check? An

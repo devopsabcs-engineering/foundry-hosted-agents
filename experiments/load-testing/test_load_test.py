@@ -118,7 +118,8 @@ def test_completed_text_is_successful():
 def test_cli_failure_writes_evidence_and_exits_nonzero(monkeypatch, tmp_path):
     output = tmp_path / "load.json"
     monkeypatch.setattr(
-        "sys.argv", ["load_test.py", "concurrent-sessions", "--count", "1", "--out", str(output)]
+        "sys.argv", ["load_test.py", "concurrent-sessions", "--count", "1", "--out", str(output),
+                     "--endpoint", "https://test.services.ai.azure.com/responses"]
     )
     monkeypatch.setattr(probe, "_get_bearer_token", lambda: "unused")
 
@@ -136,7 +137,22 @@ def test_cli_failure_writes_evidence_and_exits_nonzero(monkeypatch, tmp_path):
 
 @pytest.mark.parametrize("count", ["0", "-1", "21"])
 def test_cli_bounds_count_before_authentication(monkeypatch, count):
-    monkeypatch.setattr("sys.argv", ["load_test.py", "concurrent-sessions", "--count", count])
+    monkeypatch.setattr("sys.argv", ["load_test.py", "concurrent-sessions", "--count", count,
+                                     "--endpoint", "https://test.services.ai.azure.com/responses"])
+    with pytest.raises(SystemExit) as failure:
+        probe.main()
+    assert failure.value.code == 2
+
+
+@pytest.mark.parametrize("arguments", [
+    [],
+    ["--endpoint", "http://test.services.ai.azure.com/responses"],
+    ["--endpoint", "https://other.example/responses"],
+    ["--endpoint", "https://user@test.services.ai.azure.com/responses"],
+])
+def test_cli_requires_safe_explicit_endpoint(monkeypatch, arguments):
+    monkeypatch.setattr("sys.argv", ["load_test.py", "concurrent-sessions", *arguments])
+    monkeypatch.setattr(probe, "_get_bearer_token", lambda: pytest.fail("Must validate before authentication"))
     with pytest.raises(SystemExit) as failure:
         probe.main()
     assert failure.value.code == 2

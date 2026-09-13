@@ -8,8 +8,8 @@ description: "Investigate a hosted-agent 401 PermissionDenied error and verify r
 
 ## Overview
 
-| | |
-|---|---|
+| Item | Value |
+| --- | --- |
 | **Duration** | 40 minutes |
 | **Level** | Advanced |
 | **Prerequisites** | [Lab 06](lab-06-cicd.md) |
@@ -21,7 +21,7 @@ By the end of this lab, you will be able to:
 * Reproduce the exact `az` commands used to rule RBAC configuration in or out as a root cause
 * Read a built-in role definition's `dataActions` directly instead of trusting a support script's assumption
 * Check whether Azure Policy could be silently overriding a resource property you're reading
-* Enumerate tenant Conditional Access policies to rule out identity-layer blocks
+* Recognize when tenant-level investigation needs an authorized administrator
 * Explain why "the portal shows the role assigned" is not sufficient proof by itself
 
 ## The Symptom
@@ -47,15 +47,25 @@ not established. Follow the diagnostic steps below before retrying.
 
 ## Exercises
 
+Run only against your own Lab 02 environment. Do not deliberately revoke roles,
+disable networking, or recreate the historical customer failure. The following
+diagnostics are read-only; record your observed results separately from WI-11.
+
 ### Exercise 7.1: Don't Trust the Error Message's Own Diagnosis — Verify It
 
 The error names a specific missing data action. Verify the assignment
 directly instead of assuming the message is accurate:
 
 ```powershell
-az role assignment list --assignee <service-principal-id> `
-  --scope /subscriptions/<sub-id>/resourceGroups/<rg>/providers/Microsoft.CognitiveServices/accounts/<account-name> `
-  -o table
+azd env select $WorkshopEnv
+if ((azd env get-value AZURE_RESOURCE_GROUP) -ne $ResourceGroup) { throw 'Wrong resource group' }
+$ProjectId = azd env get-value AZURE_AI_PROJECT_ID
+$AccountScope = $ProjectId -replace '/projects/[^/]+$', ''
+$AccountName = ($AccountScope -split '/')[-1]
+$AgentState = azd ai agent show threat-assessment-agent --output json | ConvertFrom-Json
+$PrincipalId = $AgentState.instance_identity.principal_id
+if (-not $PrincipalId) { throw 'No runtime principal returned' }
+az role assignment list --subscription $SubscriptionId --scope $AccountScope --query "[?principalId=='$PrincipalId'].{role:roleDefinitionName,scope:scope}" -o table
 ```
 
 In this investigation, this came back showing **both** `Foundry User` and
@@ -69,7 +79,7 @@ data action named in the error. Rather than take that on faith, read the
 role definition's `dataActions` directly:
 
 ```powershell
-az role definition list --name "Cognitive Services OpenAI User" -o json
+az role definition list --subscription $SubscriptionId --name "Cognitive Services OpenAI User" --query '[0].permissions[].dataActions' -o json
 ```
 
 > [!TIP]
@@ -85,7 +95,7 @@ support hypothesis with the role definition's own source of truth.
 ### Exercise 7.3: Rule Out Resource-Level and Network Blocks
 
 ```powershell
-az cognitiveservices account show --name <account-name> --resource-group <rg> `
+az cognitiveservices account show --subscription $SubscriptionId --name $AccountName --resource-group $ResourceGroup `
   --query "{disableLocalAuth:properties.disableLocalAuth, publicNetworkAccess:properties.publicNetworkAccess, networkAcls:properties.networkAcls, privateEndpointConnections:properties.privateEndpointConnections}" -o json
 ```
 
@@ -94,8 +104,9 @@ Two things to reason through, not just read:
 * `disableLocalAuth: true` blocks **API-key** auth only — it does not
   affect the managed-identity/AAD token auth this agent actually uses.
   Don't let a `true` value here become a false lead.
-* `networkAcls: null` and an empty `privateEndpointConnections` array mean
-  there's no network-layer restriction blocking the call either.
+* `networkAcls: null` and an empty `privateEndpointConnections` array do not
+  prove end-to-end connectivity. Check `publicNetworkAccess`, DNS, client egress
+  and the failing request's details before ruling out a network restriction.
 
 ### Exercise 7.4: Check Whether a Policy Is Silently Overriding What You Just Read
 
@@ -105,7 +116,7 @@ you haven't spotted yet. Verify what's actually been evaluated against
 this specific resource:
 
 ```powershell
-az policy state list --resource "/subscriptions/<sub-id>/resourceGroups/<rg>/providers/Microsoft.CognitiveServices/accounts/<account-name>" `
+az policy state list --subscription $SubscriptionId --resource $AccountScope `
   --query "[].{policy:policyDefinitionName, assignment:policyAssignmentName, complianceState:complianceState}" -o json
 ```
 
@@ -114,7 +125,7 @@ force-disable public network access, check its `policyRule`'s `if` clause
 for the exact resource **type and kind** it targets:
 
 ```powershell
-az policy definition show --name <policy-definition-name> --management-group <mg-id> --query "policyRule" -o json
+az policy definition show --name '<policy-definition-name>' --management-group '<mg-id>' --query "policyRule" -o json
 ```
 
 In this investigation, a tenant-wide policy *did* exist that force-disables
@@ -126,6 +137,11 @@ Services `AIServices` account + nested `.../accounts/projects` model), so
 that policy could not be the cause.
 
 ### Exercise 7.5: Check Tenant-Level Conditional Access
+
+Optional administrator-led investigation only. Do not request tenant-wide read
+permissions to complete this workshop. A permission denial means this layer is
+unverified, not that no policy exists. The following command is historical
+reference for an authorized tenant administrator, not a required learner step.
 
 ```powershell
 az rest --method get --url "https://graph.microsoft.com/v1.0/identity/conditionalAccess/policies" -o json
@@ -147,11 +163,10 @@ agent in the Foundry portal — using the same identity and model deployment
 ![Manual agent chat succeeded where the hosted agent's own invoke path 401'd](../assets/images/manual-agent-chat-success.png)
 ![Manual agent's MCP tool calls succeeded too](../assets/images/manual-agent-mcp-tools-success.png)
 
-This is a powerful diagnostic signal on its own: if RBAC were genuinely
-wrong, **both** paths should fail identically. A working manual path next
-to a failing hosted-agent path points at something specific to the hosted
-agent's own token-acquisition code path — not the customer-visible RBAC
-configuration.
+This comparison narrows the investigation but does not eliminate RBAC or prove
+a token-cache cause. Establish that both requests really use the same principal,
+token audience, scope, model deployment and authorization conditions. Different
+sessions and token lifetimes can produce different outcomes.
 
 ### Exercise 7.7: Redeploy and Verify a Fresh Runtime
 
@@ -160,14 +175,22 @@ investigation, passing `--environment` to `azd ai agent show` still selected
 the stale environment; `azd env select` corrected the target.
 
 ```powershell
-azd env select air-canada-threat-assessment-poc
+azd env select $WorkshopEnv
+if ((azd env get-value AZURE_RESOURCE_GROUP) -ne $ResourceGroup) { throw 'Wrong resource group' }
 azd deploy threat-assessment-agent --no-prompt
-azd ai agent show threat-assessment-agent --output json
-azd ai agent invoke threat-assessment-agent 'Assess a simulated suspicious sign-in for user test-user@example.invalid. State clearly when live evidence is unavailable.' --version 32 --new-session --new-conversation
-azd ai agent monitor threat-assessment-agent --tail 40
+bash scripts/configure-agent-rbac.sh threat-assessment-agent
+$env:AGENT_VERSION = bash scripts/record-production-version.sh $env:AGENT_NAME .azure/workshop-retry
+bash scripts/invoke-agent.sh > .azure/workshop-retry.sse
+jq -Rse -f scripts/validate-agent-response.jq .azure/workshop-retry.sse
+azd ai agent sessions list --agent-name threat-assessment-agent --output table
 ```
 
-Replace `32` with the version returned by your deployment. Compare the
+Run this redeployment only when diagnosing an actual failure, not as a mandatory
+fix for a healthy agent. The helper creates a new version-pinned session and
+does not add native conversation identifiers. For session logs, select its ID
+from the list and run `azd ai agent monitor threat-assessment-agent --session-id <session-id> --tail 40`.
+Do not print the full agent definition: it can include telemetry connection data.
+Compare the
 instance principal, model endpoint, and actual response with the failing
 run. An active deployment or HTTP 200 alone does not prove success because
 streaming responses can contain application errors.

@@ -9,7 +9,7 @@ ms.date: 2026-09-10
 
 ## Overview
 
-| | |
+| Item | Value |
 | --- | --- |
 | **Duration** | 45 minutes |
 | **Level** | Intermediate |
@@ -28,18 +28,19 @@ By the end of this lab, you will be able to:
 
 ### Exercise 4.1: Invoke from the CLI
 
-From the repository root in Bash (Git Bash on Windows), use the staging azd
-environment configured in Lab 03. The helper requires Azure CLI authentication,
-`azd`, `jq`, and `curl`. Verify the selected project before invoking:
+From the repository root in the PowerShell session from Lab 02, use your own
+environment. The helper requires the Git Bash setup from Lab 00 and the runtime
+roles from Lab 03. Verify the selected project before invoking:
 
-```bash
-azd env select air-canada-threat-assessment-staging
+```powershell
+azd env select $WorkshopEnv
+if ((azd env get-value AZURE_RESOURCE_GROUP) -ne $ResourceGroup) { throw 'Wrong resource group' }
 azd env get-value FOUNDRY_PROJECT_ENDPOINT
-export AGENT_NAME=threat-assessment-agent
-export AGENT_VERSION=$(bash scripts/record-production-version.sh "$AGENT_NAME" /tmp/demo-agent)
-export AGENT_TEST_PROMPT='Assess synthetic device ID CREW-PORTAL-01 and account/user ID crew-admin. Investigate repeated MFA failures followed by a successful login from 203.0.113.45.'
-bash scripts/invoke-agent.sh > /tmp/demo-response.sse
-jq -Rse -f scripts/validate-agent-response.jq /tmp/demo-response.sse
+$env:AGENT_NAME = 'threat-assessment-agent'
+$env:AGENT_VERSION = bash scripts/record-production-version.sh $env:AGENT_NAME .azure/workshop-agent
+$env:AGENT_TEST_PROMPT = 'Assess synthetic device ID CREW-PORTAL-01 and account/user ID crew-admin. Investigate repeated MFA failures followed by a successful login from 203.0.113.45.'
+bash scripts/invoke-agent.sh > .azure/workshop-smoke.sse
+jq -Rse -f scripts/validate-agent-response.jq .azure/workshop-smoke.sse
 ```
 
 The helper creates a version-pinned agent session and sends `input` with
@@ -47,12 +48,16 @@ The helper creates a version-pinned agent session and sends `input` with
 `previous_response_id`. The contract requires completed assistant text, not
 merely HTTP 200. An HTTP 200 stream can still contain a failed SSE event.
 
-### Exercise 4.2: Demo Three Reviewed Scenarios in Web Chat
+### Exercise 4.2: Review Three Scenarios
 
-Open the [staging web pilot](https://foundry-threat-chat-staging.wonderfulpebble-ce861678.eastus2.azurecontainerapps.io)
-and sign in with an assigned pilot-group account. Anonymous access to the API
-must return 401. Public HTTPS ingress does not mean anonymous API access or
-private networking. The sample controls require the refreshed web build.
+The base workshop does not deploy a web app. Run these three cases through your
+own agent using the dataset runner in Lab 05. Do not open an instructor's or
+customer's shared staging pilot to complete this exercise.
+
+If your administrator separately provisions an authenticated web chat connected
+to **your** project, you can also use the optional UI walkthrough below.
+Anonymous API access must return 401. Public HTTPS ingress does not mean
+anonymous API access or private networking.
 
 Choose **New assessment** before each independent scenario. Under
 **Synthetic demo queries**, select a sample, inspect or edit the populated
@@ -134,6 +139,10 @@ This is the `evidence_tool_unavailable` flag from
 
 ### Exercise 4.5: Recall, Isolation, and Replay Boundaries
 
+The interactive steps below require the optional web chat. Without it, use the
+live full-history checker and backend contract tests in the next section; a
+single call to `invoke-agent.sh` starts a new session and cannot demonstrate recall.
+
 1. In the crew-admin assessment, send `Keep investigation reference DEMO-73921 with this assessment.`
 2. Ask `What investigation reference did I provide earlier?` without repeating
    the value. Expect the exact reference, identified as user-supplied rather
@@ -151,6 +160,23 @@ Sessions remain in memory with a one-hour TTL and a 20-turn limit. Browser
 reload loses the local list; backend restart loses session state. There is no
 durable history, resumable Cosmos checkpointing, or durable exactly-once
 execution guarantee in this pilot. Teams remains future work.
+
+### Exercise 4.6: Test History Without a Web Deployment
+
+Run the same three live history assertions directly against your routed endpoint.
+The explicit account argument only accepts a matching `aif-fha-learn-*` hostname.
+
+```powershell
+$ProjectEndpoint = azd env get-value FOUNDRY_PROJECT_ENDPOINT
+$WorkshopAccount = ([uri]$ProjectEndpoint).Host.Split('.')[0]
+$ResponsesEndpoint = "$ProjectEndpoint/agents/$env:AGENT_NAME/endpoint/protocols/openai/responses?api-version=v1"
+python eval/check_conversation.py --endpoint $ResponsesEndpoint --workshop-account $WorkshopAccount --output-dir .azure/workshop-conversation
+```
+
+Expect `3/3 passed`. This proves caller-supplied history behavior on the active
+route, not native storage or browser authentication. Inspect the saved streams.
+The optional web app has separate owner-isolation and replay tests; its security
+properties are not implied by the live CLI check.
 
 ## Knowledge Check
 

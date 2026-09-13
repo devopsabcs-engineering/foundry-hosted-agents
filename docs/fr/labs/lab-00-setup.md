@@ -9,8 +9,8 @@ description: "Installer les outils requis, cloner le dépôt, créer un environn
 
 ## Aperçu
 
-| | |
-|---|---|
+| Élément | Valeur |
+| --- | --- |
 | **Durée** | 20 minutes |
 | **Niveau** | Débutant |
 | **Prérequis** | Aucun |
@@ -21,7 +21,7 @@ description: "Installer les outils requis, cloner le dépôt, créer un environn
 
 * Installer les outils nécessaires pour provisionner et invoquer un agent hébergé Foundry
 * Cloner le dépôt `foundry-hosted-agents` et configurer un environnement virtuel Python
-* Vous connecter à Azure et confirmer que vous voyez le projet Foundry utilisé dans cet atelier
+* Vous connecter à Azure et choisir un abonnement approuvé pour vos ressources d'atelier isolées
 * Exécuter les suites de tests du dépôt comme vérification de bon fonctionnement
 
 ## Exercices
@@ -48,6 +48,29 @@ description: "Installer les outils requis, cloner le dépôt, créer un environn
 
 4. **Visual Studio Code** — <https://code.visualstudio.com/>
 
+Les commandes utilisent **PowerShell 7.3 ou plus récent**. Les scripts d'appel,
+de RBAC et d'évaluation nécessitent aussi **Git Bash, jq et curl**. Sous Windows,
+installez Git for Windows et jq par le canal logiciel approuvé (par exemple
+`winget install --id Git.Git --exact` et `winget install --id jqlang.jq --exact`).
+Redémarrez le terminal après l'installation. Ne modifiez pas les politiques
+d'exécution ou de réseau de votre organisation pour installer une dépendance.
+
+À chaque nouvelle session PowerShell, activez Python comme indiqué ci-dessous
+et vérifiez les outils. Le `System32/bash.exe` de Windows lance WSL, pas Git Bash.
+Adaptez le chemin de Git si votre organisation l'installe ailleurs.
+
+```powershell
+$env:PATH = "C:\Program Files\Git\bin;$env:LOCALAPPDATA\Microsoft\WinGet\Links;$env:PATH"
+$env:MSYS_NO_PATHCONV = '1'
+Get-Command git, bash, jq, curl.exe, az, azd
+bash -lc 'command -v az azd jq curl && jq --version'
+```
+
+`MSYS_NO_PATHCONV` empêche Git Bash de transformer les ID de ressources Azure en
+chemins Windows. Gardez la même session pour les Labs 02-08 ; ses variables
+identifient vos ressources jetables. Si vous perdez la session, récupérez les
+valeurs de votre environnement, jamais les noms des captures historiques.
+
 ### Exercice 0.2 : Installer l'extension `azd` Foundry
 
 Les agents hébergés Foundry sont provisionnés via une extension `azd` :
@@ -63,7 +86,7 @@ git clone https://github.com/devopsabcs-engineering/foundry-hosted-agents.git
 cd foundry-hosted-agents
 python -m venv .venv
 ./.venv/Scripts/Activate.ps1
-pip install -r src/threat-assessment-agent/requirements.txt -r src/threat-assessment-agent/requirements-dev.txt
+python -m pip install -r src/threat-assessment-agent/requirements.txt -r src/threat-assessment-agent/requirements-dev.txt
 ```
 
 ### Exercice 0.4 : Se connecter à Azure
@@ -73,11 +96,14 @@ azd auth login
 az login
 ```
 
-Confirmez que vous êtes bien sur l'abonnement qui héberge les ressources de
-cet atelier :
+Utilisez un abonnement où vous êtes autorisé à créer des ressources facturables et à attribuer
+des rôles limités aux ressources. Ne réutilisez pas le groupe de ressources du formateur ou
+d'un client existant. Connectez-vous avec votre propre identité approuvée ; les scénarios
+utilisent des données synthétiques, pas des données d'employés ou de clients.
+Confirmez l'abonnement et le locataire avant de continuer :
 
 ```powershell
-az account show --query "{name:name, id:id}" -o table
+az account show --query "{name:name, id:id, tenantId:tenantId}" -o table
 ```
 
 ### Exercice 0.5 : Exécuter les suites de tests existantes
@@ -87,14 +113,14 @@ passent dans votre environnement — c'est exactement la même commande que
 le pipeline CI exécute.
 
 ```powershell
-pytest eval/deterministic-tests/ -v
-pytest src/threat-assessment-agent/tests/ -v
+python -m pytest eval/deterministic-tests/ -v
+python -m pytest src/threat-assessment-agent/tests/ -v
 ```
 
-Résultat attendu : **12 passed** pour les vérifications d'évaluation
-déterministes et **18 passed** pour les tests unitaires de l'agent. Si
-l'une des suites échoue, revérifiez l'exercice 0.3 (installation des
-dépendances) avant de continuer.
+Résultat attendu : les deux commandes se terminent sans test échoué. Le nombre de tests
+évolue avec l'atelier ; ne le comparez pas à une ancienne capture ou à un rapport de publication.
+Certains tests facultatifs sont ignorés par défaut. Utilisez `python -m pytest -rs` avec les
+mêmes chemins pour voir pourquoi. Si une suite échoue, revérifiez l'exercice 0.3 avant de continuer.
 
 > [!TIP]
 > Ces deux suites de tests ne touchent pas du tout à Azure — elles

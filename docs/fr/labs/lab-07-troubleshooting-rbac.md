@@ -9,8 +9,8 @@ description: "Diagnostiquer une erreur 401 PermissionDenied d'un agent hébergé
 
 ## Aperçu
 
-| | |
-|---|---|
+| Élément | Valeur |
+| --- | --- |
 | **Durée** | 40 minutes |
 | **Niveau** | Avancé |
 | **Prérequis** | [Lab 06](lab-06-cicd.md) |
@@ -22,7 +22,7 @@ description: "Diagnostiquer une erreur 401 PermissionDenied d'un agent hébergé
 * Reproduire les commandes `az` exactes utilisées pour confirmer ou infirmer une configuration RBAC comme cause racine
 * Lire directement les `dataActions` d'une définition de rôle intégrée au lieu de faire confiance à l'hypothèse d'un script de support
 * Vérifier si une politique Azure pourrait silencieusement remplacer une propriété de ressource que vous lisez
-* Énumérer les politiques d'accès conditionnel du tenant pour écarter les blocages au niveau de l'identité
+* Reconnaître quand une investigation du tenant nécessite un administrateur autorisé
 * Expliquer pourquoi « le portail montre le rôle attribué » ne suffit pas comme preuve à lui seul
 
 ## Le symptôme
@@ -50,6 +50,11 @@ sont pas établies. Suivez les diagnostics ci-dessous avant de réessayer.
 
 ## Exercices
 
+Utilisez uniquement votre environnement du Lab 02. Ne révoquez pas de rôles,
+ne désactivez pas le réseau et ne recréez pas la panne historique du client.
+Les diagnostics suivants sont en lecture seule ; consignez vos observations
+séparément de WI-11.
+
 ### Exercice 7.1 : Ne faites pas confiance au diagnostic du message d'erreur lui-même — vérifiez-le
 
 Le message d'erreur nomme une action de données spécifique manquante.
@@ -57,9 +62,15 @@ Vérifiez l'attribution directement plutôt que de supposer que le message
 est exact :
 
 ```powershell
-az role assignment list --assignee <id-du-principal-de-service> `
-  --scope /subscriptions/<id-abonnement>/resourceGroups/<rg>/providers/Microsoft.CognitiveServices/accounts/<nom-du-compte> `
-  -o table
+azd env select $WorkshopEnv
+if ((azd env get-value AZURE_RESOURCE_GROUP) -ne $ResourceGroup) { throw 'Wrong resource group' }
+$ProjectId = azd env get-value AZURE_AI_PROJECT_ID
+$AccountScope = $ProjectId -replace '/projects/[^/]+$', ''
+$AccountName = ($AccountScope -split '/')[-1]
+$AgentState = azd ai agent show threat-assessment-agent --output json | ConvertFrom-Json
+$PrincipalId = $AgentState.instance_identity.principal_id
+if (-not $PrincipalId) { throw 'No runtime principal returned' }
+az role assignment list --subscription $SubscriptionId --scope $AccountScope --query "[?principalId=='$PrincipalId'].{role:roleDefinitionName,scope:scope}" -o table
 ```
 
 Dans cette investigation, cette commande a montré que **les deux** rôles,
@@ -75,7 +86,7 @@ de croire cela sur parole, lisez directement les `dataActions` de la
 définition du rôle :
 
 ```powershell
-az role definition list --name "Cognitive Services OpenAI User" -o json
+az role definition list --subscription $SubscriptionId --name "Cognitive Services OpenAI User" --query '[0].permissions[].dataActions' -o json
 ```
 
 > [!TIP]
@@ -92,7 +103,7 @@ définition de rôle elle-même.
 ### Exercice 7.3 : Écarter les blocages au niveau de la ressource et du réseau
 
 ```powershell
-az cognitiveservices account show --name <nom-du-compte> --resource-group <rg> `
+az cognitiveservices account show --subscription $SubscriptionId --name $AccountName --resource-group $ResourceGroup `
   --query "{disableLocalAuth:properties.disableLocalAuth, publicNetworkAccess:properties.publicNetworkAccess, networkAcls:properties.networkAcls, privateEndpointConnections:properties.privateEndpointConnections}" -o json
 ```
 
@@ -102,9 +113,9 @@ Deux points à raisonner, pas seulement à lire :
   API** — cela n'affecte pas l'authentification par identité
   managée/jeton AAD que cet agent utilise réellement. Ne laissez pas une
   valeur `true` ici devenir une fausse piste.
-* `networkAcls: null` et un tableau `privateEndpointConnections` vide
-  signifient qu'il n'y a pas non plus de restriction réseau bloquant
-  l'appel.
+* `networkAcls: null` et un tableau `privateEndpointConnections` vide ne prouvent
+  pas la connectivité de bout en bout. Vérifiez `publicNetworkAccess`, DNS, les
+  sorties réseau du client et les détails de l'appel avant d'écarter le réseau.
 
 ### Exercice 7.4 : Vérifier si une politique remplace silencieusement ce que vous venez de lire
 
@@ -114,7 +125,7 @@ effet `Modify`** que vous n'avez pas encore repérée. Vérifiez ce qui a
 réellement été évalué contre cette ressource spécifique :
 
 ```powershell
-az policy state list --resource "/subscriptions/<id-abonnement>/resourceGroups/<rg>/providers/Microsoft.CognitiveServices/accounts/<nom-du-compte>" `
+az policy state list --subscription $SubscriptionId --resource $AccountScope `
   --query "[].{policy:policyDefinitionName, assignment:policyAssignmentName, complianceState:complianceState}" -o json
 ```
 
@@ -124,7 +135,7 @@ vérifiez la clause `if` de son `policyRule` pour le **type et le kind**
 exacts de ressource qu'elle cible :
 
 ```powershell
-az policy definition show --name <nom-de-la-definition-de-politique> --management-group <id-mg> --query "policyRule" -o json
+az policy definition show --name '<policy-definition-name>' --management-group '<mg-id>' --query "policyRule" -o json
 ```
 
 Dans cette investigation, une politique à l'échelle du tenant existait
@@ -138,6 +149,11 @@ utilise le modèle plus récent de compte Cognitive Services `AIServices` +
 être la cause.
 
 ### Exercice 7.5 : Vérifier l'accès conditionnel au niveau du tenant
+
+Investigation facultative menée par un administrateur autorisé. Ne demandez pas
+de droits de lecture à l'échelle du tenant pour cet atelier. Un refus signifie
+que cette couche reste non vérifiée, pas qu'aucune politique n'existe. La commande
+ci-dessous est une référence historique pour l'administrateur, pas une étape requise.
 
 ```powershell
 az rest --method get --url "https://graph.microsoft.com/v1.0/identity/conditionalAccess/policies" -o json
@@ -161,11 +177,11 @@ même identité et le même déploiement de modèle — a réussi.
 ![Le chat de l'agent manuel a réussi là où le propre chemin d'invocation de l'agent hébergé échouait avec 401](../../assets/images/manual-agent-chat-success.png)
 ![Les appels d'outils MCP de l'agent manuel ont également réussi](../../assets/images/manual-agent-mcp-tools-success.png)
 
-C'est en soi un signal de diagnostic puissant : si le RBAC était réellement
-incorrect, **les deux** chemins devraient échouer de manière identique. Un
-chemin manuel fonctionnel à côté d'un chemin d'agent hébergé défaillant
-pointe vers quelque chose de spécifique au propre code d'acquisition de
-jeton de l'agent hébergé — pas la configuration RBAC visible côté client.
+Cette comparaison réduit les hypothèses, mais n'élimine pas le RBAC et ne prouve
+pas une cause liée au cache de jetons. Vérifiez que les deux appels utilisent
+réellement le même principal, la même audience, la même portée, le même modèle
+et les mêmes conditions d'autorisation. Les sessions et durées de vie des jetons
+peuvent produire des résultats différents.
 
 ### Exercice 7.7 : Redéployer et vérifier une nouvelle instance d'exécution
 
@@ -175,14 +191,22 @@ sélectionnait encore l'ancien environnement ; `azd env select` a corrigé
 la cible.
 
 ```powershell
-azd env select air-canada-threat-assessment-poc
+azd env select $WorkshopEnv
+if ((azd env get-value AZURE_RESOURCE_GROUP) -ne $ResourceGroup) { throw 'Wrong resource group' }
 azd deploy threat-assessment-agent --no-prompt
-azd ai agent show threat-assessment-agent --output json
-azd ai agent invoke threat-assessment-agent 'Assess a simulated suspicious sign-in for user test-user@example.invalid. State clearly when live evidence is unavailable.' --version 32 --new-session --new-conversation
-azd ai agent monitor threat-assessment-agent --tail 40
+bash scripts/configure-agent-rbac.sh threat-assessment-agent
+$env:AGENT_VERSION = bash scripts/record-production-version.sh $env:AGENT_NAME .azure/workshop-retry
+bash scripts/invoke-agent.sh > .azure/workshop-retry.sse
+jq -Rse -f scripts/validate-agent-response.jq .azure/workshop-retry.sse
+azd ai agent sessions list --agent-name threat-assessment-agent --output table
 ```
 
-Remplacez `32` par la version retournée par votre déploiement. Comparez le
+Ne redéployez que pour diagnostiquer un échec réel, pas pour corriger un agent sain.
+Le script crée une nouvelle session liée à une version, sans identifiant natif de
+conversation. Pour les journaux, choisissez son ID dans la liste et exécutez
+`azd ai agent monitor threat-assessment-agent --session-id <session-id> --tail 40`.
+N'affichez pas la définition complète de l'agent : elle peut contenir des données
+de connexion de télémétrie. Comparez le
 principal d'instance, le point de terminaison du modèle et la réponse réelle
 avec l'exécution en échec. Un déploiement actif ou un HTTP 200 ne suffit pas :
 une réponse en streaming peut contenir une erreur applicative.

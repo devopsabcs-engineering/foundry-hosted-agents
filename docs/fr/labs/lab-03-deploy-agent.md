@@ -9,8 +9,8 @@ description: "Utiliser azd pour provisionner un projet Foundry, un déploiement 
 
 ## Aperçu
 
-| | |
-|---|---|
+| Élément | Valeur |
+| --- | --- |
 | **Durée** | 35 minutes |
 | **Niveau** | Intermédiaire |
 | **Prérequis** | [Lab 02](lab-02-mcp-servers.md) |
@@ -20,7 +20,7 @@ description: "Utiliser azd pour provisionner un projet Foundry, un déploiement 
 À la fin de ce lab, vous serez capable de :
 
 * Lire un manifeste `azure.yaml` qui mélange des services d'infrastructure et un service d'agent hébergé
-* Provisionner un projet Foundry, un déploiement de modèle et une Toolbox avec `azd provision`
+* Provisionner un projet Foundry, un déploiement de modèle et des connexions MCP avec `azd provision`
 * Déployer le code de l'agent hébergé avec `azd deploy`
 * Localiser l'agent déployé, son modèle et son identité dans le portail Foundry
 
@@ -56,7 +56,7 @@ threat-assessment-agent:
 Champs clés :
 
 | Champ | Signification |
-|---|---|
+| --- | --- |
 | `host: azure.ai.agent` | Ceci est un service d'agent hébergé Foundry, pas une container app ni une fonction |
 | `kind: hosted` | Foundry exploite le calcul de session ; vous ne possédez que le code du graphe |
 | `uses: [ai-project, security-tools]` | Câble le déploiement de modèle et la Toolbox MCP du Lab 01 |
@@ -65,16 +65,35 @@ Champs clés :
 
 ### Exercice 3.2 : Provisionner
 
+Continuez dans la même session PowerShell et le même dépôt qu'au Lab 02.
+Ne créez pas un autre environnement et ne sélectionnez pas un environnement
+staging/production du formateur. Vérifiez le groupe et les paramètres MCP
+avant d'approuver l'aperçu.
+
 ```powershell
-azd auth login
-azd env new <votre-nom-environnement-atelier>
+azd env select $WorkshopEnv
+if ((azd env get-value AZURE_RESOURCE_GROUP) -ne $ResourceGroup) { throw 'Wrong resource group' }
+azd env get-value MCP_NAME_PREFIX
+azd env get-value MCP_ACR_NAME
+azd env get-value DEFENDER_MCP_IMAGE
+azd env get-value ANOMALY_MCP_IMAGE
+azd provision --preview
 azd provision
 ```
 
-Cette étape crée (ou confirme) le compte Foundry, le projet, le
-déploiement de modèle `gpt-4o-mini`, et les deux connexions Toolbox du
-Lab 01 (`defender-conn`, `anomaly-conn`) — tout **sauf** le code de
-l'agent lui-même.
+Cette étape crée (ou confirme) le compte Foundry, le projet, le déploiement
+`gpt-4o-mini` et deux connexions de projet (`defender-conn`, `anomaly-conn`).
+L'étape suivante déploie la Toolbox `security-tools` et le code de l'agent.
+L'environnement apprenant démarre à 10k jetons/minute, et non à la capacité
+supérieure de staging. La disponibilité régionale et le quota peuvent varier ;
+en cas de quota insuffisant, arrêtez et contactez votre administrateur.
+
+Si la CLI est interrompue, consultez d'abord **Déploiements** dans votre nouveau
+groupe de ressources. Si le déploiement ARM a réussi, récupérez les sorties
+avec `azd env refresh` au lieu de recréer les ressources. S'il a échoué,
+consultez son erreur. Un avertissement du catalogue de modèles ne suffit pas
+à conclure à un échec : vérifiez que le déploiement réel `gpt-4o-mini` affiche
+`Succeeded` dans votre compte Foundry.
 
 ### Exercice 3.3 : Déployer l'agent
 
@@ -83,8 +102,24 @@ azd deploy
 ```
 
 Cette étape téléverse `src/threat-assessment-agent/` et le construit à
-distance selon `dependencyResolution: remote_build`, puis publie une
-nouvelle version de l'agent hébergé.
+distance selon `dependencyResolution: remote_build`. Notez la version retournée ;
+un code inchangé peut réutiliser une version. Un déploiement réussi ne prouve
+pas encore que l'agent peut appeler son modèle ou sa Toolbox.
+
+Accordez à l'identité d'instance les deux rôles requis avec le script existant.
+Il déduit le compte de cet environnement et n'ajoute que les rôles manquants :
+**Foundry User** et **Cognitive Services OpenAI User**. Votre identité opérateur
+doit pouvoir attribuer des rôles sur ce compte ; ne vous accordez pas de droits
+à l'échelle de l'abonnement pour contourner un refus.
+
+```powershell
+bash scripts/configure-agent-rbac.sh threat-assessment-agent
+```
+
+Sous Windows, utilisez la configuration Git Bash du Lab 00. Vous pouvez
+relancer ce script après un redéploiement qui change l'identité d'instance.
+La propagation des rôles peut prendre quelques minutes ; validez une vraie
+réponse au Lab 04 avant de continuer.
 
 > **Dépannage : `no Foundry project endpoint resolved`**
 >
@@ -101,6 +136,8 @@ nouvelle version de l'agent hébergé.
 > `<accountName>` et `<projectName>` sont les valeurs `accountName`/`projectName`
 > déjà présentes dans votre fichier `.azure/<env>/.env`.
 
+<!-- Cas de dépannage distincts. -->
+
 > **Dépannage : `failed to resolve connection "defender-conn"` (ou `anomaly-conn`)**
 >
 > Cela signifie que la connexion n'existe pas encore sur le projet Foundry.
@@ -109,6 +146,8 @@ nouvelle version de l'agent hébergé.
 > environnement a été provisionné avant l'ajout de ces connexions comme
 > ressources bicep, elles n'ont jamais été créées. Relancez
 > `azd provision` pour les créer, puis relancez `azd deploy`.
+
+<!-- Cas de dépannage distincts. -->
 
 > **Dépannage : `AZURE_AI_PROJECT_ID is not set`**
 >
