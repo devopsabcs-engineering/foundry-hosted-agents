@@ -5,6 +5,8 @@ description: LangGraph hosted-agent proof of concept with isolated staging MCP f
 
 A proof of concept that hosts a LangGraph multi-agent threat-assessment workflow on **Microsoft Foundry Hosted Agents**, backed by two independent MCP tool servers (mocked Microsoft Defender and anomaly-detection data). The PoC evaluates Foundry Hosted Agents as a deployment target for Air Canada's existing LangGraph prototype and produces a decision-ready comparison against self-hosted LangGraph/LangSmith options.
 
+📋 **Next features to implement:** see the customer enhancement backlog captured in [`assets/summary_session_002.md`](assets/summary_session_002.md) (OBO identity pass-through, reusable auth/history/telemetry frameworks, graph-path evaluation, scalability, AKS/BYOC, and more).
+
 📖 **Full investigation notes, RBAC troubleshooting, and manual-agent workaround live in the project [wiki](../../wiki):**
 [Home](../../wiki/Home) · [Architecture](../../wiki/Architecture) · [Manual Agent Workaround](../../wiki/Manual-Agent-Workaround) · [RBAC 401 Investigation](../../wiki/RBAC-401-Investigation)
 
