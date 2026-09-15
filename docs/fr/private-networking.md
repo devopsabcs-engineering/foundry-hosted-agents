@@ -75,6 +75,34 @@ avant chaque déploiement réel.
 
 ## Migration d'un environnement partagé existant
 
+Pour la migration Air Canada approuvée avec réutilisation des noms, utilisez le
+workflow manuel `teardown-hybrid-migration.yml`. Lancez d'abord `execute=false`
+avec `confirm_resource_group=rg-air-canada-threat-assessment-poc`, puis examinez
+l'artefact d'inventaire et le résultat what-if. Lancez ensuite `execute=true` avec
+la même confirmation. Les deux exécutions utilisent l'approbation de production
+et le verrou de déploiement partagé. Le script refuse les apps dépendantes
+inattendues et les ressources déjà intégrées au réseau.
+
+Le workflow conserve les empreintes des images, identités et URL, provisionne le
+réseau approuvé, puis supprime uniquement les cinq apps autorisées, deux
+environnements MCP et deux comptes Foundry. Il purge ces comptes pour réutiliser
+leurs noms. Cosmos, ACR, la supervision et les identités attribuées par
+l'utilisateur restent en place. La purge détruit les anciennes versions hébergées :
+l'inventaire permet une récupération, mais ne constitue ni une sauvegarde des
+données ni un retour arrière exécutable. Redéployez avec `deploy-and-evaluate.yml`
+et `bootstrap_after_teardown=true`. Ce mode ignore la recherche d'une ancienne
+version seulement si un inventaire Azure réussi prouve l'absence du compte de
+production. Tous les contrôles de release restent obligatoires. Restaurez le chat
+web séparément avec son image conservée et actualisez son URI de connexion.
+
+Pour un compte Cosmos existant, déployez
+`infra/modules/cosmos-private-endpoint.bicep` avec `accountName`, `location`,
+`privateEndpointSubnetId` et `privateDnsZoneId`. Prévisualisez les modifications et
+n'acceptez que le point de terminaison et son DNS. Ce module réseau référence le
+compte existant sans redéployer ses paramètres, sa base ou son conteneur. Réservez
+le module complet `cosmos-db.bicep` aux nouveaux comptes expérimentaux ; ne
+l'appliquez pas aux politiques d'un compte existant sans examiner les différences.
+
 N'exécutez pas les exercices de création contre le groupe PoC existant. Les anciens
 comptes Foundry n'ont pas d'injection réseau et les anciens environnements Container
 Apps n'ont pas de sous-réseau d'infrastructure. Traitez cela comme une migration,

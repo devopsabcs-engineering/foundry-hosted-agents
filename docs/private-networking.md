@@ -71,6 +71,32 @@ permissions or connectivity. Review `what-if` before every actual deployment.
 
 ## Existing Shared Environment Migration
 
+For the approved Air Canada same-name migration, use the manual
+`teardown-hybrid-migration.yml` workflow. Run `execute=false` first, with
+`confirm_resource_group=rg-air-canada-threat-assessment-poc`, and inspect its
+inventory artifact and network what-if. Only then run `execute=true` with the same
+confirmation. The protected production environment and shared deployment lock
+apply to both runs. The script rejects unexpected dependent apps and resources
+that already have network integration.
+
+This workflow saves app image digests, identities and URLs, provisions the approved
+network, then removes only the five allowlisted apps, two MCP environments and two
+Foundry accounts. It purges those accounts for name reuse. Cosmos, ACR, monitoring
+and user-assigned identities remain. Purging destroys old hosted versions: the
+inventory is recovery metadata, not a data backup or an executable rollback.
+Redeploy with `deploy-and-evaluate.yml`, setting `bootstrap_after_teardown=true`.
+Bootstrap skips prior-version discovery only when a successful Azure inventory
+proves the production account absent; all release gates remain required. Restore
+web chat separately from its retained image and update its sign-in redirect URI.
+
+For an existing Cosmos account, deploy
+`infra/modules/cosmos-private-endpoint.bicep` with `accountName`, `location`,
+`privateEndpointSubnetId` and `privateDnsZoneId`. Preview first and require only
+endpoint/DNS changes. This network-only module references the account as existing
+and does not redeploy account, database or container settings. Use the full
+`cosmos-db.bicep` module for new experiment accounts, not an unreviewed migration
+of existing account policies.
+
 Do not run the fresh learner deployment against the existing PoC group. The old
 Foundry accounts have no agent injection and the old Container Apps environments
 have no infrastructure subnet. Treat these as migration boundaries, not mutable

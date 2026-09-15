@@ -89,14 +89,18 @@ def test_hybrid_network_contract_keeps_cosmos_optional():
     main = (ROOT / 'infra/main.bicep').read_text(encoding='utf-8')
     foundry = (ROOT / 'infra/modules/ai-foundry.bicep').read_text(encoding='utf-8')
     cosmos = (ROOT / 'infra/modules/cosmos-db.bicep').read_text(encoding='utf-8')
+    private_endpoint = (ROOT / 'infra/modules/cosmos-private-endpoint.bicep').read_text(encoding='utf-8')
     aca = (ROOT / 'infra/modules/mcp-container-apps.bicep').read_text(encoding='utf-8')
     assert "publicNetworkAccess: 'Enabled'" in foundry
     assert 'subnetArmId: agentSubnetId' in foundry
     assert 'useMicrosoftManagedNetwork: false' in foundry
     assert "publicNetworkAccess: 'Disabled'" in cosmos
     assert 'disableLocalAuth: true' in cosmos
-    assert "groupIds: ['Sql']" in cosmos
-    assert 'privateDnsZoneGroups' in cosmos
+    assert "module privateEndpoint 'cosmos-private-endpoint.bicep'" in cosmos
+    assert "groupIds: ['Sql']" in private_endpoint
+    assert 'privateDnsZoneGroups' in private_endpoint
+    assert "databaseAccounts@2024-11-15' existing" in private_endpoint
+    assert 'sqlDatabases' not in private_endpoint
     assert "'/partition_key'" in cosmos
     assert 'infrastructureSubnetId: infrastructureSubnetId' in aca
     assert 'internal: false' in aca

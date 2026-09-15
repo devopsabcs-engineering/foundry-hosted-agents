@@ -63,37 +63,13 @@ resource cosmosAccount 'Microsoft.DocumentDB/databaseAccounts@2024-11-15' = {
   }
 }
 
-resource privateEndpoint 'Microsoft.Network/privateEndpoints@2024-05-01' = {
-  name: 'pe-${accountName}'
-  location: location
-  properties: {
-    subnet: {
-      id: privateEndpointSubnetId
-    }
-    privateLinkServiceConnections: [
-      {
-        name: 'cosmos-sql'
-        properties: {
-          privateLinkServiceId: cosmosAccount.id
-          groupIds: ['Sql']
-        }
-      }
-    ]
-  }
-}
-
-resource privateDnsZoneGroup 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2024-05-01' = {
-  parent: privateEndpoint
-  name: 'default'
-  properties: {
-    privateDnsZoneConfigs: [
-      {
-        name: 'documents'
-        properties: {
-          privateDnsZoneId: privateDnsZoneId
-        }
-      }
-    ]
+module privateEndpoint 'cosmos-private-endpoint.bicep' = {
+  name: 'cosmos-private-endpoint'
+  params: {
+    accountName: cosmosAccount.name
+    location: location
+    privateEndpointSubnetId: privateEndpointSubnetId
+    privateDnsZoneId: privateDnsZoneId
   }
 }
 
