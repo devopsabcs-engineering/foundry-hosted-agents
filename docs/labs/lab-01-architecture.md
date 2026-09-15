@@ -25,6 +25,13 @@ By the end of this lab, you will be able to:
 
 ## Exercises
 
+The deployment uses a hybrid network: public Foundry client access, public synthetic
+MCP ingress, dedicated agent and Container Apps egress subnets, and private-only
+Cosmos when the optional checkpoint experiment is deployed. The separately owned
+network foundation prevents staging and production from overwriting shared subnets.
+Trace these boundaries in [Private Cosmos networking](../private-networking.md);
+this is not a fully private Foundry or web-chat deployment.
+
 ### Exercise 1.1: The Supervisor/Specialist Graph
 
 Open [`src/threat-assessment-agent/graph.py`](https://github.com/devopsabcs-engineering/foundry-hosted-agents/blob/main/src/threat-assessment-agent/graph.py).

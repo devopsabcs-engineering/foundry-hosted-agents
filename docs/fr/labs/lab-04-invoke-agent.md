@@ -27,6 +27,11 @@ ms.date: 2026-09-10
 
 ## Exercices
 
+Foundry reste invocable depuis un client public approuvé : les sorties de l'agent
+dans le VNet ne désactivent pas son point public authentifié. Une réponse ou une
+session de chat réussie ne prouve ni l'accès Cosmos privé ni la persistance des
+checkpoints. Testez-les séparément selon [Réseau Cosmos privé](../private-networking.md).
+
 ### Exercice 4.1 : Invoquer depuis la CLI
 
 À la racine du dépôt, dans la session PowerShell du Lab 02, utilisez votre propre

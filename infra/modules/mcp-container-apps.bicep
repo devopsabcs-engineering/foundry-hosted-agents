@@ -3,11 +3,8 @@
 // own Log Analytics workspace and does not reference infra/modules/ai-foundry.bicep
 // or any other Phase 1 module, so it compiles and can be deployed independently.
 //
-// Ingress is external (public HTTPS) for both apps: this PoC uses Basic
-// (public, no-VNet) Foundry Agent Setup, so the Foundry-managed hosted-agent
-// runtime has no private path into an internal-only Container Apps FQDN.
-// Standard Agent Setup with VNet integration would allow internal-only
-// ingress instead -- revisit if/when this PoC adopts network isolation.
+// Ingress remains external (public HTTPS); the workload-profiles environment
+// uses the shared VNet for egress. Deploy the network foundation first.
 // Images are built and pushed via `az acr build` (see acrName param) rather
 // than the previous public placeholder.
 
@@ -28,6 +25,9 @@ param anomalyImage string = 'mcr.microsoft.com/k8se/quickstart:latest'
 
 @description('Port exposed by each MCP server container (matches PORT env var in mcp/*/main.py).')
 param containerPort int = 8000
+
+@description('Delegated Container Apps infrastructure subnet; existing non-VNet environments require migration')
+param infrastructureSubnetId string
 
 var useAcr = !empty(acrName)
 var isolatedPullIdentity = useAcr && namePrefix != 'mcp'
@@ -76,6 +76,16 @@ resource containerAppsEnvironment 'Microsoft.App/managedEnvironments@2024-03-01'
         sharedKey: logAnalyticsWorkspace.listKeys().primarySharedKey
       }
     }
+    vnetConfiguration: {
+      infrastructureSubnetId: infrastructureSubnetId
+      internal: false
+    }
+    workloadProfiles: [
+      {
+        name: 'Consumption'
+        workloadProfileType: 'Consumption'
+      }
+    ]
   }
 }
 

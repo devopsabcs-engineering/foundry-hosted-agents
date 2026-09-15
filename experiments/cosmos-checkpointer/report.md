@@ -1,4 +1,17 @@
-# Step 7.2 — Cosmos DB State Experiment Report
+---
+title: Step 7.2 - Cosmos DB State Experiment Report
+description: Historical checkpoint benchmark outcome and the subsequent private-networking implementation path.
+---
+
+## Historical Result
+
+The report below preserves the original experiment evidence. As of September 15,
+2026, the source templates declare private-only Cosmos, a SQL private endpoint and
+DNS zone group, with Foundry VNet injection in the environment stack. See
+[Private Cosmos networking](../../docs/private-networking.md) for the implementation,
+migration boundary and required new tests. No new live benchmark or hosted-runtime
+connectivity result is claimed by that template change; the original partial status
+below remains unchanged.
 
 **Status: Partial.** Infrastructure provisioned live and a real code bug in
 the existing extension point was found and fixed; the actual

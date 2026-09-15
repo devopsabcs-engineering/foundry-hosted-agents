@@ -14,6 +14,9 @@
     "mcpNamePrefix": {
       "value": "${MCP_NAME_PREFIX=}"
     },
+    "vnetName": {
+      "value": "${VNET_NAME=vnet-air-canada-threat-assessment}"
+    },
     "defenderMcpImage": {
       "value": "${DEFENDER_MCP_IMAGE}"
     },

@@ -59,6 +59,7 @@ $Location = 'eastus2'
 $Registry = "acrfhalearn$Suffix"
 $McpPrefix = 'mcp-learn'
 $ImageTag = 'workshop-v1'
+az account set --subscription $SubscriptionId
 az account show --subscription $SubscriptionId --query '{name:name,id:id,tenantId:tenantId}'
 if ((az group exists --subscription $SubscriptionId --name $ResourceGroup) -eq 'true') {
     throw 'Choose a new workshop name; this group already exists.'
@@ -70,6 +71,33 @@ azd env new $WorkshopEnv --subscription $SubscriptionId --location $Location
 azd env set AZURE_RESOURCE_GROUP $ResourceGroup -e $WorkshopEnv
 az acr create --subscription $SubscriptionId --resource-group $ResourceGroup `
   --name $Registry --sku Basic --admin-enabled false --output none
+```
+
+Deploy the shared network once, before either environment stack. Have your network
+owner approve the default `10.30.0.0/16` range; if it overlaps, adjust all subnet
+prefixes in the preview and deployment together. This new learner group uses the
+production-named subnet pair because `$WorkshopEnv` does not end in `-staging`;
+the names do not make it a production system. Do not use these steps to migrate
+existing resources. See [Private Cosmos networking](../private-networking.md).
+
+```powershell
+$VnetName = "vnet-$WorkshopEnv"
+$NetworkParameters = @("vnetName=$VnetName", "location=$Location")
+az deployment group what-if --subscription $SubscriptionId --resource-group $ResourceGroup `
+  --template-file infra/network.bicep --parameters @NetworkParameters
+```
+
+Approve only the new network, five subnets, private DNS zone and VNet link in your
+learner group. The shared network template is their sole owner; do not deploy it
+independently for staging and production or remove one environment's subnets.
+
+```powershell
+az deployment group create --subscription $SubscriptionId --resource-group $ResourceGroup `
+  --name workshop-network --template-file infra/network.bicep --parameters @NetworkParameters --output none
+$NetworkOutputs = az deployment group show --subscription $SubscriptionId --resource-group $ResourceGroup `
+  --name workshop-network --query properties.outputs -o json | ConvertFrom-Json
+$AcaSubnetId = $NetworkOutputs.acaProductionSubnetId.value
+azd env set VNET_NAME $VnetName -e $WorkshopEnv
 ```
 
 Build the actual MCP images. The Bicep template's default quickstart images
@@ -89,6 +117,7 @@ azd env set MCP_NAME_PREFIX $McpPrefix -e $WorkshopEnv
 azd env set DEFENDER_MCP_IMAGE $DefenderImage -e $WorkshopEnv
 azd env set ANOMALY_MCP_IMAGE $AnomalyImage -e $WorkshopEnv
 $McpParameters = @("namePrefix=$McpPrefix", "acrName=$Registry", "defenderImage=$DefenderImage", "anomalyImage=$AnomalyImage")
+$McpParameters += "infrastructureSubnetId=$AcaSubnetId"
 az deployment group what-if --subscription $SubscriptionId --resource-group $ResourceGroup `
   --template-file infra/modules/mcp-container-apps.bicep --parameters @McpParameters
 ```

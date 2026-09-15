@@ -69,6 +69,47 @@ def test_capacity_increase_is_staging_only():
     assert "modelSkuCapacity: modelSkuCapacity" in infrastructure
 
 
+def test_release_checks_network_before_provisioning():
+    release = workflow('deploy-and-evaluate.yml')
+    validation = '\n'.join(step.get('run', '') for step in release['jobs']['bicep-validate']['steps'])
+    for template in ('infra/network.bicep', 'infra/main.bicep', 'infra/modules/cosmos-db.bicep'):
+        assert f'az bicep build --file {template}' in validation
+    assert validation.index('test-network-readiness.ps1') < validation.index('az deployment group what-if')
+    for job_name in ('deploy-staging', 'promote-production'):
+        steps = release['jobs'][job_name]['steps']
+        provision = next(step for step in steps if 'azd provision' in step.get('run', ''))
+        assert provision['shell'] == 'pwsh'
+        assert provision['run'].index('test-network-readiness.ps1') < provision['run'].index('azd provision')
+        assert '-VnetName $env:VNET_NAME' in provision['run']
+        assert any('azd env set VNET_NAME' in step.get('run', '') for step in steps)
+    assert 'az deployment group create' not in validation
+
+
+def test_hybrid_network_contract_keeps_cosmos_optional():
+    main = (ROOT / 'infra/main.bicep').read_text(encoding='utf-8')
+    foundry = (ROOT / 'infra/modules/ai-foundry.bicep').read_text(encoding='utf-8')
+    cosmos = (ROOT / 'infra/modules/cosmos-db.bicep').read_text(encoding='utf-8')
+    aca = (ROOT / 'infra/modules/mcp-container-apps.bicep').read_text(encoding='utf-8')
+    assert "publicNetworkAccess: 'Enabled'" in foundry
+    assert 'subnetArmId: agentSubnetId' in foundry
+    assert 'useMicrosoftManagedNetwork: false' in foundry
+    assert "publicNetworkAccess: 'Disabled'" in cosmos
+    assert 'disableLocalAuth: true' in cosmos
+    assert "groupIds: ['Sql']" in cosmos
+    assert 'privateDnsZoneGroups' in cosmos
+    assert "'/partition_key'" in cosmos
+    assert 'infrastructureSubnetId: infrastructureSubnetId' in aca
+    assert 'internal: false' in aca
+    assert "workloadProfileType: 'Consumption'" in aca
+    assert 'agentSubnetId: vnet::agentSubnet.id' in main
+    assert 'infrastructureSubnetId: vnet::acaSubnet.id' in main
+    assert 'cosmos-db.bicep' not in main
+    assert "module network " not in main
+    config = yaml.safe_load((ROOT / 'azure.yaml').read_text(encoding='utf-8'))
+    settings = config['services']['threat-assessment-agent']['environmentVariables']
+    assert not any(item['name'] == 'ENABLE_COSMOS_CHECKPOINTER' for item in settings)
+
+
 @pytest.mark.parametrize("trace_count,exception_count,expected", [
     ("0", "0", 1),
     ("", "0", 1),

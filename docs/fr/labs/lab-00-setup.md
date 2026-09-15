@@ -26,6 +26,13 @@ description: "Installer les outils requis, cloner le dépôt, créer un environn
 
 ## Exercices
 
+Avant le Lab 02, faites approuver le VNet, les sous-réseaux délégués, la zone DNS
+privée, les plages sans chevauchement et les permissions réseau limitées. Cosmos,
+si retenu, exige un point privé et une machine de test reliée au réseau ; un poste
+public ne peut pas tester son plan de données. Foundry reste public et authentifié.
+Consultez [Réseau Cosmos privé](../private-networking.md). Si les politiques exigent
+aussi Foundry, le registre ou MCP privés, arrêtez : ce profil ne les couvre pas.
+
 ### Exercice 0.1 : Installer les outils requis
 
 1. **Python 3.13** — <https://www.python.org/downloads/>

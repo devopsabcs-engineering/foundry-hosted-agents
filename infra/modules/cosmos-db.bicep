@@ -6,11 +6,8 @@
 // part of the Phases 1-6 baseline deployment. Deploy it standalone against
 // the same resource group:
 //
-//   az deployment group create \
-//     --resource-group rg-air-canada-threat-assessment-poc \
-//     --template-file infra/modules/cosmos-db.bicep \
-//     --parameters environmentName=air-canada-threat-assessment-poc \
-//                  dataPlanePrincipalIds="['<your-object-id>']"
+// Deploy infra/network.bicep first and supply its private endpoint subnet and
+// private DNS zone IDs. See docs/private-networking.md for the experiment steps.
 //
 // The baseline hosted agent (threat-assessment-agent) is never modified by
 // this deployment -- it does not read any output of this module.
@@ -34,6 +31,12 @@ param containerName string = 'checkpoints'
 @description('Principal IDs (Entra object IDs) to grant Cosmos DB Built-in Data Contributor for the benchmark/experiment. Leave empty to skip data-plane role assignment.')
 param dataPlanePrincipalIds array = []
 
+@description('Resource ID of the private endpoint subnet from infra/network.bicep')
+param privateEndpointSubnetId string
+
+@description('Resource ID of the linked privatelink.documents.azure.com private DNS zone')
+param privateDnsZoneId string
+
 resource cosmosAccount 'Microsoft.DocumentDB/databaseAccounts@2024-11-15' = {
   name: accountName
   location: location
@@ -54,13 +57,43 @@ resource cosmosAccount 'Microsoft.DocumentDB/databaseAccounts@2024-11-15' = {
     consistencyPolicy: {
       defaultConsistencyLevel: 'Session'
     }
-    // Public network access left enabled (default) for this PoC-scale
-    // experiment: private-endpoint reachability from a Foundry Hosted Agent
-    // sandbox is an open research question (research.md lines 216-227) that
-    // this deployment does not itself resolve -- see experiments/
-    // cosmos-checkpointer/report.md "Private-endpoint reachability" section.
     disableLocalAuth: true
-    publicNetworkAccess: 'Enabled'
+    publicNetworkAccess: 'Disabled'
+    minimalTlsVersion: 'Tls12'
+  }
+}
+
+resource privateEndpoint 'Microsoft.Network/privateEndpoints@2024-05-01' = {
+  name: 'pe-${accountName}'
+  location: location
+  properties: {
+    subnet: {
+      id: privateEndpointSubnetId
+    }
+    privateLinkServiceConnections: [
+      {
+        name: 'cosmos-sql'
+        properties: {
+          privateLinkServiceId: cosmosAccount.id
+          groupIds: ['Sql']
+        }
+      }
+    ]
+  }
+}
+
+resource privateDnsZoneGroup 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2024-05-01' = {
+  parent: privateEndpoint
+  name: 'default'
+  properties: {
+    privateDnsZoneConfigs: [
+      {
+        name: 'documents'
+        properties: {
+          privateDnsZoneId: privateDnsZoneId
+        }
+      }
+    ]
   }
 }
 

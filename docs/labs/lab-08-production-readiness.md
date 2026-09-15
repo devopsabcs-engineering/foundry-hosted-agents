@@ -25,6 +25,12 @@ By the end of this lab, you will be able to:
 
 ## Exercises
 
+The private-network templates address the old Cosmos public-access mismatch, but
+do not change the historical benchmark outcome below. Require new private DNS,
+authenticated data-plane and hosted-runtime evidence before marking that gate
+passed. Follow [Private Cosmos networking](../private-networking.md); neither local
+compilation nor a passing baseline chat proves checkpoint durability.
+
 The experiment outcomes below belong to the historical PoC, not automatically
 to your learner environment. Cosmos, Agent 365 and continuous monitoring are
 not provisioned by the base labs. Do not add licenses, tenant permissions or

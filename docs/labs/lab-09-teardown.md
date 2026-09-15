@@ -60,6 +60,13 @@ you no longer need it. Never delete another environment's local state.
 
 ## Scope and Remaining Checks
 
+Your disposable group includes the network, subnet delegations and private DNS
+link from Lab 02, plus a private endpoint and checkpoint data if you ran the Cosmos
+experiment. Retain approved evidence before deleting that data. Never use this
+group-deletion procedure for the shared staging/production foundation or remove its
+subnets independently. Service associations can delay deletion; inspect failures
+with your administrator rather than deleting dependencies used by another environment.
+
 Group deletion does not promise removal of tenant-level Entra agent identities,
 GitHub OIDC credentials or soft-deleted service records. The base workshop creates
 no GitHub environment or web-chat app registration. Have an authorized tenant

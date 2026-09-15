@@ -70,6 +70,12 @@ Ne créez pas un autre environnement et ne sélectionnez pas un environnement
 staging/production du formateur. Vérifiez le groupe et les paramètres MCP
 avant d'approuver l'aperçu.
 
+Le réseau du Lab 02 doit déjà exister. Le contrôle ci-dessous vérifie les
+sous-réseaux, délégations, le lien DNS Cosmos et les paramètres réseau existants.
+S'il exige une migration, arrêtez : ajouter l'injection réseau Foundry ou changer
+le réseau d'un environnement Container Apps existant n'est pas une mise à jour
+ordinaire. Ne supprimez pas de ressources pour forcer la réussite de l'exercice.
+
 ```powershell
 azd env select $WorkshopEnv
 if ((azd env get-value AZURE_RESOURCE_GROUP) -ne $ResourceGroup) { throw 'Wrong resource group' }
@@ -77,6 +83,8 @@ azd env get-value MCP_NAME_PREFIX
 azd env get-value MCP_ACR_NAME
 azd env get-value DEFENDER_MCP_IMAGE
 azd env get-value ANOMALY_MCP_IMAGE
+./scripts/test-network-readiness.ps1 -ResourceGroup $ResourceGroup -EnvironmentName $WorkshopEnv `
+    -Location $Location -VnetName $VnetName -McpNamePrefix $McpPrefix
 azd provision --preview
 azd provision
 ```
@@ -87,6 +95,13 @@ L'étape suivante déploie la Toolbox `security-tools` et le code de l'agent.
 L'environnement apprenant démarre à 10k jetons/minute, et non à la capacité
 supérieure de staging. La disponibilité régionale et le quota peuvent varier ;
 en cas de quota insuffisant, arrêtez et contactez votre administrateur.
+
+Foundry reste accessible publiquement aux clients authentifiés, tandis que les
+sorties de l'agent utilisent son sous-réseau dédié. Le stockage des checkpoints
+Cosmos reste facultatif : cette étape ne le crée ni ne l'active. L'accès public à
+Foundry ne contourne pas le pare-feu Cosmos. Consultez [Réseau Cosmos privé](../private-networking.md)
+avant cette expérience. Les builds distants du code nécessitent aussi les points
+de terminaison sortants documentés ; ne bloquez pas toutes les sorties du sous-réseau.
 
 Si la CLI est interrompue, consultez d'abord **Déploiements** dans votre nouveau
 groupe de ressources. Si le déploiement ARM a réussi, récupérez les sorties

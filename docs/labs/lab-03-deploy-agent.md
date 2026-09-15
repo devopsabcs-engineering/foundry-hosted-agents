@@ -68,6 +68,12 @@ Continue in the same PowerShell session and repository as Lab 02. Do not
 create another environment or select an instructor's staging/production
 environment. Confirm the group and MCP settings before approving the preview.
 
+The network foundation must already exist from Lab 02. The preflight below checks
+subnets, delegation, the Cosmos DNS link and existing resource network settings.
+If it reports a migration requirement, stop: adding Foundry network injection or
+changing an existing Container Apps environment's network is not a routine update.
+Do not delete resources to force the exercise through.
+
 ```powershell
 azd env select $WorkshopEnv
 if ((azd env get-value AZURE_RESOURCE_GROUP) -ne $ResourceGroup) { throw 'Wrong resource group' }
@@ -75,6 +81,8 @@ azd env get-value MCP_NAME_PREFIX
 azd env get-value MCP_ACR_NAME
 azd env get-value DEFENDER_MCP_IMAGE
 azd env get-value ANOMALY_MCP_IMAGE
+./scripts/test-network-readiness.ps1 -ResourceGroup $ResourceGroup -EnvironmentName $WorkshopEnv `
+    -Location $Location -VnetName $VnetName -McpNamePrefix $McpPrefix
 azd provision --preview
 azd provision
 ```
@@ -85,6 +93,13 @@ model deployment, and two project connections (`defender-conn`,
 code. The learner environment starts at 10k tokens/minute, not the larger
 staging capacity. Region availability and subscription quota can vary; stop
 and ask your administrator if deployment reports insufficient quota.
+
+Foundry remains publicly reachable for authenticated clients, while hosted agent
+egress uses its dedicated subnet. Cosmos checkpoint storage is still optional and
+is not created or enabled by this step. Public Foundry access does not bypass a
+private Cosmos firewall. See [Private Cosmos networking](../private-networking.md)
+before running that experiment. Source-code remote builds also need the documented
+outbound endpoints; do not block all subnet egress as part of this hybrid setup.
 
 If the CLI is interrupted, first inspect **Deployments** in your new resource
 group. If the ARM deployment succeeded, recover outputs with `azd env refresh`

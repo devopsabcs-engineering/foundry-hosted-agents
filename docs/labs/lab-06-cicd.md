@@ -26,6 +26,14 @@ By the end of this lab, you will be able to:
 
 ## Exercises
 
+Network readiness is now a prerequisite to release provisioning. CI compiles
+`network.bicep`, `main.bicep` and the optional Cosmos module, then checks the existing
+foundation before staging what-if and both environment provisions. It does not
+deploy the shared network or recreate incompatible resources. A network preflight
+failure requires the [reviewed migration path](../private-networking.md), not a retry
+with weaker checks. Public runners can invoke Foundry but cannot directly test
+private Cosmos without an approved private network path.
+
 This lab combines a local gate rehearsal with read-only inspection of historical
 GitHub Actions evidence. **Do not dispatch this repository's shared release or
 Continuous Validation workflows, edit its environments, or push to its `main`

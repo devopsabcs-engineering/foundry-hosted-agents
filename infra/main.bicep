@@ -59,7 +59,23 @@ param anomalyMcpImage string = 'mcr.microsoft.com/k8se/quickstart:latest'
 @description('MCP resource prefix; staging must not share production tool apps.')
 param mcpNamePrefix string = ''
 
-var effectiveMcpNamePrefix = !empty(mcpNamePrefix) ? mcpNamePrefix : (endsWith(environmentName, '-staging') ? 'mcp-staging' : 'mcp')
+@description('Shared network name; deploy infra/network.bicep separately before either environment')
+param vnetName string = 'vnet-air-canada-threat-assessment'
+
+var isStaging = endsWith(environmentName, '-staging')
+var effectiveMcpNamePrefix = !empty(mcpNamePrefix) ? mcpNamePrefix : (isStaging ? 'mcp-staging' : 'mcp')
+
+resource vnet 'Microsoft.Network/virtualNetworks@2024-05-01' existing = {
+  name: vnetName
+
+  resource acaSubnet 'subnets' existing = {
+    name: isStaging ? 'snet-aca-staging' : 'snet-aca-production'
+  }
+
+  resource agentSubnet 'subnets' existing = {
+    name: isStaging ? 'snet-agent-staging' : 'snet-agent-production'
+  }
+}
 
 module monitoring 'modules/monitoring.bicep' = {
   name: 'monitoring'
@@ -86,6 +102,7 @@ module aiFoundry 'modules/ai-foundry.bicep' = {
     modelSkuCapacity: modelSkuCapacity
     defenderMcpUrl: 'https://${mcpContainerApps.outputs.defenderContainerAppFqdn}/mcp'
     anomalyMcpUrl: 'https://${mcpContainerApps.outputs.anomalyContainerAppFqdn}/mcp'
+    agentSubnetId: vnet::agentSubnet.id
   }
 }
 
@@ -106,6 +123,7 @@ module mcpContainerApps 'modules/mcp-container-apps.bicep' = {
     acrName: mcpAcrName
     defenderImage: defenderMcpImage
     anomalyImage: anomalyMcpImage
+    infrastructureSubnetId: vnet::acaSubnet.id
   }
 }
 

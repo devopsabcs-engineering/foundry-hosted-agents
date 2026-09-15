@@ -26,6 +26,11 @@ By the end of this lab, you will be able to:
 
 ## Exercises
 
+You can still invoke Foundry from an approved public client: agent VNet egress does
+not disable its authenticated public endpoint. A successful response or web-chat
+session does not prove private Cosmos access or checkpoint persistence. Keep those
+checks separate using [Private Cosmos networking](../private-networking.md).
+
 ### Exercise 4.1: Invoke from the CLI
 
 From the repository root in the PowerShell session from Lab 02, use your own

@@ -27,6 +27,13 @@ ms.date: 2026-09-10
 
 ## Exercices
 
+Le réseau doit être prêt avant le provisionnement d'une release. La CI compile
+`network.bicep`, `main.bicep` et le module Cosmos facultatif, puis contrôle le réseau
+avant le what-if staging et les deux provisionnements. Elle ne déploie pas le réseau
+partagé et ne recrée pas de ressources incompatibles. Un échec exige la
+[migration approuvée](../private-networking.md), pas un contrôle affaibli. Les runners
+publics peuvent invoquer Foundry mais pas tester Cosmos directement sans route privée.
+
 Ce lab combine une répétition locale des contrôles et une inspection en lecture
 seule des preuves historiques GitHub Actions. **Ne déclenchez pas les workflows
 partagés de publication ou Continuous Validation, ne modifiez pas leurs

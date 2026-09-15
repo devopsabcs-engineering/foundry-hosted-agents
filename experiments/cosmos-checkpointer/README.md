@@ -1,4 +1,7 @@
-# Cosmos DB Checkpointer Experiment — Step 7.2
+---
+title: Cosmos DB Checkpointer Experiment - Step 7.2
+description: Optional checkpoint experiment, historical network blocker, and current private-network deployment guidance.
+---
 
 ## What this is
 
@@ -13,8 +16,10 @@ in `azure.yaml`, so `threat-assessment-agent` v9 is completely unaffected.
 
 * `../../infra/modules/cosmos-db.bicep` — standalone, optional Cosmos DB
   serverless account module. **Not** referenced by `infra/main.bicep`;
-  deployed separately (see the module's own header comment for the exact
-  command). Deployed live in this session into the existing
+  deployed separately using [the private-network guide](../../docs/private-networking.md).
+  The current module requires private endpoint subnet and DNS zone IDs. Its new
+  configuration has not been deployed or benchmarked by this source change.
+  The historical experiment deployed the original module into the existing
   `rg-air-canada-threat-assessment-poc` resource group (additive resource,
   no Phase 1-6 resource touched or recreated).
 * `benchmark.py` — direct Cosmos read/write RU-charge benchmark + a real

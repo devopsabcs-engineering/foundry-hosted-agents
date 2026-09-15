@@ -63,6 +63,13 @@ local d'un autre environnement.
 
 ## Portée et vérifications restantes
 
+Votre groupe jetable contient le réseau, les délégations et le lien DNS du Lab 02,
+ainsi que le point privé et les checkpoints si vous avez exécuté l'expérience Cosmos.
+Conservez les preuves approuvées avant de supprimer ces données. N'appliquez jamais
+cette suppression à la fondation partagée staging/production et ne retirez pas ses
+sous-réseaux séparément. Des associations de service peuvent retarder la suppression ;
+examinez les échecs avec l'administrateur sans supprimer de dépendances partagées.
+
 Supprimer le groupe ne garantit pas la suppression des identités d'agent Entra
 du tenant, des identifiants OIDC GitHub ou des enregistrements de service conservés
 en suppression réversible. L'atelier de base ne crée ni environnement GitHub ni

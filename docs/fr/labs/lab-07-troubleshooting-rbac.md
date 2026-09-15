@@ -50,6 +50,13 @@ sont pas établies. Suivez les diagnostics ci-dessous avant de réessayer.
 
 ## Exercices
 
+Pour Cosmos facultatif, distinguez un refus réseau d'un manque de RBAC. Une politique
+peut désactiver l'accès public malgré un déploiement ARM réussi. Vérifiez le paramètre
+effectif, l'approbation du point privé et le DNS depuis le réseau appelant avant de
+changer les rôles. Un jeton Entra valide ne contourne pas le pare-feu. La
+[procédure de vérification privée](../private-networking.md) contrôle aussi l'identité
+réelle de l'expérience ; compte Foundry, projet, agent et opérateur sont distincts.
+
 Utilisez uniquement votre environnement du Lab 02. Ne révoquez pas de rôles,
 ne désactivez pas le réseau et ne recréez pas la panne historique du client.
 Les diagnostics suivants sont en lecture seule ; consignez vos observations

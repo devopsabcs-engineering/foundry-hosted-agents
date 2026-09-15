@@ -26,6 +26,12 @@ description: "Lire la grille de décision de mise en production du PoC et compre
 
 ## Exercices
 
+Les modèles réseau privé corrigent l'écart d'accès public Cosmos, sans modifier
+le résultat historique du benchmark ci-dessous. Exigez de nouvelles preuves DNS
+privé, d'accès aux données authentifié et du runtime hébergé avant de valider ce
+critère. Suivez [Réseau Cosmos privé](../private-networking.md) ; compiler localement
+ou réussir un chat de base ne prouve pas la durabilité des checkpoints.
+
 Les résultats ci-dessous appartiennent au PoC historique, pas automatiquement
 à votre environnement apprenant. Cosmos, Agent 365 et la surveillance continue
 ne sont pas provisionnés par les labs de base. N'ajoutez pas de licences, de

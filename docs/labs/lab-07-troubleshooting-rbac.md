@@ -47,6 +47,14 @@ not established. Follow the diagnostic steps below before retrying.
 
 ## Exercises
 
+For the optional Cosmos experiment, distinguish network refusal from missing RBAC.
+Policy can force public access off even when ARM reports a successful deployment.
+Check the effective setting, private endpoint approval and private DNS resolution
+from the caller's network before changing roles. A valid Entra token cannot bypass
+the firewall. The [private-network verification procedure](../private-networking.md)
+also checks the actual experiment identity; the Foundry account, project, hosted
+agent and operator identities are not interchangeable.
+
 Run only against your own Lab 02 environment. Do not deliberately revoke roles,
 disable networking, or recreate the historical customer failure. The following
 diagnostics are read-only; record your observed results separately from WI-11.

@@ -45,6 +45,7 @@ env:
   AGENT_TEST_PROMPT: "Hello from CI. Reply with a short confirmation that you are running and ready to assess threats."
   STAGING_AZD_ENV_NAME: air-canada-threat-assessment-staging
   PRODUCTION_AZD_ENV_NAME: air-canada-threat-assessment-poc
+  VNET_NAME: ${{ vars.VNET_NAME || 'vnet-air-canada-threat-assessment' }}
 
 jobs:
   # ---------------------------------------------------------------------
@@ -122,7 +123,18 @@ jobs:
           subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
 
       - name: az bicep build (full module graph)
-        run: az bicep build --file infra/main.bicep
+        run: |
+          az bicep build --file infra/network.bicep
+          az bicep build --file infra/main.bicep
+          az bicep build --file infra/modules/cosmos-db.bicep
+
+      - name: Verify shared network and staging migration readiness
+        shell: pwsh
+        env:
+          AZURE_RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
+          AZURE_LOCATION: ${{ vars.AZURE_LOCATION }}
+        run: |
+          ./scripts/test-network-readiness.ps1 -ResourceGroup $env:AZURE_RESOURCE_GROUP -EnvironmentName $env:STAGING_AZD_ENV_NAME -Location $env:AZURE_LOCATION -VnetName $env:VNET_NAME
 
       - name: az deployment group what-if (staging resource group)
         env:
@@ -137,6 +149,7 @@ jobs:
             --resource-group "$AZURE_RESOURCE_GROUP" \
             --template-file infra/main.bicep \
             --parameters environmentName="$STAGING_AZD_ENV_NAME" location="$AZURE_LOCATION" \
+              vnetName="$VNET_NAME" \
               mcpAcrName="$MCP_ACR_NAME" defenderMcpImage="$DEFENDER_MCP_IMAGE" anomalyMcpImage="$ANOMALY_MCP_IMAGE"
 
   # ---------------------------------------------------------------------
@@ -180,6 +193,7 @@ jobs:
           set -euo pipefail
           azd env select "$STAGING_AZD_ENV_NAME" || azd env new "$STAGING_AZD_ENV_NAME" --no-prompt
 
+          azd env set VNET_NAME "$VNET_NAME"
           azd env set AZURE_SUBSCRIPTION_ID "${{ vars.AZURE_SUBSCRIPTION_ID }}"
           azd env set AZURE_TENANT_ID "${{ vars.AZURE_TENANT_ID }}"
           azd env set AZURE_LOCATION "${{ vars.AZURE_LOCATION }}"
@@ -210,7 +224,14 @@ jobs:
 
       - name: Provision staging infrastructure (idempotent)
         working-directory: ${{ env.AGENT_PROJECT_DIR }}
-        run: azd provision --no-prompt
+        shell: pwsh
+        env:
+          AZURE_RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
+          AZURE_LOCATION: ${{ vars.AZURE_LOCATION }}
+        run: |
+          ./scripts/test-network-readiness.ps1 -ResourceGroup $env:AZURE_RESOURCE_GROUP -EnvironmentName $env:STAGING_AZD_ENV_NAME -Location $env:AZURE_LOCATION -VnetName $env:VNET_NAME
+          azd provision --no-prompt
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Deploy candidate (new immutable hosted-agent version)
         id: deploy
@@ -475,6 +496,7 @@ jobs:
           azd config set defaults.subscription "${{ vars.AZURE_SUBSCRIPTION_ID }}"
           azd env select "$PRODUCTION_AZD_ENV_NAME" || azd env new "$PRODUCTION_AZD_ENV_NAME" --no-prompt
 
+          azd env set VNET_NAME "$VNET_NAME"
           azd env set AZURE_SUBSCRIPTION_ID "${{ vars.AZURE_SUBSCRIPTION_ID }}"
           azd env set AZURE_TENANT_ID "${{ vars.AZURE_TENANT_ID }}"
           azd env set AZURE_LOCATION "${{ vars.AZURE_LOCATION }}"
@@ -500,7 +522,14 @@ jobs:
 
       - name: Provision production infrastructure (idempotent)
         working-directory: ${{ env.AGENT_PROJECT_DIR }}
-        run: azd provision --no-prompt
+        shell: pwsh
+        env:
+          AZURE_RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
+          AZURE_LOCATION: ${{ vars.AZURE_LOCATION }}
+        run: |
+          ./scripts/test-network-readiness.ps1 -ResourceGroup $env:AZURE_RESOURCE_GROUP -EnvironmentName $env:PRODUCTION_AZD_ENV_NAME -Location $env:AZURE_LOCATION -VnetName $env:VNET_NAME
+          azd provision --no-prompt
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Deploy evaluated source to production (remote rebuild)
         id: deploy

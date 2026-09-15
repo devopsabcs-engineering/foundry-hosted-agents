@@ -16,6 +16,12 @@ A proof of concept that hosts a LangGraph multi-agent threat-assessment workflow
 
 ## Try the web chatbot
 
+The infrastructure now targets [private Cosmos with public Foundry access](docs/private-networking.md)
+([français](docs/fr/private-networking.md)), following the FSI sibling's hybrid pattern.
+Existing accounts and Container Apps environments require a reviewed migration before
+the next release; these template changes are not evidence that the live pilot has migrated.
+Cosmos checkpointing remains optional and disabled in the baseline agent.
+
 [Open the staging chatbot](https://foundry-threat-chat-staging.wonderfulpebble-ce861678.eastus2.azurecontainerapps.io)
 and sign in with an approved member of **Foundry Threat Assessment Pilot** in the
 `MngEnvMCAP675646.onmicrosoft.com` tenant. The initial approved member is the tenant

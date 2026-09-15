@@ -25,6 +25,13 @@ By the end of this lab, you will be able to:
 
 ## Exercises
 
+Before Lab 02, obtain approval for a VNet, delegated subnets and a private DNS zone,
+including the proposed non-overlapping address space and scoped network permissions.
+Cosmos, when used, requires a private endpoint and a network-connected test location;
+a public laptop cannot test its data plane. Foundry remains public for authenticated
+access. See [Private Cosmos networking](../private-networking.md). If policies also
+require private Foundry, registry or MCP ingress, stop: that is outside this profile.
+
 ### Exercise 0.1: Install Required Tools
 
 1. **Python 3.13** — <https://www.python.org/downloads/>

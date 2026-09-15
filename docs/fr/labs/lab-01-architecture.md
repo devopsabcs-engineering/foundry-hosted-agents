@@ -26,6 +26,13 @@ description: "Comprendre le patron superviseur/spécialistes de LangGraph, l'iso
 
 ## Exercices
 
+Le réseau est hybride : accès client Foundry public, entrée MCP publique avec
+données fictives, sous-réseaux de sortie dédiés aux agents et Container Apps, et
+Cosmos privé si l'expérience de checkpoints est déployée. Le réseau partagé a un
+propriétaire unique pour éviter les écritures concurrentes staging/production.
+Repérez ces limites dans [Réseau Cosmos privé](../private-networking.md) ; Foundry
+et le chat web ne sont pas entièrement privés.
+
 ### Exercice 1.1 : Le graphe superviseur/spécialistes
 
 Ouvrez [`src/threat-assessment-agent/graph.py`](https://github.com/devopsabcs-engineering/foundry-hosted-agents/blob/main/src/threat-assessment-agent/graph.py).

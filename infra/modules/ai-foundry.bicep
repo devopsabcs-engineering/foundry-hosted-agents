@@ -44,6 +44,9 @@ param applicationInsightsResourceId string
 @description('Application Insights ingestion connection string')
 param applicationInsightsConnectionString string
 
+@description('Subnet dedicated to this account for hosted agent egress; configure on a new account')
+param agentSubnetId string
+
 // Basic Agent Setup: Microsoft-managed conversation/file/vector storage — no capabilityHosts.
 resource account 'Microsoft.CognitiveServices/accounts@2025-06-01' = {
   name: accountName
@@ -60,6 +63,13 @@ resource account 'Microsoft.CognitiveServices/accounts@2025-06-01' = {
     allowProjectManagement: true
     disableLocalAuth: false
     publicNetworkAccess: 'Enabled'
+    networkInjections: [
+      {
+        scenario: 'agent'
+        subnetArmId: agentSubnetId
+        useMicrosoftManagedNetwork: false
+      }
+    ]
   }
 }
 
