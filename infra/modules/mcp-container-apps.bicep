@@ -30,7 +30,7 @@ param containerPort int = 8000
 param infrastructureSubnetId string
 
 var useAcr = !empty(acrName)
-var isolatedPullIdentity = useAcr && namePrefix != 'mcp'
+var isolatedPullIdentity = useAcr
 
 resource acr 'Microsoft.ContainerRegistry/registries@2023-07-01' existing = if (useAcr) {
   name: acrName
@@ -136,14 +136,6 @@ resource defenderContainerApp 'Microsoft.App/containerApps@2024-03-01' = {
     }
   }
 }
-
-// AcrPull for both container apps' system-assigned identities is already granted
-// out-of-band (pre-existing role assignments on the ACR). Bicep-managed
-// roleAssignment resources here previously conflicted with those existing
-// assignments (ARM enforces one assignment per principal+role+scope, regardless
-// of resource name), causing RoleAssignmentExists failures on every
-// `azd provision` re-run. Intentionally not re-declared here; run
-// `az role assignment list --scope <acr-id>` to verify the grants still exist.
 
 resource anomalyContainerApp 'Microsoft.App/containerApps@2024-03-01' = {
   name: '${namePrefix}-anomaly-server'

@@ -11,12 +11,20 @@ name: Deploy and Evaluate (Staging -> Production)
 on:
   workflow_call:
     inputs:
+      bootstrap_after_teardown:
+        type: boolean
+        required: false
+        default: false
       golden_dataset_path:
         type: string
         required: false
         default: eval/golden-dataset.jsonl
   workflow_dispatch:
     inputs:
+      bootstrap_after_teardown:
+        description: Allow first production deployment only when the production account is absent
+        type: boolean
+        default: false
       golden_dataset_path:
         description: "Path to the golden dataset used for the evaluation gate"
         required: false
@@ -515,8 +523,20 @@ jobs:
       - name: Record the currently-live production version (for rollback)
         id: record-previous
         working-directory: ${{ env.AGENT_PROJECT_DIR }}
+        env:
+          BOOTSTRAP_AFTER_TEARDOWN: ${{ inputs.bootstrap_after_teardown }}
+          AZURE_RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
         run: |
           set -euo pipefail
+          if [[ "$BOOTSTRAP_AFTER_TEARDOWN" == "true" ]]; then
+            az cognitiveservices account list --resource-group "$AZURE_RESOURCE_GROUP" --output json > /tmp/prod-account-inventory.json
+            jq -e 'type == "array"' /tmp/prod-account-inventory.json > /dev/null
+            if jq -e --arg name "aif-$PRODUCTION_AZD_ENV_NAME" 'all(.[]; .name != $name)' /tmp/prod-account-inventory.json > /dev/null; then
+              echo "previous_agent_version=" >> "$GITHUB_OUTPUT"
+              echo "Explicit bootstrap after teardown: production account absent; no prior version exists for rollback." >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+          fi
           PREVIOUS_VERSION=$(bash scripts/record-production-version.sh "$AGENT_NAME" /tmp/prod-agent-show-before)
           echo "previous_agent_version=$PREVIOUS_VERSION" >> "$GITHUB_OUTPUT"
 

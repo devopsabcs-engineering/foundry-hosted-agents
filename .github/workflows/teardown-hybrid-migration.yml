@@ -1,0 +1,73 @@
+name: Teardown for Hybrid Network Migration
+
+on:
+  workflow_dispatch:
+    inputs:
+      execute:
+        description: Delete the legacy resources after saving inventory
+        type: boolean
+        default: false
+      confirm_resource_group:
+        description: Exact resource group name to authorize deletion and Foundry purge
+        type: string
+        required: true
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: foundry-shared-environments
+  queue: max
+
+jobs:
+  teardown:
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 90
+    env:
+      SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
+      CONFIRM_RESOURCE_GROUP: ${{ inputs.confirm_resource_group }}
+      VNET_NAME: ${{ vars.VNET_NAME || 'vnet-air-canada-threat-assessment' }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: azure/login@v3
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Inventory and validate approved scope
+        shell: pwsh
+        run: |
+          ./scripts/reset-hybrid-environments.ps1 -SubscriptionId $env:SUBSCRIPTION_ID -ResourceGroup $env:RESOURCE_GROUP -EvidenceDirectory migration-evidence
+          if ($env:CONFIRM_RESOURCE_GROUP -cne $env:RESOURCE_GROUP) { throw 'Resource group confirmation mismatch' }
+      - name: Preserve pre-deletion recovery inventory
+        uses: actions/upload-artifact@v6
+        with:
+          name: hybrid-migration-inventory-${{ github.run_id }}
+          path: migration-evidence/inventory.json
+          if-no-files-found: error
+          retention-days: 30
+      - name: Preview approved network foundation
+        run: |
+          az deployment group what-if --subscription "$SUBSCRIPTION_ID" --resource-group "$RESOURCE_GROUP" --template-file infra/network.bicep --parameters vnetName="$VNET_NAME" location=eastus2
+      - name: Provision foundation before downtime
+        if: inputs.execute
+        run: |
+          az deployment group create --subscription "$SUBSCRIPTION_ID" --resource-group "$RESOURCE_GROUP" --name hybrid-network-foundation --template-file infra/network.bicep --parameters vnetName="$VNET_NAME" location=eastus2 --output none
+      - name: Delete only approved legacy resources
+        if: inputs.execute
+        shell: pwsh
+        run: |
+          ./scripts/reset-hybrid-environments.ps1 -SubscriptionId $env:SUBSCRIPTION_ID -ResourceGroup $env:RESOURCE_GROUP -EvidenceDirectory migration-execution -Delete -ConfirmResourceGroup $env:CONFIRM_RESOURCE_GROUP
+      - name: Record outcome
+        if: always()
+        shell: pwsh
+        env:
+          RESULT: ${{ job.status }}
+          EXECUTE: ${{ inputs.execute }}
+        run: |
+          "Migration teardown: $env:RESULT; execute=$env:EXECUTE. Inventory artifact retained. Redeployment and live validation are separate required steps." >> $env:GITHUB_STEP_SUMMARY

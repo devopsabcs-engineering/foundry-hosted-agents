@@ -60,3 +60,52 @@ def test_teardown_rejects_unreliable_existence_result(state, exit_code):
     assert result.returncode != 0
     assert "Already absent" not in result.stdout
     assert "Verified absent" not in result.stdout
+
+
+@pytest.mark.parametrize('case,success,deleted', [
+    ('preview', True, False), ('delete', True, True), ('wrong-confirmation', False, False),
+    ('unexpected-app', False, False), ('injected-account', False, False),
+    ('integrated-environment', False, False), ('azure-error', False, False),
+])
+def test_hybrid_migration_scope(tmp_path, case, success, deleted):
+    script = SCRIPT.parent / 'reset-hybrid-environments.ps1'
+    command = r'''
+    $global:Removed = $false
+    function global:az {
+        $global:LASTEXITCODE = if ($env:CASE -eq 'azure-error') { 1 } else { 0 }
+        $verb = $args[0..2] -join ' '
+        if ($args -contains 'delete') { $global:Removed = $true; Write-Host 'DELETE_CALLED'; return }
+        if ($args -contains 'purge') { throw 'Unexpected purge' }
+        if ($global:Removed) { '[]'; return }
+        switch -Wildcard ($verb) {
+            'containerapp list *' {
+                $name = if ($env:CASE -eq 'unexpected-app') { 'not-approved' } else { 'mcp-defender-server' }
+                ConvertTo-Json -InputObject @(@{name=$name; properties=@{
+                    managedEnvironmentId='/environments/mcp-mcp-env'
+                    configuration=@{ingress=@{fqdn='test'}};template=@{containers=@(@{image='digest'})}
+                }}) -Depth 10 -Compress
+            }
+            'containerapp env list' {
+                $network = if ($env:CASE -eq 'integrated-environment') { @{infrastructureSubnetId='subnet'} } else { $null }
+                ConvertTo-Json -InputObject @(@{name='mcp-mcp-env';properties=@{vnetConfiguration=$network}}) -Depth 10
+            }
+            'cognitiveservices account list' {
+                $injection = if ($env:CASE -eq 'injected-account') { @(@{scenario='agent'}) } else { $null }
+                ConvertTo-Json -InputObject @(@{name='aif-air-canada-threat-assessment-poc';kind='AIServices';
+                    location='eastus2';properties=@{networkInjections=$injection}}) -Depth 10
+            }
+            default { throw "Unexpected command $verb" }
+        }
+    }
+    ''' + f"& '{script.as_posix()}' -SubscriptionId 64c3d212-40ed-4c6d-a825-6adfbdf25dad " + (
+        f"-ResourceGroup rg-air-canada-threat-assessment-poc -EvidenceDirectory '{tmp_path.as_posix()}'"
+    )
+    if case != 'preview':
+        confirmation = 'wrong' if case == 'wrong-confirmation' else 'rg-air-canada-threat-assessment-poc'
+        command += f' -Delete -ConfirmResourceGroup {confirmation}'
+    result = subprocess.run(
+        [PWSH, '-NoProfile', '-NonInteractive', '-Command', command],
+        env={**os.environ, 'CASE': case}, capture_output=True, text=True, timeout=30, check=False,
+    )
+    assert (result.returncode == 0) == success, result.stdout + result.stderr
+    assert ('DELETE_CALLED' in result.stdout) == deleted
