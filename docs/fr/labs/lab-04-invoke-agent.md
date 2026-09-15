@@ -60,6 +60,12 @@ Si votre administrateur déploie séparément un chat authentifié connecté à
 L'API anonyme doit retourner 401. HTTPS public ne signifie ni API anonyme ni
 réseau privé.
 
+![Écran de connexion du chat web aux couleurs Air Canada sur ordinateur](../../assets/images/web-chat-air-canada-desktop.png)
+
+Aperçu visuel local capturé le 2026-09-15 avec une configuration fictive, avant
+connexion. Il ne prouve ni l'authentification, ni le déploiement, ni une réponse
+réelle de l'agent. [Voir la capture mobile](../../assets/images/web-chat-air-canada-mobile.png).
+
 Choisissez **New assessment** pour chaque scénario indépendant. Sous
 **Synthetic demo queries**, sélectionnez un exemple, examinez ou modifiez le
 brouillon, puis choisissez **Send message**. La sélection seule n'appelle pas

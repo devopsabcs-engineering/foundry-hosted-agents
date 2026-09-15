@@ -59,6 +59,12 @@ to **your** project, you can also use the optional UI walkthrough below.
 Anonymous API access must return 401. Public HTTPS ingress does not mean
 anonymous API access or private networking.
 
+![Air Canada-themed web chat sign-in screen on desktop](../assets/images/web-chat-air-canada-desktop.png)
+
+Local visual preview captured on 2026-09-15 with fixture configuration, before
+sign-in. This is not evidence of authentication, deployment, or a live agent
+response. [View the mobile capture](../assets/images/web-chat-air-canada-mobile.png).
+
 Choose **New assessment** before each independent scenario. Under
 **Synthetic demo queries**, select a sample, inspect or edit the populated
 composer, then press **Send message**. Selection alone makes no model call;

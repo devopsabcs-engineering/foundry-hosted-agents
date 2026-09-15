@@ -45,28 +45,28 @@ export function addReleaseSlides(pptx, language = 'en') {
     const content = update[language];
     const slide = pptx.addSlide();
     slide.background = { color: 'FFFFFF' };
-    slide.addText(content[0], { x: 0.5, y: 0.35, w: 12.3, h: 0.8, fontSize: 28, bold: true, color: '146C54', fontFace: 'Segoe UI' });
+    slide.addText(content[0], { x: 0.5, y: 0.35, w: 12.3, h: 0.8, fontSize: 28, bold: true, color: '1A1A1A', fontFace: 'Segoe UI' });
     for (let row = 0; row < 3; row++) {
       const top = 1.5 + row * 1.65;
-      slide.addShape('rect', { x: 0.5, y: top, w: 0.06, h: 1.25, fill: { color: ['146C54', '0078D4', 'B22938'][row] }, line: { transparency: 100 } });
-      slide.addText(content[1 + row * 2], { x: 0.75, y: top, w: 11.8, h: 0.4, fontSize: 21, bold: true, color: '243831', fontFace: 'Segoe UI' });
-      slide.addText(content[2 + row * 2], { x: 0.75, y: top + 0.5, w: 11.8, h: 0.85, fontSize: 18, color: '43544D', fontFace: 'Segoe UI', breakLine: false });
+      slide.addShape('rect', { x: 0.5, y: top, w: 0.06, h: 1.25, fill: { color: ['1A1A1A', '0078D4', 'C8102E'][row] }, line: { transparency: 100 } });
+      slide.addText(content[1 + row * 2], { x: 0.75, y: top, w: 11.8, h: 0.4, fontSize: 21, bold: true, color: '1A1A1A', fontFace: 'Segoe UI' });
+      slide.addText(content[2 + row * 2], { x: 0.75, y: top + 0.5, w: 11.8, h: 0.85, fontSize: 18, color: '5A5A5A', fontFace: 'Segoe UI', breakLine: false });
     }
-    slide.addText('Implementation snapshot | 2026-09-10 UTC | 15098b7 + demo UI refresh', { x: 0.5, y: 7.05, w: 11.7, h: 0.25, fontSize: 10, color: '075C9B', hyperlink: { url: latestRun } });
+    slide.addText('Implementation snapshot | 2026-09-10 UTC | 15098b7 + demo UI refresh', { x: 0.5, y: 7.05, w: 11.7, h: 0.25, fontSize: 10, color: 'C8102E', hyperlink: { url: latestRun } });
     slide.addNotes(`${content.join('\n')}\n${update.notes ?? ''}\nDemo controls populate the draft; Send initiates the authenticated request. Start a new assessment for each independent scenario. Scenarios use exact reviewed English fixture prompts in both language tracks. Source: apps/web-chat/frontend/src/samples.js, src/threat-assessment-agent/graph.py, scripts/invoke-agent.sh, .github/workflows/deploy-and-evaluate.yml. ${latestRun}\nLoad: https://github.com/devopsabcs-engineering/foundry-hosted-agents/actions/runs/34427429700\nHistorical artifact slides that follow retain their original run and version labels.`);
   }
   for (const item of proof) {
     const slide = pptx.addSlide();
     slide.background = { color: 'FFFFFF' };
-    slide.addText(`${language === 'en' ? 'Historical proof' : 'Preuve historique'}: ${item[language]}`, { x: 0.45, y: 0.16, w: 12.4, h: 0.55, fontSize: 22, bold: true, color: '146C54', fontFace: 'Segoe UI' });
+    slide.addText(`${language === 'en' ? 'Historical proof' : 'Preuve historique'}: ${item[language]}`, { x: 0.45, y: 0.16, w: 12.4, h: 0.55, fontSize: 22, bold: true, color: '1A1A1A', fontFace: 'Segoe UI' });
     const imagePath = path.join(evidenceDirectory, `${item.image}.png`);
     const dimensions = imageSize(fs.readFileSync(imagePath));
     const scale = Math.min(12.63 / dimensions.width, 5.87 / dimensions.height);
     const width = dimensions.width * scale;
     const height = dimensions.height * scale;
     slide.addImage({ path: imagePath, x: (13.33 - width) / 2, y: 0.85 + (5.87 - height) / 2, w: width, h: height, altText: item[language] });
-    slide.addText(language === 'en' ? 'Artifact rendering, not a portal screenshot. Synthetic fixtures. Sources and SHA-256 hashes retained.' : 'Rendu des artefacts, pas une capture du portail. Données synthétiques. Sources et SHA-256 conservés.', { x: 0.45, y: 6.83, w: 12.4, h: 0.28, fontSize: 10, color: '53635E', fontFace: 'Segoe UI' });
-    slide.addText('GitHub Actions 34178081808 | f3da486 | 2026-09-08 UTC', { x: 0.45, y: 7.14, w: 11.5, h: 0.22, fontSize: 9, color: '075C9B', hyperlink: { url: runUrl }, fontFace: 'Segoe UI' });
+    slide.addText(language === 'en' ? 'Artifact rendering, not a portal screenshot. Synthetic fixtures. Sources and SHA-256 hashes retained.' : 'Rendu des artefacts, pas une capture du portail. Données synthétiques. Sources et SHA-256 conservés.', { x: 0.45, y: 6.83, w: 12.4, h: 0.28, fontSize: 10, color: '5A5A5A', fontFace: 'Segoe UI' });
+    slide.addText('GitHub Actions 34178081808 | f3da486 | 2026-09-08 UTC', { x: 0.45, y: 7.14, w: 11.5, h: 0.22, fontSize: 9, color: 'C8102E', hyperlink: { url: runUrl }, fontFace: 'Segoe UI' });
     slide.addNotes(`${item.notes[language]}\nSource: ${runUrl}\nEvidence: assets/release-evidence/source; SHA-256 manifest: assets/release-evidence/manifest.json. Images render downloaded artifacts, not native portal UI.`);
   }
 }
