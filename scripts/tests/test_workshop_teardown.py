@@ -66,15 +66,23 @@ def test_teardown_rejects_unreliable_existence_result(state, exit_code):
     ('preview', True, False), ('delete', True, True), ('wrong-confirmation', False, False),
     ('unexpected-app', False, False), ('injected-account', False, False),
     ('integrated-environment', False, False), ('azure-error', False, False),
+    ('unexpected-project', False, False), ('invalid-project-inventory', False, False),
 ])
 def test_hybrid_migration_scope(tmp_path, case, success, deleted):
     script = SCRIPT.parent / 'reset-hybrid-environments.ps1'
     command = r'''
     $global:Removed = $false
+    $global:ProjectRemoved = $false
     function global:az {
         $global:LASTEXITCODE = if ($env:CASE -eq 'azure-error') { 1 } else { 0 }
         $verb = $args[0..2] -join ' '
-        if ($args -contains 'delete') { $global:Removed = $true; Write-Host 'DELETE_CALLED'; return }
+        if ($args -contains 'delete') {
+            if ($args -contains 'project') { $global:ProjectRemoved = $true }
+            if ($verb -eq 'cognitiveservices account delete' -and -not $global:ProjectRemoved) {
+                throw 'Project must be removed before its account'
+            }
+            $global:Removed = $true; Write-Host 'DELETE_CALLED'; return
+        }
         if ($args -contains 'purge') { throw 'Unexpected purge' }
         if ($global:Removed) { '[]'; return }
         switch -Wildcard ($verb) {
@@ -93,6 +101,13 @@ def test_hybrid_migration_scope(tmp_path, case, success, deleted):
                 $injection = if ($env:CASE -eq 'injected-account') { @(@{scenario='agent'}) } else { $null }
                 ConvertTo-Json -InputObject @(@{name='aif-air-canada-threat-assessment-poc';kind='AIServices';
                     location='eastus2';properties=@{networkInjections=$injection}}) -Depth 10
+            }
+            'cognitiveservices account project' {
+                if ($env:CASE -eq 'invalid-project-inventory') { '{}'; return }
+                $name = if ($env:CASE -eq 'unexpected-project') { 'unexpected' } else {
+                    'aif-air-canada-threat-assessment-poc/proj-air-canada-threat-assessment-poc'
+                }
+                ConvertTo-Json -InputObject @(@{name=$name;id='/projects/test'}) -Compress
             }
             default { throw "Unexpected command $verb" }
         }

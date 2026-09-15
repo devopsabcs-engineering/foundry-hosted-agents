@@ -54,9 +54,18 @@ $targets = @($apps | Where-Object {
     }
 })
 $targetAccounts = @($accounts | Where-Object { $_.name -in $accountNames })
+$targetProjects = @()
 foreach ($account in $targetAccounts) {
     if ($account.location -ne 'eastus2' -or $account.kind -ne 'AIServices') { throw 'Foundry account mismatch.' }
     if ($account.properties.networkInjections) { throw 'Refusing to reset an already network-injected account.' }
+    $projects = Read-Azure (@('cognitiveservices', 'account', 'project', 'list', '--name', $account.name) + $scope)
+    if ($projects -isnot [array]) { throw 'Invalid project inventory.' }
+    $expectedProject = 'proj-' + $account.name.Substring(4)
+    foreach ($project in $projects) {
+        $projectName = ($project.name -split '/')[-1]
+        if ($projectName -cne $expectedProject) { throw "Unexpected Foundry project: $($project.name). Nothing was deleted." }
+        $targetProjects += @{ account = $account.name; name = $projectName; id = $project.id }
+    }
 }
 $targetEnvironments = @($environments | Where-Object { $_.name -in $environmentNames })
 foreach ($environment in $targetEnvironments) {
@@ -75,6 +84,7 @@ $evidence = @{
         images = @($_.properties.template.containers | ForEach-Object { $_.image })
     } })
     accounts = @($targetAccounts | ForEach-Object { @{ name = $_.name; id = $_.id; location = $_.location } })
+    projects = $targetProjects
     environments = @($targetEnvironments | ForEach-Object { @{ name = $_.name; id = $_.id } })
 }
 New-Item -ItemType Directory -Path $EvidenceDirectory -Force | Out-Null
@@ -87,6 +97,9 @@ foreach ($environment in $targetEnvironments) {
     Write-Azure (@('containerapp', 'env', 'delete', '--name', $environment.name, '--yes') + $scope)
 }
 foreach ($account in $targetAccounts) {
+    foreach ($project in @($targetProjects | Where-Object { $_.account -eq $account.name })) {
+        Write-Azure (@('cognitiveservices', 'account', 'project', 'delete', '--name', $account.name, '--project-name', $project.name) + $scope)
+    }
     Write-Azure (@('cognitiveservices', 'account', 'delete', '--name', $account.name) + $scope)
 }
 $deletedAccounts = Read-Azure @('cognitiveservices', 'account', 'list-deleted', '--subscription', "$SubscriptionId")
