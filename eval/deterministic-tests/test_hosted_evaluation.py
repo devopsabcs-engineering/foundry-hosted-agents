@@ -17,7 +17,9 @@ from run_hosted_evaluation import (
     collect_output_items,
     completed_response,
     criteria,
+    failed_judge_summary,
     runtime_state,
+    task_query,
     validate_candidate_evidence,
     verified_safety_refusal,
 )
@@ -140,6 +142,52 @@ def test_task_adherence_receives_real_agent_constraints():
     assert mappings["task_adherence"]["query"] == "{{item.task_query}}"
     assert mappings["groundedness"]["query"] == "{{item.query}}"
     assert mappings["coherence"]["query"] == "{{item.query}}"
+
+
+@pytest.mark.parametrize("receipts", [[], [{"node": "evidence_investigator", "status": "success"}]])
+def test_task_query_includes_composer_inputs_without_answer_leakage(receipts):
+    record = {
+        "query": "Reported attachment on FIN-WKS-014; telemetry unavailable for 24 hours.",
+        "runtime_state": {
+            "evidence_report": "Verification unavailable; device ID not supplied.",
+            "risk_report": "Risk remains unknown; missing data is not safety.",
+            "tool_calls": receipts,
+            "final_report": "FINAL ANSWER MUST NOT BECOME INPUT EVIDENCE",
+        },
+    }
+    messages = task_query(record)
+    assert [message["role"] for message in messages] == ["system", "user"]
+    assert messages[0]["content"] == agent_instructions()
+    content = messages[1]["content"]
+    assert record["query"] in content
+    assert record["runtime_state"]["evidence_report"] in content
+    assert record["runtime_state"]["risk_report"] in content
+    assert f"recorded tool receipts: {len(receipts)}" in content
+    assert record["runtime_state"]["final_report"] not in content
+
+
+@pytest.mark.parametrize("state", [None, {}, {"evidence_report": "Evidence", "risk_report": "Risk"}])
+def test_task_query_rejects_missing_composer_evidence(state):
+    with pytest.raises(ValueError, match="composer"):
+        task_query({"query": "Incident", "runtime_state": state})
+
+
+def test_failed_judge_summary_identifies_case_and_preserves_reason():
+    rows = failed_judge_summary([{
+        "id": "4", "datasource_item": {"item": {"id": "miss-001"}},
+        "results": [
+            {"name": "coherence", "passed": True},
+            {"name": "task_adherence", "passed": False, "reason": "Missing <detail>|reported\nobservation"},
+        ],
+    }])
+    assert rows[-1] == "| miss-001 | task_adherence | Missing &lt;detail&gt;\\|reported observation |"
+    assert not any("coherence" in row for row in rows)
+    assert failed_judge_summary([]) == []
+
+
+def test_failed_judge_summary_handles_missing_case_and_reason():
+    rows = failed_judge_summary([{"id": "4", "results": [{"name": "task_adherence", "passed": False}]}])
+    assert rows[-1] == "| 4 | task_adherence | No reason returned |"
 
 
 def test_prose_cannot_claim_structured_or_tool_evidence():

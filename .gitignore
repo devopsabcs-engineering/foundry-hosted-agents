@@ -21,6 +21,7 @@ assets/
 !docs/assets/
 !docs/assets/**
 .copilot-tracking/
+**/.foundry/results/
 
 # Local scratch/debug artifacts (pip/pytest/server-smoke .pid and log dumps)
 *.pid

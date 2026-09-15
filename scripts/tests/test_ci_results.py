@@ -1,6 +1,8 @@
+import hashlib
 import importlib.util
 import json
 import os
+import sys
 from pathlib import Path
 
 spec = importlib.util.spec_from_file_location("ci_results", Path(__file__).parents[1] / "ci_results.py")
@@ -27,6 +29,22 @@ def test_missing_evidence_is_not_zero(tmp_path):
     assert record["load"] is None
     assert "N/A" in report.summary(record)
     assert "failure" in report.render_trends([record])
+
+
+def test_evaluator_fingerprint_includes_shared_composer_input(monkeypatch, tmp_path):
+    root = Path(__file__).parents[2]
+    output = tmp_path / "context.json"
+    monkeypatch.setattr(sys, "argv", [
+        "ci_results.py", "--context", str(output), "--agent-version", "13",
+        "--dataset", str(root / "eval/golden-dataset.jsonl"),
+    ])
+    report.main()
+    sources = [root / relative for relative in (
+        "eval/run_hosted_evaluation.py", "eval/evaluation_gate.py",
+        "src/threat-assessment-agent/report_input.py",
+    )]
+    expected = hashlib.sha256(b"".join(source.read_bytes() for source in sources)).hexdigest()
+    assert json.loads(output.read_text())["evaluator_sha256"] == expected
 
 
 def test_junit_counts_cases_without_double_counting_nested_suites(tmp_path):

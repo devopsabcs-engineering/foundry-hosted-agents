@@ -4,6 +4,7 @@ import argparse
 import ast
 import base64
 import binascii
+import html
 import json
 import os
 import runpy
@@ -243,6 +244,25 @@ def agent_instructions() -> str:
     return "\n\n".join(prompts.values())
 
 
+def task_query(record: dict) -> list[dict]:
+    state = record.get("runtime_state")
+    if (
+        not isinstance(state, dict)
+        or any(not isinstance(state.get(field), str) or not state[field].strip()
+               for field in ("evidence_report", "risk_report"))
+        or not isinstance(state.get("tool_calls"), list)
+    ):
+        raise ValueError("Missing structured composer input evidence")
+    source = Path(__file__).parents[1] / "src" / "threat-assessment-agent" / "report_input.py"
+    build_report_input = runpy.run_path(str(source))["build_report_input"]
+    return [
+        {"role": "system", "content": agent_instructions()},
+        {"role": "user", "content": build_report_input(
+            record["query"], state["evidence_report"], state["risk_report"], len(state["tool_calls"])
+        )},
+    ]
+
+
 def criteria(deployment: str) -> list[dict]:
     return [
         {
@@ -272,16 +292,30 @@ def collect_output_items(client, eval_id: str, run_id: str, expected_count: int)
         time.sleep(10)
 
 
+def failed_judge_summary(items: list[dict]) -> list[str]:
+    rows = []
+    for item in items:
+        source = item.get("datasource_item") or {}
+        record = source.get("item", source)
+        identifier = record.get("id", item.get("id", "unknown"))
+        for result in item.get("results", []):
+            if result.get("passed") is False:
+                values = [
+                    identifier, result.get("name", "unknown"), result.get("reason") or "No reason returned",
+                ]
+                cells = [html.escape(str(value)).replace("|", "\\|").replace("\n", " ").replace("\r", " ")
+                         for value in values]
+                rows.append("| " + " | ".join(cells) + " |")
+    return (["", "### Failed Judge Checks", "", "| Case | Metric | Judge reason |",
+             "| --- | --- | --- |", *rows] if rows else [])
+
+
 def evaluate(captured: list[dict], args) -> None:
     from azure.ai.projects import AIProjectClient
     from azure.identity import DefaultAzureCredential
 
-    instructions = agent_instructions()
     evaluation_records = [
-        {**record, "task_query": [
-            {"role": "system", "content": instructions},
-            {"role": "user", "content": record["query"]},
-        ]}
+        {**record, "task_query": task_query(record)}
         for record in captured
     ]
     with (
@@ -349,6 +383,7 @@ def evaluate(captured: list[dict], args) -> None:
                 f"| {metric['testing_criteria']} | {metric['passed']} | "
                 f"{metric.get('errored', 'unknown')} | {metric['failed']} |"
             )
+        summary.extend(failed_judge_summary(items))
         try:
             validate_results(result["run"], items, len(captured), args.minimum_pass_rate)
         except ValueError as error:

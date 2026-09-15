@@ -48,6 +48,10 @@ stable tail percentile. The legacy `sequential-cold-start` mode does not prove a
 not scheduled by CI. Historical load JSON files used an older success contract and are excluded from
 the new trend series. Verified safety refusals remain deterministic checks, not model-judge passes.
 
+Task-adherence evaluation uses the composer's full input, including captured specialist reports
+and tool receipt count. See the [September 15 evaluation correction](task-adherence-20260915.md)
+for the failed-case diagnosis, shared input contract, and controlled replay evidence.
+
 ## Summaries and Wiki History
 
 Offline counts, evaluation summaries, and load numbers appear in the source workflow's job summaries.

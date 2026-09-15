@@ -14,6 +14,8 @@ Foundry project, model, or Toolbox connection is required.
 from __future__ import annotations
 
 import json
+import runpy
+from pathlib import Path
 from typing import Any
 
 import graph
@@ -504,6 +506,24 @@ def test_report_preserves_omitted_user_references_without_trusting_assistant(mon
     assert report.count("203.0.113.45") == 1
     assert "fabricated-host-99" not in report
     assert result["messages"][0].content == report
+
+
+@pytest.mark.parametrize("receipt_count", [0, 1, 3])
+def test_composer_and_evaluator_receive_identical_inputs(monkeypatch, receipt_count):
+    monkeypatch.syspath_prepend(str(Path(__file__).parents[3] / "eval"))
+    task_query = runpy.run_path(str(Path(__file__).parents[3] / "eval" / "run_hosted_evaluation.py"))["task_query"]
+    captured = []
+    monkeypatch.setattr(graph, "_chat", lambda prompt, content: captured.append((prompt, content)) or "Report")
+    incident = "Attachment opened on FIN-WKS-014; telemetry unavailable for 24 hours."
+    state = _base_state(
+        messages=[{"role": "user", "content": incident}],
+        evidence_report="No explicit device ID; verification unavailable.",
+        risk_report="Missing evidence does not establish safety.",
+        tool_calls=[{"status": "success"}] * receipt_count,
+    )
+    graph.report_composer_node(state)
+    messages = task_query({"query": incident, "runtime_state": state})
+    assert captured == [(messages[0]["content"], messages[1]["content"])]
 
 
 def test_report_composer_node_combines_both_reports(monkeypatch) -> None:

@@ -18,6 +18,7 @@ TEAMS_APP_SETUP.md
 .env.*
 .azure/
 .git/
+.foundry/results/
 
 # Python
 __pycache__/

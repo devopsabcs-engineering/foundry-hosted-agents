@@ -542,6 +542,7 @@ def main():
                 "evaluator_sha256": hashlib.sha256(
                     (Path(__file__).parents[1] / "eval/run_hosted_evaluation.py").read_bytes()
                     + (Path(__file__).parents[1] / "eval/evaluation_gate.py").read_bytes()
+                    + (Path(__file__).parents[1] / "src/threat-assessment-agent/report_input.py").read_bytes()
                 ).hexdigest(),
                 "judge_deployment": os.environ.get("JUDGE_DEPLOYMENT"),
             }
