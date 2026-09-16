@@ -25,6 +25,19 @@ def test_clickable_deployment_inventory():
     assert "no production web frontend" in summary
 
 
+def test_current_urls_match_published_entry_points():
+    summary = MODULE.render()
+    for retired in ("wonderfulpebble-ce861678", "ambitioussea-69c7df60",
+                    "aif-air-canada-threat-assessment-staging"):
+        assert retired not in summary
+    assert "aif-air-canada-staging-vnet" in summary
+    assert "mcp-defender-server.redbush-f3ffad44" in summary
+    for relative_path in ("README.md", "docs/index.md", "docs/fr/index.md"):
+        content = (SCRIPT.parents[1] / relative_path).read_text(encoding="utf-8")
+        assert MODULE.WEB_URL in content
+        assert "wonderfulpebble-ce861678" not in content
+
+
 def test_appends_without_overwriting_job_results(tmp_path):
     destination = tmp_path / "summary.md"
     destination.write_text("Existing test results\n", encoding="utf-8")

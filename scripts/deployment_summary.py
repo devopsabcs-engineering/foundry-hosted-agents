@@ -3,7 +3,7 @@ from pathlib import Path
 
 
 REPOSITORY_URL = "https://github.com/devopsabcs-engineering/foundry-hosted-agents"
-WEB_URL = "https://foundry-threat-chat-staging.wonderfulpebble-ce861678.eastus2.azurecontainerapps.io"
+WEB_URL = "https://foundry-threat-chat-staging.purpletree-432267ca.eastus2.azurecontainerapps.io"
 RESOURCE_GROUP_ID = (
     "/subscriptions/64c3d212-40ed-4c6d-a825-6adfbdf25dad"
     "/resourceGroups/rg-air-canada-threat-assessment-poc"
@@ -22,8 +22,8 @@ def render():
         ("Resource group", portal(RESOURCE_GROUP_ID), "Azure access required"),
         ("Container registry", portal(f"{RESOURCE_GROUP_ID}/providers/Microsoft.ContainerRegistry/registries/acraircanadapoc001"), "Image digests and remote builds"),
     ]
-    for label, environment in (("Staging", "staging"), ("Production PoC", "poc")):
-        name = f"air-canada-threat-assessment-{environment}"
+    for label, name in (("Staging", "air-canada-staging-vnet"),
+                        ("Production PoC", "air-canada-threat-assessment-poc")):
         project_id = f"{RESOURCE_GROUP_ID}/providers/Microsoft.CognitiveServices/accounts/aif-{name}/projects/proj-{name}"
         endpoint = f"https://aif-{name}.services.ai.azure.com/api/projects/proj-{name}"
         links.extend([
@@ -31,10 +31,10 @@ def render():
             (f"{label} Responses API", f"{endpoint}/agents/threat-assessment-agent/endpoint/protocols/openai/responses?api-version=v1", "Authenticated POST API, not a browser chat page"),
         ])
     links.extend([
-        ("Staging Defender MCP", "https://mcp-staging-defender-server.wonderfulpebble-ce861678.eastus2.azurecontainerapps.io/mcp", "Synthetic MCP protocol endpoint, not a chat page"),
-        ("Staging anomaly MCP", "https://mcp-staging-anomaly-server.wonderfulpebble-ce861678.eastus2.azurecontainerapps.io/mcp", "Synthetic MCP protocol endpoint, not a chat page"),
-        ("Production PoC Defender MCP", "https://mcp-defender-server.ambitioussea-69c7df60.eastus2.azurecontainerapps.io/mcp", "Synthetic MCP protocol endpoint, not a chat page"),
-        ("Production PoC anomaly MCP", "https://mcp-anomaly-server.ambitioussea-69c7df60.eastus2.azurecontainerapps.io/mcp", "Synthetic MCP protocol endpoint, not a chat page"),
+        ("Staging Defender MCP", "https://mcp-staging-defender-server.purpletree-432267ca.eastus2.azurecontainerapps.io/mcp", "Synthetic MCP protocol endpoint, not a chat page"),
+        ("Staging anomaly MCP", "https://mcp-staging-anomaly-server.purpletree-432267ca.eastus2.azurecontainerapps.io/mcp", "Synthetic MCP protocol endpoint, not a chat page"),
+        ("Production PoC Defender MCP", "https://mcp-defender-server.redbush-f3ffad44.eastus2.azurecontainerapps.io/mcp", "Synthetic MCP protocol endpoint, not a chat page"),
+        ("Production PoC anomaly MCP", "https://mcp-anomaly-server.redbush-f3ffad44.eastus2.azurecontainerapps.io/mcp", "Synthetic MCP protocol endpoint, not a chat page"),
         ("Pilot guide and diagrams", f"{REPOSITORY_URL}/wiki/Web-Chat-Pilot", "Access, deployment, recovery and Teams roadmap"),
         ("Continuous test trends", f"{REPOSITORY_URL}/wiki/Continuous-Test-Trends", "Run-linked validation evidence"),
     ])

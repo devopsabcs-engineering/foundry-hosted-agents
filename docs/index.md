@@ -27,6 +27,16 @@ difference between observed recovery and an unconfirmed platform root cause.
 > telemetry uses synthetic fixtures, not live customer data. Historical
 > investigation excerpts are retained and labeled separately from current results.
 
+## Current Pilot Links
+
+[Open the staging web chatbot](https://foundry-threat-chat-staging.purpletree-432267ca.eastus2.azurecontainerapps.io/)
+with an approved pilot account. The UI uses synthetic security data and targets
+staging, not production. [Health check](https://foundry-threat-chat-staging.purpletree-432267ca.eastus2.azurecontainerapps.io/healthz).
+
+The September 16 hybrid release passed with production version 37;
+see the [current validation record](https://github.com/devopsabcs-engineering/foundry-hosted-agents/blob/main/deliverables/hybrid-network-validation-20260915.md).
+The September 8 artifacts below are historical evidence.
+
 ## Verified Release: September 8, 2026
 
 [Run 34178081808](https://github.com/devopsabcs-engineering/foundry-hosted-agents/actions/runs/34178081808)

@@ -18,11 +18,11 @@ A proof of concept that hosts a LangGraph multi-agent threat-assessment workflow
 
 The infrastructure now targets [private Cosmos with public Foundry access](docs/private-networking.md)
 ([français](docs/fr/private-networking.md)), following the FSI sibling's hybrid pattern.
-Existing accounts and Container Apps environments require a reviewed migration before
-the next release; these template changes are not evidence that the live pilot has migrated.
+The migration and production release passed validation on 2026-09-16; see the
+[verified release evidence](deliverables/hybrid-network-validation-20260915.md).
 Cosmos checkpointing remains optional and disabled in the baseline agent.
 
-[Open the staging chatbot](https://foundry-threat-chat-staging.wonderfulpebble-ce861678.eastus2.azurecontainerapps.io)
+[Open the staging chatbot](https://foundry-threat-chat-staging.purpletree-432267ca.eastus2.azurecontainerapps.io/)
 and sign in with an approved member of **Foundry Threat Assessment Pilot** in the
 `MngEnvMCAP675646.onmicrosoft.com` tenant. The initial approved member is the tenant
 administrator. A same-tenant account without pilot membership is not sufficient.
@@ -55,8 +55,8 @@ This verifies the pilot path, not real Defender telemetry or enterprise readines
 
 | Destination | Purpose |
 | --- | --- |
-| [Web chatbot](https://foundry-threat-chat-staging.wonderfulpebble-ce861678.eastus2.azurecontainerapps.io) | Try the signed-in staging pilot |
-| [Health check](https://foundry-threat-chat-staging.wonderfulpebble-ce861678.eastus2.azurecontainerapps.io/healthz) | Process health only; does not invoke the agent |
+| [Web chatbot](https://foundry-threat-chat-staging.purpletree-432267ca.eastus2.azurecontainerapps.io/) | Try the signed-in staging pilot |
+| [Health check](https://foundry-threat-chat-staging.purpletree-432267ca.eastus2.azurecontainerapps.io/healthz) | Process health only; does not invoke the agent |
 | [Web Chat Pilot wiki](https://github.com/devopsabcs-engineering/foundry-hosted-agents/wiki/Web-Chat-Pilot) | Identity, diagrams, deployment, recovery, verification and Teams roadmap |
 | [Web Chat Build workflow](https://github.com/devopsabcs-engineering/foundry-hosted-agents/actions/workflows/web-chat-build.yml) | Hosted dependency installation, tests and frontend artifacts |
 | [Continuous Test Trends](https://github.com/devopsabcs-engineering/foundry-hosted-agents/wiki/Continuous-Test-Trends) | Agent evaluation and load evidence, separate from web UI verification |

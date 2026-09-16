@@ -29,6 +29,17 @@ cause racine de plateforme qui reste non confirmée.
 > données de sécurité synthétiques, pas des données client réelles. Les
 > extraits historiques sont distingués des résultats actuels.
 
+## Liens actuels du pilote
+
+[Ouvrir le chatbot web de staging](https://foundry-threat-chat-staging.purpletree-432267ca.eastus2.azurecontainerapps.io/)
+avec un compte autorisé du pilote. L'interface utilise des données de sécurité
+synthétiques et cible le staging, pas la production.
+[État du service](https://foundry-threat-chat-staging.purpletree-432267ca.eastus2.azurecontainerapps.io/healthz).
+
+La publication hybride du 16 septembre a réussi avec la version 37 en production ;
+consultez le [rapport de validation actuel](https://github.com/devopsabcs-engineering/foundry-hosted-agents/blob/main/deliverables/hybrid-network-validation-20260915.md).
+Les artefacts du 8 septembre ci-dessous constituent des preuves historiques.
+
 ## Mise en production vérifiée : 8 septembre 2026
 
 L'[exécution 34178081808](https://github.com/devopsabcs-engineering/foundry-hosted-agents/actions/runs/34178081808)
