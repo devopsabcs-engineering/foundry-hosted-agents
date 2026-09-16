@@ -9,7 +9,7 @@ permalink: /private-networking
 > [!WARNING]
 > The shared migration is not release-complete. Private Cosmos CRUD and web health
 > passed, but staging session creation returned `Project not found`, blocking
-> production promotion. See the [dated validation record](../deliverables/hybrid-network-validation-20260915.md).
+> production promotion. See the [dated validation record](https://github.com/devopsabcs-engineering/foundry-hosted-agents/blob/main/deliverables/hybrid-network-validation-20260915.md).
 
 ## Network Boundary
 

@@ -10,7 +10,7 @@ permalink: /fr/private-networking
 > La migration partagée n'est pas terminée. Les opérations Cosmos privées et la
 > santé du chat web sont validées, mais la création de session en staging renvoie
 > `Project not found` et bloque la promotion en production. Voir le
-> [compte rendu daté](../../deliverables/hybrid-network-validation-20260915.md).
+> [compte rendu daté](https://github.com/devopsabcs-engineering/foundry-hosted-agents/blob/main/deliverables/hybrid-network-validation-20260915.md).
 
 ## Périmètre réseau
 
