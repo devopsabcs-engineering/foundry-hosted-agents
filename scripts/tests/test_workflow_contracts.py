@@ -71,6 +71,14 @@ def test_capacity_increase_is_staging_only():
     assert "modelSkuCapacity: modelSkuCapacity" in infrastructure
 
 
+def test_project_identity_can_access_evaluation_assets():
+    foundry = (ROOT / 'infra/modules/ai-foundry.bicep').read_text(encoding='utf-8')
+    assignment = foundry.split('resource projectEvaluationRole ', 1)[1].split('\nresource ', 1)[0]
+    assert 'scope: project' in assignment
+    assert 'principalId: project.identity.principalId' in assignment
+    assert "'53ca6127-db72-4b80-b1b0-d745d6d5456d'" in assignment
+
+
 def test_release_checks_network_before_provisioning():
     release = workflow('deploy-and-evaluate.yml')
     validation = '\n'.join(step.get('run', '') for step in release['jobs']['bicep-validate']['steps'])

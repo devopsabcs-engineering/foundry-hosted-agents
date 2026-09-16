@@ -102,6 +102,16 @@ resource project 'Microsoft.CognitiveServices/accounts/projects@2025-04-01-previ
   }
 }
 
+resource projectEvaluationRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(project.id, 'project-evaluation-foundry-user')
+  scope: project
+  properties: {
+    principalId: project.identity.principalId
+    principalType: 'ServicePrincipal'
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '53ca6127-db72-4b80-b1b0-d745d6d5456d')
+  }
+}
+
 resource telemetryConnection 'Microsoft.CognitiveServices/accounts/projects/connections@2025-04-01-preview' = {
   parent: project
   name: 'application-insights'

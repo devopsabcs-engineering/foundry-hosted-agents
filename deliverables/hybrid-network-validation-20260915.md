@@ -136,7 +136,21 @@ Release provisioning, continuous validation, and web-chat defaults now target
 the replacement staging account and project. The agent consumes the versioned
 toolbox endpoint produced by azd instead of hardcoded toolbox version 1, which
 could retain retired MCP hostnames. Production defaults and quality gates remain
-unchanged. CI deployment and evaluation of these changes are still pending.
+unchanged.
+
+[Release run 35044768604](https://github.com/devopsabcs-engineering/foundry-hosted-agents/actions/runs/35044768604)
+deployed candidate version 2 and passed smoke, streaming, and full-history
+conversation isolation checks. All eight hosted responses were captured.
+Evaluation failed before scoring because project identity
+`7552570a-07b1-4f90-a92a-be7b1346cb8e` lacked evaluation asset read/write access.
+The shared Foundry template now grants that identity Foundry User on its own
+project. This correction requires another release run; production remains blocked.
+
+Web deployment `hybrid-web-chat-account-recovery` succeeded with the retained
+image and identity. An authenticated browser assessment of the synthetic
+crew-admin scenario completed with tool findings and the application provenance
+notice. Sidebar history is held in page memory and clears on reload; this test
+does not establish durable conversation storage.
 Foundry remains public, Cosmos remains private, and baseline checkpointing remains disabled.
 The shared network template retains the approved subnet for future deployments.
 
