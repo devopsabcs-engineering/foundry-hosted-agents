@@ -6,8 +6,8 @@ param image string
 param tenantId string = 'aa93b9d9-037d-4f08-a26d-783cff0e2369'
 param clientId string = '9cfb9dc7-f433-47f6-826b-14bc90a817bc'
 param pilotGroupId string = '201b962a-8619-401e-a1f0-733bca2cd7b2'
-param foundryAccountName string = 'aif-air-canada-threat-assessment-staging'
-param foundryProjectName string = 'proj-air-canada-threat-assessment-staging'
+param foundryAccountName string = 'aif-air-canada-staging-vnet'
+param foundryProjectName string = 'proj-air-canada-staging-vnet'
 
 resource environment 'Microsoft.App/managedEnvironments@2024-03-01' existing = {
   name: environmentName

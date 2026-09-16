@@ -8,6 +8,15 @@
     "location": {
       "value": "${AZURE_LOCATION}"
     },
+    "accountName": {
+      "value": "${FOUNDRY_ACCOUNT_NAME=}"
+    },
+    "projectName": {
+      "value": "${FOUNDRY_PROJECT_NAME=}"
+    },
+    "agentSubnetName": {
+      "value": "${AGENT_SUBNET_NAME=}"
+    },
     "mcpAcrName": {
       "value": "${MCP_ACR_NAME}"
     },

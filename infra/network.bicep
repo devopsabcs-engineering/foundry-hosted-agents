@@ -24,6 +24,9 @@ param agentStagingSubnetPrefix string = '10.30.5.0/24'
 @description('Private endpoint subnet prefix')
 param privateEndpointSubnetPrefix string = '10.30.6.0/24'
 
+@description('Approved replacement staging account subnet prefix')
+param agentStagingRecoverySubnetPrefix string = '10.30.7.0/24'
+
 var delegatedSubnets = [
   { name: 'snet-aca-production', prefix: acaProductionSubnetPrefix }
   { name: 'snet-aca-staging', prefix: acaStagingSubnetPrefix }
@@ -59,6 +62,20 @@ resource vnet 'Microsoft.Network/virtualNetworks@2024-05-01' = {
         properties: {
           addressPrefix: privateEndpointSubnetPrefix
           privateEndpointNetworkPolicies: 'Disabled'
+        }
+      }
+      {
+        name: 'snet-agent-staging-recovery'
+        properties: {
+          addressPrefix: agentStagingRecoverySubnetPrefix
+          delegations: [
+            {
+              name: 'workload-delegation'
+              properties: {
+                serviceName: 'Microsoft.App/environments'
+              }
+            }
+          ]
         }
       }
     ])

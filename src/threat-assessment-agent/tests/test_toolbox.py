@@ -16,6 +16,32 @@ def test_specialist_tool_allowlist(connection):
     assert {tool.name for tool in select_tools(tools, connection)} == ALLOWED_TOOLS[connection]
 
 
+def test_deployed_toolbox_endpoint_overrides_legacy_version(monkeypatch):
+    project = "https://account.services.ai.azure.com/api/projects/staging"
+    endpoint = f"{project}/toolboxes/security-tools/versions/17/mcp?api-version=v1"
+    monkeypatch.setenv("AZURE_AI_PROJECT_ENDPOINT", project + "/")
+    monkeypatch.setenv("FOUNDRY_TOOLBOX_VERSION", "1")
+    monkeypatch.setenv("FOUNDRY_TOOLBOX_MCP_ENDPOINT", endpoint)
+    assert toolbox.toolbox_endpoint() == endpoint
+
+
+def test_legacy_local_toolbox_version_remains_supported(monkeypatch):
+    project = "https://account.services.ai.azure.com/api/projects/staging"
+    monkeypatch.setenv("AZURE_AI_PROJECT_ENDPOINT", project)
+    monkeypatch.setenv("FOUNDRY_TOOLBOX_VERSION", "3")
+    monkeypatch.delenv("FOUNDRY_TOOLBOX_MCP_ENDPOINT", raising=False)
+    monkeypatch.delenv("FOUNDRY_TOOLBOX_NAME", raising=False)
+    assert toolbox.toolbox_endpoint() == f"{project}/toolboxes/security-tools/versions/3/mcp?api-version=v1"
+
+
+def test_cross_project_toolbox_endpoint_fails_closed(monkeypatch):
+    monkeypatch.setenv("AZURE_AI_PROJECT_ENDPOINT", "https://account.services.ai.azure.com/api/projects/staging")
+    monkeypatch.setenv("FOUNDRY_TOOLBOX_MCP_ENDPOINT",
+                      "https://account.services.ai.azure.com/api/projects/production/toolboxes/security-tools/versions/1/mcp")
+    with pytest.raises(ValueError, match="configured project"):
+        toolbox.toolbox_endpoint()
+
+
 def test_missing_required_tools_fail_closed():
     with pytest.raises(RuntimeError, match="Required toolbox tools missing"):
         select_tools([], "defender-conn")

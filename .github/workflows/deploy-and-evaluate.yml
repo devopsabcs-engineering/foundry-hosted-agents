@@ -52,6 +52,9 @@ env:
   GOLDEN_DATASET_PATH: ${{ inputs.golden_dataset_path || 'eval/golden-dataset.jsonl' }}
   AGENT_TEST_PROMPT: "Hello from CI. Reply with a short confirmation that you are running and ready to assess threats."
   STAGING_AZD_ENV_NAME: air-canada-threat-assessment-staging
+  STAGING_FOUNDRY_ACCOUNT_NAME: aif-air-canada-staging-vnet
+  STAGING_FOUNDRY_PROJECT_NAME: proj-air-canada-staging-vnet
+  STAGING_AGENT_SUBNET_NAME: snet-agent-staging-recovery
   PRODUCTION_AZD_ENV_NAME: air-canada-threat-assessment-poc
   VNET_NAME: ${{ vars.VNET_NAME || 'vnet-air-canada-threat-assessment' }}
 
@@ -142,7 +145,7 @@ jobs:
           AZURE_RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
           AZURE_LOCATION: ${{ vars.AZURE_LOCATION }}
         run: |
-          ./scripts/test-network-readiness.ps1 -ResourceGroup $env:AZURE_RESOURCE_GROUP -EnvironmentName $env:STAGING_AZD_ENV_NAME -Location $env:AZURE_LOCATION -VnetName $env:VNET_NAME
+          ./scripts/test-network-readiness.ps1 -ResourceGroup $env:AZURE_RESOURCE_GROUP -EnvironmentName $env:STAGING_AZD_ENV_NAME -Location $env:AZURE_LOCATION -VnetName $env:VNET_NAME -AccountName $env:STAGING_FOUNDRY_ACCOUNT_NAME -AgentSubnetName $env:STAGING_AGENT_SUBNET_NAME
 
       - name: az deployment group what-if (staging resource group)
         env:
@@ -157,6 +160,7 @@ jobs:
             --resource-group "$AZURE_RESOURCE_GROUP" \
             --template-file infra/main.bicep \
             --parameters environmentName="$STAGING_AZD_ENV_NAME" location="$AZURE_LOCATION" \
+              accountName="$STAGING_FOUNDRY_ACCOUNT_NAME" projectName="$STAGING_FOUNDRY_PROJECT_NAME" agentSubnetName="$STAGING_AGENT_SUBNET_NAME" \
               vnetName="$VNET_NAME" \
               mcpAcrName="$MCP_ACR_NAME" defenderMcpImage="$DEFENDER_MCP_IMAGE" anomalyMcpImage="$ANOMALY_MCP_IMAGE"
 
@@ -206,8 +210,11 @@ jobs:
           azd env set AZURE_TENANT_ID "${{ vars.AZURE_TENANT_ID }}"
           azd env set AZURE_LOCATION "${{ vars.AZURE_LOCATION }}"
           azd env set AZURE_RESOURCE_GROUP "${{ vars.AZURE_RESOURCE_GROUP }}"
-          azd env set FOUNDRY_PROJECT_ENDPOINT "https://aif-${STAGING_AZD_ENV_NAME}.services.ai.azure.com/api/projects/proj-${STAGING_AZD_ENV_NAME}"
-          azd env set AZURE_AI_PROJECT_ID "/subscriptions/${{ vars.AZURE_SUBSCRIPTION_ID }}/resourceGroups/${{ vars.AZURE_RESOURCE_GROUP }}/providers/Microsoft.CognitiveServices/accounts/aif-${STAGING_AZD_ENV_NAME}/projects/proj-${STAGING_AZD_ENV_NAME}"
+          azd env set FOUNDRY_ACCOUNT_NAME "$STAGING_FOUNDRY_ACCOUNT_NAME"
+          azd env set FOUNDRY_PROJECT_NAME "$STAGING_FOUNDRY_PROJECT_NAME"
+          azd env set AGENT_SUBNET_NAME "$STAGING_AGENT_SUBNET_NAME"
+          azd env set FOUNDRY_PROJECT_ENDPOINT "https://${STAGING_FOUNDRY_ACCOUNT_NAME}.services.ai.azure.com/api/projects/${STAGING_FOUNDRY_PROJECT_NAME}"
+          azd env set AZURE_AI_PROJECT_ID "/subscriptions/${{ vars.AZURE_SUBSCRIPTION_ID }}/resourceGroups/${{ vars.AZURE_RESOURCE_GROUP }}/providers/Microsoft.CognitiveServices/accounts/${STAGING_FOUNDRY_ACCOUNT_NAME}/projects/${STAGING_FOUNDRY_PROJECT_NAME}"
           azd env set FOUNDRY_MODEL_NAME "${{ vars.FOUNDRY_MODEL_NAME }}"
           azd env set MCP_ACR_NAME "${{ vars.MCP_ACR_NAME }}"
           azd env set DEFENDER_MCP_IMAGE "${{ vars.DEFENDER_MCP_IMAGE }}"
@@ -237,7 +244,7 @@ jobs:
           AZURE_RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
           AZURE_LOCATION: ${{ vars.AZURE_LOCATION }}
         run: |
-          ./scripts/test-network-readiness.ps1 -ResourceGroup $env:AZURE_RESOURCE_GROUP -EnvironmentName $env:STAGING_AZD_ENV_NAME -Location $env:AZURE_LOCATION -VnetName $env:VNET_NAME
+          ./scripts/test-network-readiness.ps1 -ResourceGroup $env:AZURE_RESOURCE_GROUP -EnvironmentName $env:STAGING_AZD_ENV_NAME -Location $env:AZURE_LOCATION -VnetName $env:VNET_NAME -AccountName $env:STAGING_FOUNDRY_ACCOUNT_NAME -AgentSubnetName $env:STAGING_AGENT_SUBNET_NAME
           azd provision --no-prompt
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
@@ -247,7 +254,7 @@ jobs:
         run: |
           set -euo pipefail
           PROJECT_ENDPOINT=$(azd env get-values --output json | jq -er '.FOUNDRY_PROJECT_ENDPOINT')
-          EXPECTED_ENDPOINT="https://aif-${STAGING_AZD_ENV_NAME}.services.ai.azure.com/api/projects/proj-${STAGING_AZD_ENV_NAME}"
+          EXPECTED_ENDPOINT="https://${STAGING_FOUNDRY_ACCOUNT_NAME}.services.ai.azure.com/api/projects/${STAGING_FOUNDRY_PROJECT_NAME}"
           if [ "${PROJECT_ENDPOINT%/}" != "$EXPECTED_ENDPOINT" ]; then
             echo "::error::Staging resolved to $PROJECT_ENDPOINT instead of $EXPECTED_ENDPOINT; refusing to deploy."
             exit 1

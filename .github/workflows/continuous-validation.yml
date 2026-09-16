@@ -75,7 +75,7 @@ jobs:
     env:
       AGENT_NAME: threat-assessment-agent
       STAGING_AZD_ENV_NAME: air-canada-threat-assessment-staging
-      PROJECT_ENDPOINT: https://aif-air-canada-threat-assessment-staging.services.ai.azure.com/api/projects/proj-air-canada-threat-assessment-staging
+      PROJECT_ENDPOINT: https://aif-air-canada-staging-vnet.services.ai.azure.com/api/projects/proj-air-canada-staging-vnet
       JUDGE_DEPLOYMENT: ${{ vars.FOUNDRY_MODEL_NAME }}
       GOLDEN_DATASET_PATH: eval/golden-dataset.jsonl
     steps:
@@ -107,7 +107,7 @@ jobs:
           azd env set AZURE_TENANT_ID "$TENANT_ID"
           azd env set AZURE_RESOURCE_GROUP "$RESOURCE_GROUP"
           azd env set FOUNDRY_PROJECT_ENDPOINT "$PROJECT_ENDPOINT"
-          azd env set AZURE_AI_PROJECT_ID "/subscriptions/$SUBSCRIPTION_ID/resourceGroups/$RESOURCE_GROUP/providers/Microsoft.CognitiveServices/accounts/aif-$STAGING_AZD_ENV_NAME/projects/proj-$STAGING_AZD_ENV_NAME"
+          azd env set AZURE_AI_PROJECT_ID "/subscriptions/$SUBSCRIPTION_ID/resourceGroups/$RESOURCE_GROUP/providers/Microsoft.CognitiveServices/accounts/aif-air-canada-staging-vnet/projects/proj-air-canada-staging-vnet"
           azd env set FOUNDRY_MODEL_NAME "$JUDGE_DEPLOYMENT"
       - name: Resolve the active staging version
         id: target

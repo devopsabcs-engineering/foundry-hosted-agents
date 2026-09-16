@@ -39,12 +39,21 @@ def select_tools(tools, connection):
     return selected
 
 
-@asynccontextmanager
-async def toolbox_tools(connection):
+def toolbox_endpoint():
     endpoint = os.environ["AZURE_AI_PROJECT_ENDPOINT"].rstrip("/")
+    deployed_url = os.environ.get("FOUNDRY_TOOLBOX_MCP_ENDPOINT")
+    if deployed_url:
+        if not deployed_url.startswith(f"{endpoint}/toolboxes/"):
+            raise ValueError("Toolbox endpoint does not belong to the configured project")
+        return deployed_url
     name = quote(os.environ.get("FOUNDRY_TOOLBOX_NAME", "security-tools"), safe="")
     version = quote(os.environ["FOUNDRY_TOOLBOX_VERSION"], safe="")
-    url = f"{endpoint}/toolboxes/{name}/versions/{version}/mcp?api-version=v1"
+    return f"{endpoint}/toolboxes/{name}/versions/{version}/mcp?api-version=v1"
+
+
+@asynccontextmanager
+async def toolbox_tools(connection):
+    url = toolbox_endpoint()
     async with DefaultAzureCredential() as credential:
         async with httpx.AsyncClient(auth=ToolboxAuth(credential), timeout=120) as client:
             async with streamable_http_client(url, http_client=client) as (reader, writer, _):

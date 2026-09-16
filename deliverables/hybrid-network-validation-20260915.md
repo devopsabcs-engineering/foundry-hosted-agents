@@ -1,7 +1,7 @@
 ---
 title: Hybrid Network Migration Validation
 description: Verified private Cosmos connectivity, web recovery, and unresolved Foundry release evidence.
-ms.date: 2026-09-15
+ms.date: 2026-09-16
 ---
 
 ## Release Status
@@ -93,6 +93,52 @@ not resolve the blocker. The host remains in staging for diagnosis; it has not
 been added to the release template or production. Do not repeat teardown or
 change network boundaries as an unverified workaround. Escalate the project
 routing discrepancy with these request IDs and the deployment run.
+
+## Fresh Project Recovery Experiment
+
+[Continuous validation run 35038446737](https://github.com/devopsabcs-engineering/foundry-hosted-agents/actions/runs/35038446737)
+passed offline checks but captured zero of eight responses and failed all five
+concurrent streams. Downloaded invocation stderr confirmed the same
+`NotFound: Project not found` error as the release smoke test.
+
+With approval, deployment `hybrid-staging-project-recovery` created
+`proj-air-canada-threat-assessment-staging-vnet` under the existing injected
+account. Shared connection names could not be recreated or resolved from that
+project, so the isolated experiment uses `defender-recovery` and
+`anomaly-recovery`, with the original agent-facing tool labels.
+
+The original toolbox version 1 and local staging environment still referenced
+obsolete MCP hostnames. Recovery connections and toolbox version 1 were instead
+bound to the current `mcp-staging-*` apps on `purpletree-432267ca`.
+The unchanged agent deployed successfully as version 1. Session creation still
+returned HTTP 404 with request ID `0496fab8-5046-43eb-93d3-bef24e708898`.
+The official `azd ai agent invoke --version 1 --new-session` command reproduced
+the same error. A fresh project name alone therefore did not resolve routing.
+
+The user subsequently approved an additive fresh-account experiment using
+`aif-air-canada-staging-vnet`, project `proj-air-canada-staging-vnet`, and dedicated
+subnet `snet-agent-staging-recovery` (`10.30.7.0/24`). The preview contains only
+recovery additions and reuses existing MCP apps and telemetry. The account
+deployment succeeded. The agent create request lost its HTTP/2 connection,
+but an exact-version read confirmed version 1 was registered and active.
+No duplicate deployment was needed.
+
+At `2026-09-16T01:21:14Z`, version-pinned session creation returned HTTP 201,
+request ID `fb510a99-d49d-4a58-a3cf-8277cf23f82c`. After granting the baseline
+runtime roles, a Responses request with full input history and `store=false`
+returned `response.completed`, request ID
+`64c7d0a0-1a72-41ce-bba7-79ab23e3fd07`. The generic azd invoke default was rejected
+because it uses persisted conversations, which this pilot intentionally forbids.
+The successful response establishes runtime reachability, not golden-dataset
+quality or production readiness.
+
+Release provisioning, continuous validation, and web-chat defaults now target
+the replacement staging account and project. The agent consumes the versioned
+toolbox endpoint produced by azd instead of hardcoded toolbox version 1, which
+could retain retired MCP hostnames. Production defaults and quality gates remain
+unchanged. CI deployment and evaluation of these changes are still pending.
+Foundry remains public, Cosmos remains private, and baseline checkpointing remains disabled.
+The shared network template retains the approved subnet for future deployments.
 
 ## Local Verification
 

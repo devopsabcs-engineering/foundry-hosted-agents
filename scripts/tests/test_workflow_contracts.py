@@ -52,6 +52,8 @@ def test_hosted_telemetry_uses_environment_specific_monitoring_output():
     settings = {item["name"]: item["value"] for item in
                 config["services"]["threat-assessment-agent"]["environmentVariables"]}
     assert settings["APPLICATIONINSIGHTS_CONNECTION_STRING"] == "${applicationInsightsConnectionString}"
+    assert settings["FOUNDRY_TOOLBOX_MCP_ENDPOINT"] == "${TOOLBOX_SECURITY_TOOLS_MCP_ENDPOINT}"
+    assert "FOUNDRY_TOOLBOX_VERSION" not in settings
     assert "output applicationInsightsConnectionString string = monitoring.outputs.applicationInsightsConnectionString" in (
         ROOT / "infra/main.bicep").read_text(encoding="utf-8")
     infrastructure = (ROOT / "infra/main.bicep").read_text(encoding="utf-8")
@@ -83,6 +85,29 @@ def test_release_checks_network_before_provisioning():
         assert '-VnetName $env:VNET_NAME' in provision['run']
         assert any('azd env set VNET_NAME' in step.get('run', '') for step in steps)
     assert 'az deployment group create' not in validation
+
+
+def test_staging_recovery_target_is_consistent():
+    release = workflow('deploy-and-evaluate.yml')
+    assert release['env']['STAGING_FOUNDRY_ACCOUNT_NAME'] == 'aif-air-canada-staging-vnet'
+    assert release['env']['STAGING_FOUNDRY_PROJECT_NAME'] == 'proj-air-canada-staging-vnet'
+    assert release['env']['STAGING_AGENT_SUBNET_NAME'] == 'snet-agent-staging-recovery'
+    for job_name in ('bicep-validate', 'deploy-staging'):
+        script = '\n'.join(step.get('run', '') for step in release['jobs'][job_name]['steps'])
+        assert '-AccountName $env:STAGING_FOUNDRY_ACCOUNT_NAME' in script
+        assert '-AgentSubnetName $env:STAGING_AGENT_SUBNET_NAME' in script
+    staging = '\n'.join(step.get('run', '') for step in release['jobs']['deploy-staging']['steps'])
+    for setting in ('FOUNDRY_ACCOUNT_NAME', 'FOUNDRY_PROJECT_NAME', 'AGENT_SUBNET_NAME'):
+        assert f'azd env set {setting} "$STAGING_{setting}"' in staging
+        assert ('https://${STAGING_FOUNDRY_ACCOUNT_NAME}.services.ai.azure.com/api/projects/'
+            '${STAGING_FOUNDRY_PROJECT_NAME}') in staging
+    endpoint = (f"https://{release['env']['STAGING_FOUNDRY_ACCOUNT_NAME']}.services.ai.azure.com/api/projects/"
+                f"{release['env']['STAGING_FOUNDRY_PROJECT_NAME']}")
+    continuous = workflow('continuous-validation.yml')
+    assert any(job.get('env', {}).get('PROJECT_ENDPOINT') == endpoint for job in continuous['jobs'].values())
+    web = (ROOT / 'infra/web-chat.bicep').read_text(encoding='utf-8')
+    assert f"param foundryAccountName string = '{release['env']['STAGING_FOUNDRY_ACCOUNT_NAME']}'" in web
+    assert f"param foundryProjectName string = '{release['env']['STAGING_FOUNDRY_PROJECT_NAME']}'" in web
 
 
 def test_hybrid_network_contract_keeps_cosmos_optional():

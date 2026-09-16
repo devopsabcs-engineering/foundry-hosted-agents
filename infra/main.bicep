@@ -7,10 +7,10 @@ param location string = resourceGroup().location
 param environmentName string
 
 @description('Foundry account (Microsoft.CognitiveServices/accounts) name')
-param accountName string = 'aif-${environmentName}'
+param accountName string = ''
 
 @description('Foundry project name')
-param projectName string = 'proj-${environmentName}'
+param projectName string = ''
 
 @description('Model deployment name')
 param modelDeploymentName string = 'gpt-4o-mini'
@@ -62,7 +62,12 @@ param mcpNamePrefix string = ''
 @description('Shared network name; deploy infra/network.bicep separately before either environment')
 param vnetName string = 'vnet-air-canada-threat-assessment'
 
+@description('Existing delegated agent subnet override; empty retains the environment default')
+param agentSubnetName string = ''
+
 var isStaging = endsWith(environmentName, '-staging')
+var effectiveAccountName = !empty(accountName) ? accountName : 'aif-${environmentName}'
+var effectiveProjectName = !empty(projectName) ? projectName : 'proj-${environmentName}'
 var effectiveMcpNamePrefix = !empty(mcpNamePrefix) ? mcpNamePrefix : (isStaging ? 'mcp-staging' : 'mcp')
 
 resource vnet 'Microsoft.Network/virtualNetworks@2024-05-01' existing = {
@@ -73,7 +78,7 @@ resource vnet 'Microsoft.Network/virtualNetworks@2024-05-01' existing = {
   }
 
   resource agentSubnet 'subnets' existing = {
-    name: isStaging ? 'snet-agent-staging' : 'snet-agent-production'
+    name: !empty(agentSubnetName) ? agentSubnetName : (isStaging ? 'snet-agent-staging' : 'snet-agent-production')
   }
 }
 
@@ -90,8 +95,8 @@ module aiFoundry 'modules/ai-foundry.bicep' = {
   name: 'ai-foundry'
   params: {
     location: location
-    accountName: accountName
-    projectName: projectName
+    accountName: effectiveAccountName
+    projectName: effectiveProjectName
     applicationInsightsResourceId: monitoring.outputs.applicationInsightsId
     applicationInsightsConnectionString: monitoring.outputs.applicationInsightsConnectionString
     modelDeploymentName: modelDeploymentName

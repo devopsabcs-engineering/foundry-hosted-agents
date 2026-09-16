@@ -16,6 +16,7 @@ PWSH = shutil.which('pwsh')
     ('wrong-delegation', False), ('missing-dns', False), ('wrong-agent-subnet', False),
     ('public-foundry-disabled', False), ('legacy-aca', False), ('azure-error', False),
     ('null-response', False), ('incomplete-inventory', False), ('legacy-foundry', False),
+    ('recovery', True), ('recovery-wrong-subnet', False),
 ])
 def test_network_readiness(case, success):
     stage = 'production' if case == 'production' else 'staging'
@@ -43,7 +44,13 @@ def test_network_readiness(case, success):
         },
         'workloadProfiles': [{'name': 'Consumption', 'workloadProfileType': 'Consumption'}],
     }}]}
-    if case == 'fresh':
+    if case.startswith('recovery'):
+        network['subnets'][1]['name'] = 'snet-agent-staging-recovery'
+        accounts['value'][0]['name'] = 'aif-recovery'
+        accounts['value'][0]['properties']['networkInjections'][0]['subnetArmId'] = (
+            f'{network_id}/subnets/snet-agent-staging-recovery' if case == 'recovery' else 'wrong'
+        )
+    elif case == 'fresh':
         accounts['value'] = environments['value'] = []
     elif case == 'missing-subnet':
         network['subnets'].pop()
@@ -78,7 +85,9 @@ def test_network_readiness(case, success):
         f'-ResourceGroup test -EnvironmentName {environment_name} -Location eastus2 -VnetName test'
     )
     result = subprocess.run(
-        [PWSH, '-NoProfile', '-NonInteractive', '-Command', command],
+        [PWSH, '-NoProfile', '-NonInteractive', '-Command', command + (
+            ' -AccountName aif-recovery -AgentSubnetName snet-agent-staging-recovery'
+            if case.startswith('recovery') else '')],
         env={**os.environ, 'CASE': case, 'NETWORK': json.dumps(network), 'LINKS': json.dumps(links),
              'ACCOUNTS': json.dumps(accounts['value']), 'ENVIRONMENTS': json.dumps(environments)},
         capture_output=True, text=True, timeout=30, check=False,
