@@ -5,11 +5,22 @@ import subprocess
 from pathlib import Path
 
 import pytest
+import yaml
 
 
 ROOT = Path(__file__).resolve().parents[2]
 LABS = sorted((ROOT / "docs/labs").glob("lab-*.md")) + [ROOT / "docs/private-networking.md"]
 PWSH = shutil.which("pwsh")
+
+
+def test_public_pages_base_path():
+    config = yaml.safe_load((ROOT / "docs/_config.yml").read_text(encoding="utf-8"))
+    assert config["url"] == "https://devopsabcs-engineering.github.io"
+    assert config["baseurl"] == "/foundry-hosted-agents"
+    public_url = f"{config['url']}{config['baseurl']}/"
+    readme = (ROOT / "README.md").read_text(encoding="utf-8")
+    assert f"]({public_url})" in readme
+    assert "vigilant-guacamole" not in readme
 
 
 def powershell_blocks(path):

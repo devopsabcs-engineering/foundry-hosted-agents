@@ -1,13 +1,14 @@
 {%- assign is_fr_page = false -%}
+{%- assign fr_path = '/fr' | relative_url -%}
 {%- if page.lang == 'fr' or page.url contains '/fr/' -%}
   {%- assign is_fr_page = true -%}
 {%- endif -%}
 <style>
   /* Left nav is built once for the whole site; hide the other language's links per page. */
   {%- if is_fr_page %}
-  #site-nav .nav-list-item:has(> a.nav-list-link[href]:not([href="/fr"]):not([href^="/fr/"])) { display: none; }
+  #site-nav .nav-list-item:has(> a.nav-list-link[href]:not([href="{{ fr_path }}"]):not([href^="{{ fr_path }}/"])) { display: none; }
   {%- else %}
-  #site-nav .nav-list-item:has(> a.nav-list-link:is([href="/fr"], [href^="/fr/"])) { display: none; }
+  #site-nav .nav-list-item:has(> a.nav-list-link:is([href="{{ fr_path }}"], [href^="{{ fr_path }}/"])) { display: none; }
   {%- endif %}
   .nav-list-item.lang-hidden { display: none !important; }
 </style>
@@ -15,11 +16,12 @@
   // Fallback for browsers without CSS :has() support.
   document.addEventListener('DOMContentLoaded', function () {
     var isFrPage = {{ is_fr_page }};
+    var frPath = {{ fr_path | jsonify }};
     document.querySelectorAll('#site-nav .nav-list-item').forEach(function (item) {
       var link = item.querySelector('a.nav-list-link');
       if (!link || !link.hasAttribute('href')) return;
       var href = link.getAttribute('href') || '';
-      var isFrLink = href === '/fr' || href.indexOf('/fr/') === 0;
+      var isFrLink = href === frPath || href.indexOf(frPath + '/') === 0;
       if (isFrPage !== isFrLink) item.classList.add('lang-hidden');
     });
   });

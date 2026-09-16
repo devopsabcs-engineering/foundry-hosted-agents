@@ -1,8 +1,8 @@
 title: "Foundry Hosted Agents Workshop"
 description: "Hands-on workshop: host a real LangGraph multi-agent system on Microsoft Foundry Hosted Agents"
 remote_theme: just-the-docs/just-the-docs
-baseurl: ""
-url: "https://vigilant-guacamole-y8qe3rw.pages.github.io"
+baseurl: "/foundry-hosted-agents"
+url: "https://devopsabcs-engineering.github.io"
 
 exclude:
   - Gemfile.lock

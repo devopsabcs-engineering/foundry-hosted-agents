@@ -11,8 +11,8 @@ A proof of concept that hosts a LangGraph multi-agent threat-assessment workflow
 [Home](../../wiki/Home) · [Architecture](../../wiki/Architecture) · [Manual Agent Workaround](../../wiki/Manual-Agent-Workaround) · [RBAC 401 Investigation](../../wiki/RBAC-401-Investigation)
 
 🎓 **A hands-on, bilingual (EN/FR) workshop built from this PoC — 9 labs plus a companion slide deck — is published at
-[devopsabcs-engineering.github.io/foundry-hosted-agents](https://vigilant-guacamole-y8qe3rw.pages.github.io/)**
-(source in [`docs/`](docs); requires sign-in since this repo is internal).
+[devopsabcs-engineering.github.io/foundry-hosted-agents](https://devopsabcs-engineering.github.io/foundry-hosted-agents/)**
+(source in [`docs/`](docs); the workshop is publicly accessible).
 
 ## Try the web chatbot
 
