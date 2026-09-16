@@ -6,6 +6,12 @@ permalink: /fr/private-networking
 
 [English version](../private-networking.md)
 
+> [!WARNING]
+> La migration partagée n'est pas terminée. Les opérations Cosmos privées et la
+> santé du chat web sont validées, mais la création de session en staging renvoie
+> `Project not found` et bloque la promotion en production. Voir le
+> [compte rendu daté](../../deliverables/hybrid-network-validation-20260915.md).
+
 ## Périmètre réseau
 
 Cette configuration suit le modèle hybride du dépôt FSI. Ce n'est pas un

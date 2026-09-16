@@ -6,6 +6,11 @@ permalink: /private-networking
 
 [Version française](fr/private-networking.md)
 
+> [!WARNING]
+> The shared migration is not release-complete. Private Cosmos CRUD and web health
+> passed, but staging session creation returned `Project not found`, blocking
+> production promotion. See the [dated validation record](../deliverables/hybrid-network-validation-20260915.md).
+
 ## Network Boundary
 
 This configuration follows the FSI sibling's hybrid pattern. It is not a fully
