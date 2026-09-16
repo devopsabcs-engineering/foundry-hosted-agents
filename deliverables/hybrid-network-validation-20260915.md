@@ -1,19 +1,36 @@
 ---
 title: Hybrid Network Migration Validation
-description: Verified private Cosmos connectivity, web recovery, and unresolved Foundry release evidence.
+description: Verified private Cosmos connectivity, web recovery, and successful Foundry release and continuous validation.
 ms.date: 2026-09-16
 ---
 
 ## Release Status
 
-The migration is not yet release-complete. The approved teardown succeeded in
+The release completed successfully. Staging candidate 3 passed all release
+gates in attempt 2 of
+[run 35046127030](https://github.com/devopsabcs-engineering/foundry-hosted-agents/actions/runs/35046127030/attempts/2).
+Production version 37 is active. Both protected production approvals were
+completed, and production smoke and telemetry checks passed. No gate was bypassed.
+
+[Continuous validation 35046124027, attempt 2](https://github.com/devopsabcs-engineering/foundry-hosted-agents/actions/runs/35046124027/attempts/2)
+also succeeded, including offline regression, exact-version golden evaluation,
+five concurrent Responses streams, and route stability. All five streams
+completed with zero errors; p50 latency was 20.677 seconds and p95 was 24.431
+seconds. This is a bounded synthetic probe, not a production capacity benchmark.
+
+At `2026-09-16T02:58:07Z`, monitoring confirmed one ingested trace for production
+smoke response `resp_KkiyewHj7D0QRS2rKfDMcPugpGZoGoTtfRCVgHLf4K6w6wc6Ox`.
+The subsequent exception query returned zero rows in its trailing ten-minute
+window. This is a point-in-time health check, not a long-term reliability claim.
+
+The approved teardown succeeded in
 [run 35035035564](https://github.com/devopsabcs-engineering/foundry-hosted-agents/actions/runs/35035035564).
 The fresh staging deployment in
 [run 35035668932](https://github.com/devopsabcs-engineering/foundry-hosted-agents/actions/runs/35035668932)
 passed offline checks, infrastructure validation, provisioning, and agent deployment.
 Candidate 14 reported `active`, but all three fresh-session smoke attempts returned
 `NotFound: Project not found`. Evaluation and production promotion were skipped.
-Production has not been restored following teardown. No gate was bypassed.
+The recovery and subsequent passing staging results are recorded below.
 
 ## Private Cosmos Evidence
 
@@ -68,7 +85,8 @@ The new URL is:
 The new SPA callback was added while retaining the previous hostname and localhost
 callback. Browser checks confirmed the page renders, `/healthz` returns 200, and
 anonymous `POST /api/conversations` returns 401. Microsoft sign-in opens correctly.
-Authenticated conversation and history validation remain pending.
+The later authenticated assessment against the replacement account passed, as
+recorded below. Durable browser history is not part of this pilot.
 
 ## Foundry Diagnostic
 
@@ -144,7 +162,18 @@ conversation isolation checks. All eight hosted responses were captured.
 Evaluation failed before scoring because project identity
 `7552570a-07b1-4f90-a92a-be7b1346cb8e` lacked evaluation asset read/write access.
 The shared Foundry template now grants that identity Foundry User on its own
-project. This correction requires another release run; production remains blocked.
+project. In run 35046127030, the role was created at `2026-09-16T02:07:22Z`.
+The initial release attempt and continuous validation still encountered access
+denials. A failed-job-only retry, without reprovisioning candidate 3, then passed:
+
+- Completed hosted captures: 8/8.
+- Coherence, groundedness, and task adherence: 7/7 each, with no errors.
+- Deterministic policy failures: 0.
+- Verified safety refusal: `inject-001`.
+- Evaluation run: `evalrun_6f0e5815d9584f84a62d506c865c88dd`.
+
+The timing is consistent with role propagation delay, not proof of its internal
+cause. Evaluation thresholds, datasets, and network boundaries were unchanged.
 
 Web deployment `hybrid-web-chat-account-recovery` succeeded with the retained
 image and identity. An authenticated browser assessment of the synthetic
@@ -156,6 +185,9 @@ The shared network template retains the approved subnet for future deployments.
 
 ## Local Verification
 
-All 103 script tests passed, including the Cosmos probe, workflow contracts,
-guarded teardown, and workshop documentation. Cloud promotion, hosted-agent invocation, evaluation, and
-authenticated web testing still require successful live evidence.
+The recovery changes passed 213 script and agent tests, with six opt-in tests
+skipped. The evaluation RBAC correction passed 37 workflow and documentation
+tests, and the shared Bicep module compiled. Existing MCP-module BCP318 warnings
+remain. Hosted invocation, evaluation, and authenticated web evidence are
+recorded above. Production smoke and monitoring and the continuous-validation
+retry passed; the final documentation update passed all 22 workshop checks.
