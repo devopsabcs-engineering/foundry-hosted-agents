@@ -42,6 +42,21 @@ test('French samples translate titles and prompts without changing technical evi
   assert.deepEqual(queriesForLanguage('en-CA'), originals);
 });
 
+test('French samples preserve canonical identifier labels for deterministic tool lookups', () => {
+  const patterns = [
+    /\bdevice\s+ID\s*:?\s*([\w][\w.-]*)/gi,
+    /\b(?:account\/user|account|user)\s+ID\s*:?\s*([\w@][\w@.\\-]*)/gi,
+    /\b(failed_logins_per_hour|data_egress_mb_per_hour)\s*[:=]\s*(\d+(?:\.\d+)?)(?![\w.%]|\s*(?:%|percent))/g,
+  ];
+  const originals = queriesForLanguage('en-CA');
+  queriesForLanguage('fr-CA').forEach((sample, index) => {
+    for (const pattern of patterns) {
+      const values = prompt => [...prompt.matchAll(pattern)].map(match => match.slice(1));
+      assert.deepEqual(values(sample.prompt), values(originals[index].prompt), sample.id);
+    }
+  });
+});
+
 test('localized errors preserve correlation IDs and hide unknown upstream details', () => {
   const identifier = '00000000-0000-0000-0000-000000000001';
   const message = `The service is temporarily unavailable. Reference: ${identifier}`;
