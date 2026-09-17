@@ -9,21 +9,42 @@ import '@fontsource-variable/newsreader';
 import './style.css';
 import { consumeResponse } from './stream';
 import { messageRequest } from './request';
-import { sampleQueries } from './samples';
+import { queriesForLanguage } from './samples';
+import { errorText, storedLanguage, STORAGE_KEY, translate } from './i18n';
+
+function useLanguage() {
+  const [language, setLanguage] = useState(() => storedLanguage());
+  useEffect(() => {
+    try { localStorage.setItem(STORAGE_KEY, language); } catch {}
+    document.documentElement.lang = language;
+    document.title = `${translate(language, 'Threat assessment')} | Foundry`;
+  }, [language]);
+  return { language, setLanguage, t: text => translate(language, text) };
+}
+
+function LanguageToggle({ language, setLanguage }) {
+  const label = language === 'en-CA' ? 'Passer au fran\u00e7ais' : 'Switch to English';
+  return <button type="button" className="language-toggle" title={label} aria-label={label}
+    lang={language === 'en-CA' ? 'fr-CA' : 'en-CA'}
+    onClick={() => setLanguage(language === 'en-CA' ? 'fr-CA' : 'en-CA')}>
+    {language === 'en-CA' ? 'FR' : 'EN'}
+  </button>;
+}
 
 function ToolButton({ label, children, ...props }) {
   return <button className="tool" title={label} aria-label={label} {...props}>{children}</button>;
 }
 
-function CopyAnswer({ text }) {
+function CopyAnswer({ text, t }) {
   const [copied, setCopied] = useState(false);
-  return <ToolButton label={copied ? 'Copied' : 'Copy answer'} onClick={async () => {
+  return <ToolButton label={t(copied ? 'Copied' : 'Copy answer')} onClick={async () => {
     try { await navigator.clipboard.writeText(text); setCopied(true); }
     catch { setCopied(false); }
   }}>{copied ? <Check size={16} /> : <Copy size={16} />}</ToolButton>;
 }
 
 function Chat({ auth, config, initialAccount }) {
+  const { language, setLanguage, t } = useLanguage();
   const [account, setAccount] = useState(initialAccount);
   const [allowed, setAllowed] = useState(false);
   const [checking, setChecking] = useState(Boolean(initialAccount));
@@ -118,9 +139,9 @@ function Chat({ auth, config, initialAccount }) {
       setSessions(previous => previous.map(session => session.id === identifier
         ? { ...session, messages: [...session.messages, { role: 'user', text }] } : session));
       appended = true;
-      pendingRequest.current = messageRequest(pendingRequest.current, identifier, text);
+      pendingRequest.current = messageRequest(pendingRequest.current, identifier, text, language);
       const response = await api(`/api/conversations/${identifier}/messages`, {
-        method: 'POST', body: JSON.stringify({ text }), signal: controller.signal,
+        method: 'POST', body: JSON.stringify({ text, language }), signal: controller.signal,
         headers: { 'Idempotency-Key': pendingRequest.current.key },
       });
       await consumeResponse(response.body, payload => {
@@ -143,58 +164,58 @@ function Chat({ auth, config, initialAccount }) {
 
   return <div className="workspace">
     <aside className="sidebar">
-      <div className="brand"><ShieldCheck size={28} /><span>Foundry<span className="brand-sub">ASSESSMENT WORKSPACE</span></span></div>
-      <button className="new-chat" disabled={!allowed || busy} onClick={() => { setActive(null); setDraft(''); setError(''); }}><Plus size={18} />New assessment</button>
-      <div className="section-label">THIS SESSION</div>
-      <nav aria-label="Conversations" className="conversations">
+      <div className="brand"><ShieldCheck size={28} /><span>Foundry<span className="brand-sub">{t('ASSESSMENT WORKSPACE')}</span></span></div>
+      <button className="new-chat" disabled={!allowed || busy} onClick={() => { setActive(null); setDraft(''); setError(''); }}><Plus size={18} />{t('New assessment')}</button>
+      <div className="section-label">{t('THIS SESSION')}</div>
+      <nav aria-label={t('Conversations')} className="conversations">
         {sessions.map(session => <div className={`session ${session.id === active ? 'selected' : ''}`} key={session.id}>
           <button className="session-select" disabled={busy} onClick={() => { setActive(session.id); setDraft(''); setError(''); }}><MessageSquare size={16} /><span>{session.title}</span></button>
-          <ToolButton label="Delete conversation" disabled={busy} onClick={() => removeSession(session.id)}><Trash2 size={15} /></ToolButton>
+          <ToolButton label={t('Delete conversation')} disabled={busy} onClick={() => removeSession(session.id)}><Trash2 size={15} /></ToolButton>
         </div>)}
       </nav>
-      <div className="identity"><span className="identity-label">{account?.name ?? 'Not signed in'}</span>{account && <ToolButton label="Sign out" disabled={busy} onClick={signOut}><LogOut size={18} /></ToolButton>}</div>
+      <div className="identity"><span className="identity-label">{account?.name ?? t('Not signed in')}</span>{account && <ToolButton label={t('Sign out')} disabled={busy} onClick={signOut}><LogOut size={18} /></ToolButton>}</div>
     </aside>
     <main>
-      <header className="topbar"><div><span className="overline">AIR CANADA / SECURITY OPERATIONS</span><h1>Threat assessment</h1></div><span className="environment"><span />Staging pilot</span></header>
+      <header className="topbar"><div><span className="overline">{t('AIR CANADA / SECURITY OPERATIONS')}</span><h1>{t('Threat assessment')}</h1></div><div className="topbar-actions"><span className="environment"><span />{t('Staging pilot')}</span><LanguageToggle language={language} setLanguage={setLanguage} /></div></header>
       <div className="chat-scroll">
         {!messages.length && <section className="empty">
           <div className="agent-mark"><ShieldCheck size={38} strokeWidth={1.4} /></div>
-          <span className="overline">THREAT ASSESSMENT AGENT</span>
-          <h2>{allowed ? 'A new assessment.' : 'Security starts with access.'}</h2>
-          <div className="status-label">{checking ? 'Verifying pilot access...' : allowed ? 'Ready' : 'Internal pilot / authorized members only'}</div>
-          {!account && <button className="primary sign-in" onClick={signIn}><LogIn size={18} />Sign in with Microsoft</button>}
+          <span className="overline">{t('THREAT ASSESSMENT AGENT')}</span>
+          <h2>{t(allowed ? 'A new assessment.' : 'Security starts with access.')}</h2>
+          <div className="status-label">{t(checking ? 'Verifying pilot access...' : allowed ? 'Ready' : 'Internal pilot / authorized members only')}</div>
+          {!account && <button className="primary sign-in" onClick={signIn}><LogIn size={18} />{t('Sign in with Microsoft')}</button>}
         </section>}
-        <div className="messages" role="log" aria-label="Conversation" aria-live="polite" aria-relevant="additions">
+        <div className="messages" role="log" aria-label={t('Conversation')} aria-live="polite" aria-relevant="additions">
           {messages.map((message, index) => <article className={`message ${message.role}`} key={index}>
-            <div className="message-heading"><span>{message.role === 'user' ? 'YOU' : 'ASSESSMENT AGENT'}</span>{message.role === 'assistant' && <CopyAnswer text={message.text} />}</div>
+            <div className="message-heading"><span>{t(message.role === 'user' ? 'YOU' : 'ASSESSMENT AGENT')}</span>{message.role === 'assistant' && <CopyAnswer text={message.text} t={t} />}</div>
             {message.role === 'assistant' ? <Markdown remarkPlugins={[remarkGfm]} skipHtml components={{
               a: ({ children, href }) => <a href={href} target="_blank" rel="noopener noreferrer">{children}</a>,
               img: () => null,
             }}>{message.text}</Markdown> : <p className="user-text">{message.text}</p>}
           </article>)}
-          {busy && <div className="pending" role="status"><span className="pulse" />Assessment in progress</div>}
+          {busy && <div className="pending" role="status"><span className="pulse" />{t('Assessment in progress')}</div>}
           <div ref={end} />
         </div>
       </div>
       <footer className="composer-area">
-        {error && <div className="error" role="alert">{error}</div>}
+        {error && <div className="error" role="alert">{errorText(language, error)}</div>}
         {allowed && <details className="demo-queries" open={!messages.length}>
-          <summary>Synthetic demo queries</summary>
+          <summary>{t('Synthetic demo queries')}</summary>
           <div className="demo-query-list">
-            {sampleQueries.map(sample => <button key={sample.id} type="button" disabled={busy || Boolean(draft)}
+            {queriesForLanguage(language).map(sample => <button key={sample.id} type="button" disabled={busy || Boolean(draft)}
               title={sample.prompt} onClick={() => { setDraft(sample.prompt); composer.current?.focus(); }}>
               <MessageSquare size={16} aria-hidden="true" /><span>{sample.title}</span>
             </button>)}
           </div>
         </details>}
         <form className="composer" onSubmit={send}>
-          <textarea ref={composer} aria-label="Assessment message" placeholder="Describe the incident or ask a follow-up..." value={draft} maxLength={8000} rows={3} disabled={!allowed || busy}
+          <textarea ref={composer} aria-label={t('Assessment message')} placeholder={t('Describe the incident or ask a follow-up...')} value={draft} maxLength={8000} rows={3} disabled={!allowed || busy}
             onChange={event => setDraft(event.target.value)} onKeyDown={event => { if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); send(event); } }} />
-          <div className="composer-bottom"><span>{draft.length.toLocaleString()} / 8,000</span>{busy
-            ? <ToolButton label="Stop response" onClick={() => abort.current?.abort()} type="button"><Square size={18} /></ToolButton>
-            : <button className="send" title="Send message" aria-label="Send message" disabled={!allowed || !draft.trim()} type="submit"><ArrowUp size={21} /></button>}</div>
+          <div className="composer-bottom"><span>{draft.length.toLocaleString(language)} / {(8000).toLocaleString(language)}</span>{busy
+            ? <ToolButton label={t('Stop response')} onClick={() => abort.current?.abort()} type="button"><Square size={18} /></ToolButton>
+            : <button className="send" title={t('Send message')} aria-label={t('Send message')} disabled={!allowed || !draft.trim()} type="submit"><ArrowUp size={21} /></button>}</div>
         </form>
-        <div className="disclaimer">Synthetic or approved pilot data only. Verify recommendations before action. <span aria-label="Application version">v{import.meta.env.VITE_APP_VERSION || '0.0.0-dev'}</span></div>
+        <div className="disclaimer">{t('Synthetic or approved pilot data only. Verify recommendations before action.')} <span aria-label={t('Application version')}>v{import.meta.env.VITE_APP_VERSION || '0.0.0-dev'}</span></div>
       </footer>
     </main>
   </div>;
@@ -215,6 +236,12 @@ async function start() {
   createRoot(document.getElementById('root')).render(<Chat auth={auth} config={config} initialAccount={account} />);
 }
 
+function StartupError() {
+  const { language, setLanguage, t } = useLanguage();
+  return <div className="startup-error"><LanguageToggle language={language} setLanguage={setLanguage} />
+    <p role="alert">{t('The assessment workspace could not load. Refresh to try again.')}</p></div>;
+}
+
 start().catch(() => {
-  createRoot(document.getElementById('root')).render(<div className="startup-error" role="alert">The assessment workspace could not load. Refresh to try again.</div>);
+  createRoot(document.getElementById('root')).render(<StartupError />);
 });

@@ -6,7 +6,7 @@ COPY frontend/package.json frontend/package-lock.json ./
 RUN npm ci
 COPY frontend/index.html frontend/vite.config.js ./
 COPY frontend/src ./src
-COPY frontend/tests/request.test.js frontend/tests/stream.test.js ./tests/
+COPY frontend/tests/request.test.js frontend/tests/stream.test.js frontend/tests/i18n.test.js ./tests/
 RUN npm test && npm run build
 
 FROM python:3.13-slim-bookworm

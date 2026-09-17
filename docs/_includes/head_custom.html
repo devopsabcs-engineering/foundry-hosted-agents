@@ -3,6 +3,23 @@
 {%- if page.lang == 'fr' or page.url contains '/fr/' -%}
   {%- assign is_fr_page = true -%}
 {%- endif -%}
+{%- if is_fr_page -%}
+  {%- assign alternate_path = page.url | remove_first: '/fr' -%}
+  {%- assign alternate_language = 'en' -%}
+  {%- assign alternate_text = 'EN' -%}
+{%- else -%}
+  {%- assign alternate_path = page.url | prepend: '/fr' -%}
+  {%- assign alternate_language = 'fr' -%}
+  {%- assign alternate_text = 'FR' -%}
+{%- endif -%}
+{%- assign alternate_page = site.pages | where: 'url', alternate_path | first -%}
+{%- unless alternate_page -%}
+  {%- if is_fr_page -%}
+    {%- assign alternate_path = '/' -%}
+  {%- else -%}
+    {%- assign alternate_path = '/fr/' -%}
+  {%- endif -%}
+{%- endunless -%}
 <style>
   /* Left nav is built once for the whole site; hide the other language's links per page. */
   {%- if is_fr_page %}
@@ -11,11 +28,29 @@
   #site-nav .nav-list-item:has(> a.nav-list-link:is([href="{{ fr_path }}"], [href^="{{ fr_path }}/"])) { display: none; }
   {%- endif %}
   .nav-list-item.lang-hidden { display: none !important; }
+  .workshop-language { display: flex; justify-content: flex-end; margin-bottom: 12px; }
+  .workshop-language a { display: inline-flex; align-items: center; justify-content: center; width: 44px; min-height: 36px; border: 1px solid #dcdcdc; border-radius: 4px; font-size: 12px; font-weight: 600; text-decoration: none; }
 </style>
 <script>
   // Fallback for browsers without CSS :has() support.
   document.addEventListener('DOMContentLoaded', function () {
     var isFrPage = {{ is_fr_page }};
+    document.documentElement.lang = isFrPage ? 'fr-CA' : 'en-CA';
+    var main = document.querySelector('.main-content');
+    if (main) {
+      var navigation = document.createElement('nav');
+      navigation.className = 'workshop-language';
+      navigation.setAttribute('aria-label', isFrPage ? 'Langue' : 'Language');
+      var toggle = document.createElement('a');
+      toggle.href = {{ alternate_path | relative_url | jsonify }};
+      toggle.lang = {{ alternate_language | jsonify }};
+      toggle.hreflang = {{ alternate_language | jsonify }};
+      toggle.title = isFrPage ? 'Switch to English' : 'Passer au fran\u00e7ais';
+      toggle.setAttribute('aria-label', toggle.title);
+      toggle.textContent = {{ alternate_text | jsonify }};
+      navigation.appendChild(toggle);
+      main.prepend(navigation);
+    }
     var frPath = {{ fr_path | jsonify }};
     document.querySelectorAll('#site-nav .nav-list-item').forEach(function (item) {
       var link = item.querySelector('a.nav-list-link');

@@ -8,4 +8,5 @@ test('retries reuse keys only for matching conversation and text', () => {
   assert.notEqual(messageRequest(original, 'second', 'Hello').key, original.key);
   assert.notEqual(messageRequest(original, 'first', 'Changed').key, original.key);
   assert.notEqual(messageRequest(null, 'first', 'Hello').key, original.key);
+  assert.notEqual(messageRequest(original, 'first', 'Hello', 'fr-CA').key, original.key);
 });

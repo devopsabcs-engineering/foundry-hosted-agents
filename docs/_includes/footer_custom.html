@@ -1,1 +1,1 @@
-<p class="text-small text-grey-dk-100" aria-label="Workshop version">v{{ site.release_version | default: '0.0.0-dev' | escape }}</p>
+<p class="text-small text-grey-dk-100" aria-label="{% if page.lang == 'fr' or page.url contains '/fr/' %}Version de l'atelier{% else %}Workshop version{% endif %}">v{{ site.release_version | default: '0.0.0-dev' | escape }}</p>

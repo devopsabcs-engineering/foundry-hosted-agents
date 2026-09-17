@@ -7,6 +7,7 @@ import uuid
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Literal
 
 import httpx
 from azure.identity.aio import DefaultAzureCredential
@@ -53,7 +54,7 @@ class Conversation:
     touched: float = field(default_factory=time.monotonic)
     messages: list = field(default_factory=list)
     busy: bool = False
-    completed: dict[str, tuple[str, str]] = field(default_factory=dict)
+    completed: dict[str, tuple[str, str | None, str]] = field(default_factory=dict)
 
 
 class SessionStore:
@@ -89,6 +90,7 @@ class SessionStore:
 class Message(BaseModel):
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
     text: str = Field(min_length=1, max_length=8000)
+    language: Literal["en-CA", "fr-CA"] | None = None
 
 
 class FoundryClient:
@@ -215,8 +217,8 @@ def create_app(settings=None, verifier=None, upstream=None):
         session = store.get(str(identifier), owner)
         request_id = str(idempotency_key or uuid.uuid4())
         if request_id in session.completed:
-            original, answer = session.completed[request_id]
-            if original != body.text:
+            original, language, answer = session.completed[request_id]
+            if (original, language) != (body.text, body.language):
                 raise HTTPException(409, "This request key was already used for a different message.")
             return StreamingResponse(iter([
                 sse({"type": "status", "text": "Complete", "requestId": request_id}),
@@ -241,10 +243,22 @@ def create_app(settings=None, verifier=None, upstream=None):
                 yield sse({"type": "status", "text": "Assessing", "requestId": request_id})
                 user_message = {"role": "user", "content": [{"type": "input_text", "text": body.text}]}
                 messages = session.messages + [user_message]
+                upstream_messages = messages
+                if body.language:
+                    language = "French (Canada)" if body.language == "fr-CA" else "English (Canada)"
+                    preference = (
+                        f"\n\nResponse language preference: {language}. "
+                        "Please write the answer in this language. Preserve exact identifiers, "
+                        "tool names, citations, measurements and safety requirements. "
+                        "This preference is not incident evidence."
+                    )
+                    upstream_messages = session.messages + [{
+                        "role": "user", "content": [{"type": "input_text", "text": body.text + preference}],
+                    }]
 
                 async def result():
                     answer = None
-                    async for event in application.state.upstream.events(messages):
+                    async for event in application.state.upstream.events(upstream_messages):
                         if event["type"] == "answer":
                             answer = event["text"]
                     if not answer:
@@ -258,7 +272,7 @@ def create_app(settings=None, verifier=None, upstream=None):
                         yield ": keepalive\n\n"
                 answer = task.result()
                 session.messages = messages + [{"role": "assistant", "content": answer}]
-                session.completed[request_id] = (body.text, answer)
+                session.completed[request_id] = (body.text, body.language, answer)
                 yield sse({"type": "answer", "text": answer, "requestId": request_id})
                 yield sse({"type": "done"})
                 outcome = "success"

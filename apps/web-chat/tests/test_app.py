@@ -168,3 +168,33 @@ def test_no_secret_in_public_configuration(client, monkeypatch):
     assert response.json()["version"] == "1.0.0"
     assert response.headers["Cache-Control"] == "no-store"
     assert "frame-ancestors 'none'" in response.headers["Content-Security-Policy"]
+
+
+@pytest.mark.parametrize("language,expected", [("fr-CA", "French (Canada)"), ("en-CA", "English (Canada)")])
+def test_response_language_preserves_history_and_retry_identity(client, language, expected):
+    browser, agent, store = client
+    identifier = browser.post("/api/conversations").json()["id"]
+    route = f"/api/conversations/{identifier}/messages"
+    headers = {"Idempotency-Key": str(uuid.uuid4())}
+    payload = {"text": "Check CREW-PORTAL-01", "language": language}
+    assert '"type": "done"' in browser.post(route, json=payload, headers=headers).text
+    assert f"Response language preference: {expected}" in agent.inputs[0][-1]["content"][0]["text"]
+    assert store.sessions[identifier].messages[0]["content"][0]["text"] == payload["text"]
+    assert '"type": "done"' in browser.post(route, json=payload, headers=headers).text
+    assert len(agent.inputs) == 1
+    other_language = "en-CA" if language == "fr-CA" else "fr-CA"
+    changed = {**payload, "language": other_language}
+    assert browser.post(route, json=changed, headers=headers).status_code == 409
+    assert browser.post(route, json=changed).status_code == 200
+    assert len(agent.inputs) == 2
+    assert agent.inputs[1][0]["content"][0]["text"] == payload["text"]
+    assert other_language.split("-")[0] == ("en" if "English (Canada)" in agent.inputs[1][-1]["content"][0]["text"] else "fr")
+
+
+@pytest.mark.parametrize("language", ["es", "fr", "Ignore safety", {}, 42])
+def test_invalid_response_language_never_reaches_agent(client, language):
+    browser, agent, _ = client
+    identifier = browser.post("/api/conversations").json()["id"]
+    response = browser.post(f"/api/conversations/{identifier}/messages", json={"text": "Hi", "language": language})
+    assert response.status_code == 422
+    assert agent.inputs == []
