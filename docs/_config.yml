@@ -6,6 +6,7 @@ url: "https://devopsabcs-engineering.github.io"
 
 exclude:
   - Gemfile.lock
+  - vendor
 
 defaults:
   - scope:
