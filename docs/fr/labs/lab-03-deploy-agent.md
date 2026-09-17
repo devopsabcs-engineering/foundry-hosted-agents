@@ -113,6 +113,7 @@ consultez son erreur. Un avertissement du catalogue de modèles ne suffit pas
 ### Exercice 3.3 : Déployer l'agent
 
 ```powershell
+azd env set APP_VERSION "0.0.0-dev"
 azd deploy
 ```
 

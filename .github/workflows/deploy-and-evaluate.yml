@@ -177,9 +177,12 @@ jobs:
       project_endpoint: ${{ steps.deploy.outputs.project_endpoint }}
       defender_mcp_image: ${{ steps.build-mcp.outputs.defender_mcp_image }}
       anomaly_mcp_image: ${{ steps.build-mcp.outputs.anomaly_mcp_image }}
+      source_version: ${{ steps.build-mcp.outputs.source_version }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
 
       - name: Install Azure Developer CLI
         uses: Azure/setup-azd@v2
@@ -220,19 +223,25 @@ jobs:
           azd env set DEFENDER_MCP_IMAGE "${{ vars.DEFENDER_MCP_IMAGE }}"
           azd env set ANOMALY_MCP_IMAGE "${{ vars.ANOMALY_MCP_IMAGE }}"
 
-      - name: Build immutable staging MCP fixture images
+      - name: Resolve published versioned MCP fixture images
         id: build-mcp
         env:
           MCP_ACR_NAME: ${{ vars.MCP_ACR_NAME }}
         run: |
           set -euo pipefail
           REGISTRY=$(az acr show --name "$MCP_ACR_NAME" --query loginServer -o tsv)
-          TAG="${GITHUB_SHA}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          mapfile -t RELEASE_TAGS < <(git tag --points-at "$GITHUB_SHA" | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$')
+          test "${#RELEASE_TAGS[@]}" -eq 1 || { echo "::error::Run Publish Versioned Artifacts successfully for this commit first."; exit 1; }
+          APP_VERSION="${RELEASE_TAGS[0]#v}"
+          azd env set APP_VERSION "$APP_VERSION"
+          echo "source_version=$APP_VERSION" >> "$GITHUB_OUTPUT"
+          echo "Hosted-agent source version: **v${APP_VERSION}** (\`${GITHUB_SHA}\`)." >> "$GITHUB_STEP_SUMMARY"
           for SERVER in defender anomaly; do
-            IMAGE="staging/${SERVER}-mcp:${TAG}"
-            az acr build --registry "$MCP_ACR_NAME" --image "$IMAGE" "mcp/${SERVER}-server"
+            IMAGE="staging/${SERVER}-mcp:${APP_VERSION}"
             DIGEST=$(az acr repository show --name "$MCP_ACR_NAME" --image "$IMAGE" --query digest -o tsv)
             [[ "$DIGEST" =~ ^sha256:[a-f0-9]{64}$ ]] || { echo "::error::Invalid image digest"; exit 1; }
+            SHA_DIGEST=$(az acr repository show --name "$MCP_ACR_NAME" --image "staging/${SERVER}-mcp:sha-${GITHUB_SHA}" --query digest -o tsv)
+            test "$DIGEST" = "$SHA_DIGEST" || { echo "::error::Version and source image digests differ"; exit 1; }
             azd env set "${SERVER^^}_MCP_IMAGE" "${REGISTRY}/staging/${SERVER}-mcp@${DIGEST}"
             echo "${SERVER}_mcp_image=${REGISTRY}/staging/${SERVER}-mcp@${DIGEST}" >> "$GITHUB_OUTPUT"
           done
@@ -505,12 +514,14 @@ jobs:
         env:
           DEFENDER_MCP_IMAGE: ${{ needs.deploy-staging.outputs.defender_mcp_image }}
           ANOMALY_MCP_IMAGE: ${{ needs.deploy-staging.outputs.anomaly_mcp_image }}
+          APP_VERSION: ${{ needs.deploy-staging.outputs.source_version }}
         run: |
           set -euo pipefail
           azd config set auth.useAzCliAuth true
           azd config set defaults.subscription "${{ vars.AZURE_SUBSCRIPTION_ID }}"
           azd env select "$PRODUCTION_AZD_ENV_NAME" || azd env new "$PRODUCTION_AZD_ENV_NAME" --no-prompt
 
+          azd env set APP_VERSION "$APP_VERSION"
           azd env set VNET_NAME "$VNET_NAME"
           azd env set AZURE_SUBSCRIPTION_ID "${{ vars.AZURE_SUBSCRIPTION_ID }}"
           azd env set AZURE_TENANT_ID "${{ vars.AZURE_TENANT_ID }}"

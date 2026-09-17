@@ -160,9 +160,11 @@ def test_expired_session_and_capacity():
     assert failure.value.status_code == 429
 
 
-def test_no_secret_in_public_configuration(client):
+def test_no_secret_in_public_configuration(client, monkeypatch):
+    monkeypatch.setenv("APP_VERSION", "1.0.0")
     client, _, _ = client
     response = client.get("/api/config")
-    assert set(response.json()) == {"tenantId", "clientId", "scope", "environment"}
+    assert set(response.json()) == {"tenantId", "clientId", "scope", "environment", "version"}
+    assert response.json()["version"] == "1.0.0"
     assert response.headers["Cache-Control"] == "no-store"
     assert "frame-ancestors 'none'" in response.headers["Content-Security-Policy"]

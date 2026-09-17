@@ -55,6 +55,8 @@ services:
             - protocol: responses
               version: 2.0.0
         environmentVariables:
+            - name: APP_VERSION
+              value: ${APP_VERSION}
             - name: APPLICATIONINSIGHTS_CONNECTION_STRING
               value: ${applicationInsightsConnectionString}
             - name: FOUNDRY_TOOLBOX_MCP_ENDPOINT

@@ -1,4 +1,6 @@
 FROM node:22-bookworm-slim AS frontend
+ARG APP_VERSION=0.0.0-dev
+ENV VITE_APP_VERSION=$APP_VERSION
 WORKDIR /build
 COPY frontend/package.json frontend/package-lock.json ./
 RUN npm ci
@@ -8,6 +10,10 @@ COPY frontend/tests/request.test.js frontend/tests/stream.test.js ./tests/
 RUN npm test && npm run build
 
 FROM python:3.13-slim-bookworm
+ARG APP_VERSION=0.0.0-dev
+ARG GIT_SHA=unknown
+LABEL org.opencontainers.image.version=$APP_VERSION org.opencontainers.image.revision=$GIT_SHA
+ENV APP_VERSION=$APP_VERSION
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
 WORKDIR /app
 COPY requirements.txt ./

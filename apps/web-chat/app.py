@@ -191,7 +191,8 @@ def create_app(settings=None, verifier=None, upstream=None):
     @application.get("/api/config")
     async def config():
         return {"tenantId": settings.tenant_id, "clientId": settings.client_id,
-                "scope": f"api://{settings.client_id}/Chat.Access", "environment": "staging"}
+                "scope": f"api://{settings.client_id}/Chat.Access", "environment": "staging",
+                "version": os.environ.get("APP_VERSION", "0.0.0-dev")}
 
     @application.get("/api/me")
     async def me(owner: Identity = Depends(identity)):

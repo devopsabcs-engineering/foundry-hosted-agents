@@ -110,6 +110,7 @@ A model-catalog warning alone does not prove failure: verify the actual
 ### Exercise 3.3: Deploy the Agent
 
 ```powershell
+azd env set APP_VERSION "0.0.0-dev"
 azd deploy
 ```
 

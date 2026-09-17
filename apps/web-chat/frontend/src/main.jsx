@@ -194,7 +194,7 @@ function Chat({ auth, config, initialAccount }) {
             ? <ToolButton label="Stop response" onClick={() => abort.current?.abort()} type="button"><Square size={18} /></ToolButton>
             : <button className="send" title="Send message" aria-label="Send message" disabled={!allowed || !draft.trim()} type="submit"><ArrowUp size={21} /></button>}</div>
         </form>
-        <div className="disclaimer">Synthetic or approved pilot data only. Verify recommendations before action.</div>
+        <div className="disclaimer">Synthetic or approved pilot data only. Verify recommendations before action. <span aria-label="Application version">v{import.meta.env.VITE_APP_VERSION || '0.0.0-dev'}</span></div>
       </footer>
     </main>
   </div>;

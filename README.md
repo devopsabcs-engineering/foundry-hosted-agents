@@ -232,6 +232,40 @@ Review the production toolbox version together with the candidate. Before provis
 resolves the currently routed production version from Foundry and records its active status for
 manual recovery; missing or ambiguous routing blocks promotion.
 
+## Automatic release versions
+
+[Publish Versioned Artifacts](https://github.com/devopsabcs-engineering/foundry-hosted-agents/actions/workflows/publish-version.yml)
+runs on every push to `main`, including documentation-only changes. The first version
+is `1.0.0`, tagged `v1.0.0`. Each subsequent first-parent commit on `main` increments
+the patch number, regardless of its commit message. A multi-commit push assigns and
+builds each new version; feature-branch commits are versioned when integrated into
+`main`, not separately within a merge. Existing history before bootstrap is not retagged.
+
+Git tags are the version authority; CI does not create version-bump commits. An explicit
+minor or major tag such as `v1.1.0` changes the base for subsequent patch increments.
+Never move or delete published release tags. Local, unversioned builds display `0.0.0-dev`.
+
+The workflow builds and pushes three repositories to the configured `MCP_ACR_NAME`:
+`web-chat`, `staging/defender-mcp`, and `staging/anomaly-mcp`. Each image receives
+`<version>` and `sha-<full-commit>` tags, OCI version/revision labels, and tag write/delete
+locks after digest verification. There is no mutable `latest` tag. Reruns reuse the
+commit's version and verify existing image tags instead of overwriting them. Git tags
+reserve source versions; a tag alone does not prove that image publication succeeded.
+Retry failed publication jobs before promoting that source version.
+
+The web image embeds its version in the chat footer and `/api/config`. The workshop
+shows its own build version on every EN/FR page. GitHub Pages must use **GitHub Actions**
+as its publishing source so the workflow can inject the version into the Jekyll build.
+The existing `staging` environment supplies OIDC credentials and the registry name;
+pull requests do not allocate release tags or publish images.
+
+Image publication does not redeploy the running web pilot. Deploy the chosen image
+digest through the existing web deployment procedure to display that version live.
+The manual agent release requires successful image publication first, consumes the
+published MCP digests, and keeps production approvals and evaluation gates unchanged.
+Foundry continues using managed source builds; `APP_VERSION` records the Git release
+version separately from Foundry's platform-assigned numeric agent version.
+
 ## Verified release and WI-11 resolution
 
 [Run 34424741660](https://github.com/devopsabcs-engineering/foundry-hosted-agents/actions/runs/34424741660)
