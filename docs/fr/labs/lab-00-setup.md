@@ -129,6 +129,11 @@ Résultat attendu : les deux commandes se terminent sans test échoué. Le nombr
 Certains tests facultatifs sont ignorés par défaut. Utilisez `python -m pytest -rs` avec les
 mêmes chemins pour voir pourquoi. Si une suite échoue, revérifiez l'exercice 0.3 avant de continuer.
 
+Si la collecte échoue avec `ModuleNotFoundError: No module named 'langgraph'` (ou `langchain`),
+pytest s'exécute hors de l'environnement virtuel. La ligne `platform ... --` de l'en-tête pytest
+indique l'interpréteur ; il doit se trouver sous `.venv`. Exécutez `./.venv/Scripts/Activate.ps1`
+dans le même terminal (ou appelez directement `./.venv/Scripts/python.exe -m pytest ...`) puis réessayez.
+
 > [!TIP]
 > Ces deux suites de tests ne touchent pas du tout à Azure — elles
 > s'exécutent entièrement sur des fixtures locales et une machine à états

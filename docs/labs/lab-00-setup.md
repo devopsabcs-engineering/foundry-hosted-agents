@@ -126,6 +126,11 @@ the workshop evolves; do not compare them with an old screenshot or release repo
 Some opt-in tests are skipped by default. Use `python -m pytest -rs` with the same test
 paths to see the skip reasons. If either suite fails, re-check Exercise 0.3 before continuing.
 
+If collection fails with `ModuleNotFoundError: No module named 'langgraph'` (or `langchain`),
+pytest is running outside the virtual environment. The `platform ... --` line in the pytest
+header shows the interpreter; it must be under `.venv`. Run `./.venv/Scripts/Activate.ps1` in
+the same terminal (or call `./.venv/Scripts/python.exe -m pytest ...` directly) and retry.
+
 > [!TIP]
 > These two test suites don't touch Azure at all — they run entirely
 > against local fixtures and a compiled LangGraph state machine. They're a
