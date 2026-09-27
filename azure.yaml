@@ -15,12 +15,22 @@ services:
                   capacity: 10
     anomaly-conn:
         host: azure.ai.connection
-        endpoint: ${ANOMALY_MCP_URL}
-        type: remote-tool
+        uses:
+            - ai-project
+        category: RemoteTool
+        target: ${ANOMALY_MCP_URL}
+        authType: None
+        env:
+            ANOMALY_MCP_URL: ${ANOMALY_MCP_URL}
     defender-conn:
         host: azure.ai.connection
-        endpoint: ${DEFENDER_MCP_URL}
-        type: remote-tool
+        uses:
+            - ai-project
+        category: RemoteTool
+        target: ${DEFENDER_MCP_URL}
+        authType: None
+        env:
+            DEFENDER_MCP_URL: ${DEFENDER_MCP_URL}
     security-tools:
         host: azure.ai.toolbox
         uses:

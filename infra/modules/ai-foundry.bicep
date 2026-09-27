@@ -165,9 +165,8 @@ output modelDeploymentName string = modelDeployment.name
 // Foundry v2 project endpoint (not derivable from account.properties.endpoint's .cognitiveservices.azure.com domain)
 output projectEndpoint string = 'https://${account.name}.services.ai.azure.com/api/projects/${project.name}'
 
-// azd's azure.ai.connection host (azure.yaml: defender-conn/anomaly-conn) treats connections whose
-// endpoint resolves from a bicep output as infrastructure-managed and skips creating them itself
-// during `azd deploy` -- so these MCP Toolbox connections must be created here instead.
+// Provisioned here so the connections exist before `azd deploy`; the azure.ai.connection services in
+// azure.yaml reconcile the same RemoteTool/None definition afterwards.
 resource defenderConnection 'Microsoft.CognitiveServices/accounts/projects/connections@2025-04-01-preview' = if (!empty(defenderMcpUrl)) {
   parent: project
   name: 'defender-conn'
