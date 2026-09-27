@@ -100,6 +100,10 @@ resource project 'Microsoft.CognitiveServices/accounts/projects@2025-04-01-previ
     displayName: projectDisplayName
     description: projectDescription
   }
+  // Account rejects concurrent child operations (RequestConflict), so serialize after the model deployment.
+  dependsOn: [
+    modelDeployment
+  ]
 }
 
 resource projectEvaluationRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
