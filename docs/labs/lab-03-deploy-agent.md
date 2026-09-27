@@ -133,6 +133,13 @@ Use the Git Bash setup from Lab 00 on Windows. The helper is safe to rerun
 after a redeployment that changes the instance identity. Role propagation can
 take several minutes; validate an actual response in Lab 04 before proceeding.
 
+If the helper reports `azd: command not found` or `jq: command not found`,
+`bash` resolved to WSL (`C:\Windows\system32\bash.exe`) instead of Git Bash,
+usually because this is a new PowerShell session. Rerun the PATH and
+`MSYS_NO_PATHCONV` lines from Lab 00 Exercise 0.1, confirm
+`(Get-Command bash).Source` points to `C:\Program Files\Git\bin\bash.exe`,
+then retry.
+
 > **Troubleshooting: `no Foundry project endpoint resolved`**
 >
 > If `azd deploy` fails on the `security-tools` or `threat-assessment-agent`

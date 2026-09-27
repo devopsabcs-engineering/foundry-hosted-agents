@@ -137,6 +137,13 @@ relancer ce script après un redéploiement qui change l'identité d'instance.
 La propagation des rôles peut prendre quelques minutes ; validez une vraie
 réponse au Lab 04 avant de continuer.
 
+Si le script affiche `azd: command not found` ou `jq: command not found`,
+`bash` pointe vers WSL (`C:\Windows\system32\bash.exe`) au lieu de Git Bash,
+souvent parce qu'il s'agit d'une nouvelle session PowerShell. Réexécutez les
+lignes PATH et `MSYS_NO_PATHCONV` de l'exercice 0.1 du Lab 00, vérifiez que
+`(Get-Command bash).Source` pointe vers `C:\Program Files\Git\bin\bash.exe`,
+puis réessayez.
+
 > **Dépannage : `no Foundry project endpoint resolved`**
 >
 > Si `azd deploy` échoue sur le service `security-tools` ou
