@@ -53,7 +53,8 @@ if ($ChatGroupId) { az ad group delete --group $ChatGroupId }
 > [!CAUTION]
 > Deletion removes every resource in the displayed group, including the model,
 > agent project, MCP apps, images and logs. Only proceed for your disposable
-> workshop group. Do not run `azd down` from a shared environment.
+> workshop group. Do not run `azd down` from a shared environment; instructors
+> use the guarded procedure at the end of this lab.
 
 ```powershell
 ./scripts/remove-workshop.ps1 -SubscriptionId $SubscriptionId -EnvironmentName $WorkshopEnv -ResourceGroup $ResourceGroup -Delete -ConfirmResourceGroup $ResourceGroup
@@ -89,3 +90,64 @@ Check Cost Management later because usage charges can arrive after cleanup.
 
 The workshop is complete when your results are recorded, limitations are named,
 and your resource group is verified absent.
+
+## Instructor Only: Tear Down the Shared Air Canada Environment
+
+> [!WARNING]
+> This removes the shared staging and production environment, including every
+> agent version, the web chat pilot, container images and Cosmos data. Only the
+> environment owner runs it, after exporting any evidence to keep.
+
+The shared environment spans two resource groups:
+
+| Resource group | Contents | Removed by |
+|---|---|---|
+| `rg-air-canada-threat-assessment-poc` | Foundry accounts, projects and agents; MCP and web chat container apps; registry; Cosmos DB; VNet and private DNS; monitoring | `azd down --force --purge` (azd-managed group) |
+| `rg-air-canada-threat-assessment-msi` | `msi-air-canada-threat-assessment`, the GitHub OIDC identity used by every workflow | `az group delete` (not azd-managed) |
+
+`azd down` alone is not enough: it only knows the azd-managed group, and Foundry
+rejects account deletion while projects exist. `scripts/teardown-air-canada.ps1`
+wraps it. The script saves an inventory, deletes Foundry projects and capability
+hosts, runs `azd down --force --purge` (falling back to `az group delete`),
+purges soft-deleted Foundry accounts, deletes the identity group, removes the
+identity's orphaned subscription role assignments and verifies both groups are
+absent. The Container Apps-managed `ME_*` groups disappear automatically.
+
+### From Your Workstation
+
+Run from the repository root, signed in to the Air Canada subscription, with the
+local azd environment `air-canada-threat-assessment-poc`. The first command only
+previews; the second deletes both groups:
+
+```powershell
+./scripts/teardown-air-canada.ps1
+./scripts/teardown-air-canada.ps1 -Delete -ConfirmResourceGroups 'rg-air-canada-threat-assessment-poc,rg-air-canada-threat-assessment-msi'
+```
+
+Success requires `Verified absent` for both groups.
+
+### From GitHub Actions
+
+Open **Actions > Teardown Air Canada Environment > Run workflow**:
+
+1. Preview: leave **execute** cleared, then review the job log and the
+   `air-canada-teardown-inventory-<run>` artifact.
+2. Delete workloads: select **execute** and set **confirm_resource_groups** to
+   `rg-air-canada-threat-assessment-poc`. The `production` environment approval
+   applies. The pipeline identity is kept, so you can rerun the workflow.
+3. Optional final run: also select **delete_pipeline_identity** and confirm both
+   groups, comma-separated. The run deletes its own identity, so it only requests
+   deletion. Verify it locally:
+
+```powershell
+az group exists --name rg-air-canada-threat-assessment-msi
+```
+
+After the identity is gone, every workflow in this repository fails at Azure
+sign-in until you recreate the identity, its federated credentials, roles and
+repository variables. Its subscription role assignments become orphaned; remove
+them with the IDs in the inventory artifact.
+
+Tenant objects outside both groups remain: web chat app registrations, pilot
+security groups and Entra agent identities. Remove them separately with tenant
+administrator approval.

@@ -56,7 +56,8 @@ if ($ChatGroupId) { az ad group delete --group $ChatGroupId }
 > [!CAUTION]
 > La suppression retire toutes les ressources du groupe affiché : modèle, projet
 > d'agent, applications MCP, images et journaux. Procédez uniquement pour votre
-> groupe jetable. N'exécutez pas `azd down` depuis un environnement partagé.
+> groupe jetable. N'exécutez pas `azd down` depuis un environnement partagé ; les
+> formateurs utilisent la procédure contrôlée à la fin de ce lab.
 
 ```powershell
 ./scripts/remove-workshop.ps1 -SubscriptionId $SubscriptionId -EnvironmentName $WorkshopEnv -ResourceGroup $ResourceGroup -Delete -ConfirmResourceGroup $ResourceGroup
@@ -94,3 +95,69 @@ tard : des frais d'utilisation peuvent apparaître après le nettoyage.
 
 L'atelier est terminé lorsque vos résultats et limites sont consignés et que
 l'absence du groupe de ressources est vérifiée.
+
+## Formateur seulement : supprimer l'environnement partagé Air Canada
+
+> [!WARNING]
+> Cette procédure supprime l'environnement partagé staging et production, y compris
+> toutes les versions d'agent, le pilote de chat web, les images de conteneur et les
+> données Cosmos. Seul le propriétaire de l'environnement l'exécute, après avoir
+> exporté les preuves à conserver.
+
+L'environnement partagé couvre deux groupes de ressources :
+
+| Groupe de ressources | Contenu | Supprimé par |
+|---|---|---|
+| `rg-air-canada-threat-assessment-poc` | Comptes, projets et agents Foundry ; applications de conteneur MCP et chat web ; registre ; Cosmos DB ; VNet et DNS privé ; supervision | `azd down --force --purge` (groupe géré par azd) |
+| `rg-air-canada-threat-assessment-msi` | `msi-air-canada-threat-assessment`, l'identité OIDC GitHub utilisée par tous les workflows | `az group delete` (non géré par azd) |
+
+`azd down` seul ne suffit pas : il ne connaît que le groupe géré par azd, et Foundry
+refuse de supprimer un compte tant que des projets existent.
+`scripts/teardown-air-canada.ps1` l'encapsule. Le script enregistre un inventaire,
+supprime les projets et les hôtes de capacité Foundry, exécute
+`azd down --force --purge` (avec repli sur `az group delete`), purge les comptes
+Foundry en suppression réversible, supprime le groupe d'identité, retire les
+attributions de rôle orphelines de l'identité au niveau de l'abonnement et vérifie
+l'absence des deux groupes. Les groupes `ME_*` gérés par Container Apps
+disparaissent automatiquement.
+
+### Depuis votre poste
+
+Exécutez depuis la racine du dépôt, connecté à l'abonnement Air Canada, avec
+l'environnement azd local `air-canada-threat-assessment-poc`. La première commande
+prévisualise seulement ; la seconde supprime les deux groupes :
+
+```powershell
+./scripts/teardown-air-canada.ps1
+./scripts/teardown-air-canada.ps1 -Delete -ConfirmResourceGroups 'rg-air-canada-threat-assessment-poc,rg-air-canada-threat-assessment-msi'
+```
+
+La réussite exige `Verified absent` pour les deux groupes.
+
+### Depuis GitHub Actions
+
+Ouvrez **Actions > Teardown Air Canada Environment > Run workflow** :
+
+1. Prévisualisation : laissez **execute** décoché, puis examinez le journal du job
+   et l'artefact `air-canada-teardown-inventory-<run>`.
+2. Suppression des charges de travail : cochez **execute** et saisissez
+   `rg-air-canada-threat-assessment-poc` dans **confirm_resource_groups**.
+   L'approbation de l'environnement `production` s'applique. L'identité du pipeline
+   est conservée ; vous pouvez relancer le workflow.
+3. Dernière exécution facultative : cochez aussi **delete_pipeline_identity** et
+   confirmez les deux groupes, séparés par une virgule. L'exécution supprime sa
+   propre identité ; elle ne fait donc que demander la suppression. Vérifiez-la
+   localement :
+
+```powershell
+az group exists --name rg-air-canada-threat-assessment-msi
+```
+
+Une fois l'identité supprimée, chaque workflow du dépôt échoue à la connexion Azure
+jusqu'à ce que vous recréiez l'identité, ses identifiants fédérés, ses rôles et les
+variables du dépôt. Ses attributions de rôle au niveau de l'abonnement deviennent
+orphelines ; retirez-les avec les ID de l'artefact d'inventaire.
+
+Les objets du tenant hors des deux groupes restent : inscriptions d'application du
+chat web, groupes de sécurité du pilote et identités d'agent Entra. Retirez-les
+séparément avec l'approbation d'un administrateur du tenant.

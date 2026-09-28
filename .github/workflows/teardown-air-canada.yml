@@ -1,0 +1,73 @@
+name: Teardown Air Canada Environment
+
+on:
+  workflow_dispatch:
+    inputs:
+      execute:
+        description: Delete resources (false = inventory preview only)
+        type: boolean
+        default: false
+      delete_pipeline_identity:
+        description: Also delete rg-air-canada-threat-assessment-msi (this workflow's own OIDC identity; last run possible)
+        type: boolean
+        default: false
+      confirm_resource_groups:
+        description: Comma-separated groups to delete, exactly as previewed
+        type: string
+        required: false
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: foundry-shared-environments
+  queue: max
+
+jobs:
+  teardown:
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 120
+    env:
+      AZD_ENV_NAME: ${{ vars.AZURE_ENV_NAME || 'air-canada-threat-assessment-poc' }}
+      KEEP_IDENTITY: ${{ !inputs.delete_pipeline_identity }}
+      CONFIRM_RESOURCE_GROUPS: ${{ inputs.confirm_resource_groups }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: azure/login@v3
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - uses: Azure/setup-azd@v2
+      - name: Prepare azd environment
+        run: |
+          azd ext install microsoft.foundry
+          azd config set auth.useAzCliAuth true
+          azd env new "$AZD_ENV_NAME" --subscription "${{ vars.AZURE_SUBSCRIPTION_ID }}" --location eastus2 --no-prompt
+          azd env set AZURE_RESOURCE_GROUP rg-air-canada-threat-assessment-poc
+      - name: Preview inventory
+        shell: pwsh
+        run: ./scripts/teardown-air-canada.ps1 -KeepPipelineIdentity:([bool]::Parse($env:KEEP_IDENTITY))
+      - name: Preserve pre-deletion inventory
+        uses: actions/upload-artifact@v6
+        with:
+          name: air-canada-teardown-inventory-${{ github.run_id }}
+          path: teardown-evidence/inventory.json
+          if-no-files-found: error
+          retention-days: 30
+      - name: Delete and verify
+        if: inputs.execute
+        shell: pwsh
+        run: ./scripts/teardown-air-canada.ps1 -KeepPipelineIdentity:([bool]::Parse($env:KEEP_IDENTITY)) -Delete -ConfirmResourceGroups $env:CONFIRM_RESOURCE_GROUPS -EvidenceDirectory teardown-execution -Confirm:$false
+      - name: Record outcome
+        if: always()
+        shell: pwsh
+        env:
+          RESULT: ${{ job.status }}
+          EXECUTE: ${{ inputs.execute }}
+        run: |
+          "Air Canada teardown: $env:RESULT; execute=$env:EXECUTE; keepPipelineIdentity=$env:KEEP_IDENTITY. Inventory artifact retained." >> $env:GITHUB_STEP_SUMMARY

@@ -124,3 +124,67 @@ def test_hybrid_migration_scope(tmp_path, case, success, deleted):
     )
     assert (result.returncode == 0) == success, result.stdout + result.stderr
     assert ('DELETE_CALLED' in result.stdout) == deleted
+
+
+AIR_CANADA_MOCK = r'''
+$global:Gone = @{}
+$global:Calls = [System.Collections.Generic.List[string]]::new()
+function global:azd { $global:Calls.Add('azd down'); $global:Gone['rg-air-canada-threat-assessment-poc'] = $true; $global:LASTEXITCODE = 0 }
+function global:az {
+    $global:LASTEXITCODE = 0
+    $verb = $args[0..2] -join ' '
+    $group = $args[[array]::IndexOf($args, '--name') + 1]
+    switch -Wildcard ($verb) {
+        'group exists *' { if ($global:Gone[$group]) { 'false' } else { 'true' } }
+        'group delete *' { $global:Calls.Add("group delete $group $($args -contains '--no-wait')"); $global:Gone[$group] = $true }
+        'resource list *' { '[{"name":"r","type":"t","id":"/r"}]' }
+        'identity show *' { '{"principalId":"p"}' }
+        'role assignment *' {
+            if ($args[2] -eq 'delete') { $global:Calls.Add("role delete $($args[4])"); return }
+            '[{"id":"/sub-ra","roleDefinitionName":"Contributor","scope":"/subscriptions/s"},
+              {"id":"/rg-ra","roleDefinitionName":"Foundry User","scope":"/subscriptions/s/resourceGroups/rg-air-canada-threat-assessment-poc"}]'
+        }
+        'cognitiveservices account list' { '[{"name":"aif-a","id":"/accounts/aif-a"}]' }
+        'cognitiveservices account project' {
+            if ($args[3] -eq 'delete') { $global:Calls.Add('project delete'); return }
+            '[{"name":"aif-a/proj-a"}]'
+        }
+        'rest *' { '["/accounts/aif-a/capabilityHosts/h"]' }
+        'resource delete *' { $global:Calls.Add('caphost delete') }
+        'cognitiveservices account list-deleted' {
+            '[{"name":"aif-a","location":"eastus2","id":"/subscriptions/s/resourceGroups/rg-air-canada-threat-assessment-poc/deletedAccounts/aif-a"}]'
+        }
+        'cognitiveservices account purge' { $global:Calls.Add('purge') }
+        default { throw "Unexpected command $verb" }
+    }
+}
+'''
+BOTH = 'rg-air-canada-threat-assessment-poc,rg-air-canada-threat-assessment-msi'
+
+
+@pytest.mark.parametrize('flags,ci,success,expected', [
+    ('', False, True, []),
+    ('-Delete -ConfirmResourceGroups wrong', False, False, []),
+    ('-Delete -ConfirmResourceGroups rg-air-canada-threat-assessment-poc', False, False, []),
+    (f'-Delete -ConfirmResourceGroups {BOTH} -Confirm:$false', False, True, [
+        'project delete', 'caphost delete', 'azd down', 'purge',
+        'group delete rg-air-canada-threat-assessment-msi False', 'role delete /sub-ra']),
+    (f'-Delete -ConfirmResourceGroups {BOTH} -Confirm:$false', True, True, [
+        'project delete', 'caphost delete', 'azd down', 'purge',
+        'group delete rg-air-canada-threat-assessment-msi True']),
+    ('-KeepPipelineIdentity -Delete -ConfirmResourceGroups rg-air-canada-threat-assessment-poc -Confirm:$false',
+     False, True, ['project delete', 'caphost delete', 'azd down', 'purge']),
+])
+def test_air_canada_teardown(tmp_path, flags, ci, success, expected):
+    script = SCRIPT.parent / 'teardown-air-canada.ps1'
+    command = AIR_CANADA_MOCK + (
+        f"& '{script.as_posix()}' -EvidenceDirectory '{tmp_path.as_posix()}' {flags}; "
+        "Write-Output \"CALLS=$($global:Calls -join '|')\""
+    )
+    environment = {**os.environ, 'GITHUB_ACTIONS': 'true' if ci else 'false'}
+    result = subprocess.run([PWSH, '-NoProfile', '-NonInteractive', '-Command', command],
+                            env=environment, capture_output=True, text=True, timeout=30, check=False)
+    assert (result.returncode == 0) == success, result.stdout + result.stderr
+    if success:
+        assert f"CALLS={'|'.join(expected)}" in result.stdout, result.stdout
+    assert json.loads((tmp_path / 'inventory.json').read_text())['groups']
