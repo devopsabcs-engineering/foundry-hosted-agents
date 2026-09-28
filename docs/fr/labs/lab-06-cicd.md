@@ -134,8 +134,12 @@ Contrôle facultatif pour les mainteneurs (`actionlint` à installer séparémen
 
 ```bash
 bash scripts/test-agent-response.sh
-actionlint -shellcheck= .github/workflows/deploy-and-evaluate.yml
+actionlint -shellcheck= -ignore 'unexpected key "queue" for "concurrency" section' .github/workflows/deploy-and-evaluate.yml
 ```
+
+actionlint 1.7.12 et versions antérieures ne reconnaissent pas la clé GitHub
+Actions `concurrency.queue` ; l'option `-ignore` supprime uniquement ce faux
+positif. Ne retirez pas `queue: max` du workflow pour satisfaire un linter ancien.
 
 Historiquement, le 7 septembre, le validateur a accepté une réponse réelle de la version 32
 du PoC avec le prompt CI et rejeté les 12 cas invalides. Cela ne vérifie ni

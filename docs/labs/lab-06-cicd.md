@@ -132,8 +132,12 @@ Optional maintainer check (requires a separately installed `actionlint`):
 
 ```bash
 bash scripts/test-agent-response.sh
-actionlint -shellcheck= .github/workflows/deploy-and-evaluate.yml
+actionlint -shellcheck= -ignore 'unexpected key "queue" for "concurrency" section' .github/workflows/deploy-and-evaluate.yml
 ```
+
+actionlint 1.7.12 and earlier do not recognize the GitHub Actions
+`concurrency.queue` key, so the `-ignore` flag suppresses only that false
+positive. Do not remove `queue: max` from the workflow to satisfy an older linter.
 
 Historically, on September 7, the validator passed against a live PoC version 32 response
 using the CI prompt, and rejected all 12 invalid regression cases. This
