@@ -128,6 +128,7 @@ def test_hybrid_migration_scope(tmp_path, case, success, deleted):
 
 AIR_CANADA_MOCK = r'''
 $global:Gone = @{}
+$global:HostPolls = 0
 $global:Calls = [System.Collections.Generic.List[string]]::new()
 function global:azd { $global:Calls.Add('azd down'); $global:Gone['rg-air-canada-threat-assessment-poc'] = $true; $global:LASTEXITCODE = 0 }
 function global:az {
@@ -149,8 +150,15 @@ function global:az {
             if ($args[3] -eq 'delete') { $global:Calls.Add('project delete'); return }
             '[{"name":"aif-a/proj-a"}]'
         }
-        'rest *' { '["/accounts/aif-a/capabilityHosts/h"]' }
-        'resource delete *' { $global:Calls.Add('caphost delete') }
+        'rest *' {
+            if ($global:HostPolls++ -lt 1 -or -not $global:Gone['caphost']) {
+                '[{"id":"/accounts/aif-a/capabilityHosts/h","state":"Succeeded"}]'
+            } else { '[]' }
+        }
+        'resource delete *' {
+            if ($args -notcontains '--no-wait') { throw 'Capability hosts must be deleted with --no-wait' }
+            $global:Calls.Add('caphost delete'); $global:Gone['caphost'] = $true
+        }
         'cognitiveservices account list-deleted' {
             '[{"name":"aif-a","location":"eastus2","id":"/subscriptions/s/resourceGroups/rg-air-canada-threat-assessment-poc/deletedAccounts/aif-a"}]'
         }
@@ -182,7 +190,7 @@ BOTH = 'rg-air-canada-threat-assessment-poc,rg-air-canada-threat-assessment-msi'
 def test_air_canada_teardown(tmp_path, flags, ci, success, expected):
     script = SCRIPT.parent / 'teardown-air-canada.ps1'
     command = AIR_CANADA_MOCK + (
-        f"& '{script.as_posix()}' -EvidenceDirectory '{tmp_path.as_posix()}' {flags}; "
+        f"& '{script.as_posix()}' -EvidenceDirectory '{tmp_path.as_posix()}' -PollSeconds 0 {flags}; "
         "Write-Output \"CALLS=$($global:Calls -join '|')\""
     )
     environment = {**os.environ, 'GITHUB_ACTIONS': 'true' if ci else 'false'}

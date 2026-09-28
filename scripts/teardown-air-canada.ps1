@@ -5,7 +5,8 @@ param(
     [string[]]$ConfirmResourceGroups,
     [switch]$KeepPipelineIdentity,
     [string]$AzdEnvironment = 'air-canada-threat-assessment-poc',
-    [string]$EvidenceDirectory = 'teardown-evidence'
+    [string]$EvidenceDirectory = 'teardown-evidence',
+    [int]$PollSeconds = 60
 )
 
 $ErrorActionPreference = 'Stop'
@@ -26,6 +27,11 @@ function Test-Group([string]$Name) {
     $exists = Invoke-Az @('group', 'exists', '--name', $Name)
     if ($exists -isnot [bool]) { throw 'Azure did not return a valid resource-group existence result.' }
     $exists
+}
+function Get-CapabilityHost([string]$AccountId) {
+    $raw = & az rest --method get --url "https://management.azure.com$AccountId/capabilityHosts?api-version=2025-06-01" --query 'value[].{id:id, state:properties.provisioningState}' --output json --only-show-errors
+    if ($LASTEXITCODE -ne 0) { throw "Could not list capability hosts for $AccountId." }
+    if ($raw) { ($raw -join "`n") | ConvertFrom-Json }
 }
 
 $inventory = [ordered]@{
@@ -58,18 +64,25 @@ if (-not $PSCmdlet.ShouldProcess("$SubscriptionId/$expected", 'Permanently delet
 if ($inventory.groups.Contains($WorkloadGroup)) {
     $scope = @('--resource-group', $WorkloadGroup)
     # Foundry rejects account deletion while child projects exist, and capability hosts keep agent subnets linked.
-    foreach ($account in @(Invoke-Az (@('cognitiveservices', 'account', 'list') + $scope))) {
+    $accounts = @(Invoke-Az (@('cognitiveservices', 'account', 'list') + $scope))
+    foreach ($account in $accounts) {
         foreach ($project in @(Invoke-Az (@('cognitiveservices', 'account', 'project', 'list', '--name', $account.name) + $scope))) {
             $projectName = ($project.name -split '/')[-1]
             Write-Output "Deleting Foundry project $($account.name)/$projectName"
             Invoke-Az (@('cognitiveservices', 'account', 'project', 'delete', '--name', $account.name, '--project-name', $projectName) + $scope) | Out-Null
         }
-        $hosts = & az rest --method get --url "https://management.azure.com$($account.id)/capabilityHosts?api-version=2025-06-01" --query 'value[].id' --output json --only-show-errors
-        if ($LASTEXITCODE -ne 0) { throw "Could not list capability hosts for $($account.name)." }
-        foreach ($hostId in @(($hosts -join "`n") | ConvertFrom-Json)) {
-            Write-Output "Deleting capability host $hostId"
-            Invoke-Az @('resource', 'delete', '--ids', $hostId, '--api-version', '2025-06-01') | Out-Null
-        }
+    }
+    # Capability host deletion takes tens of minutes each, so start them all and wait together.
+    foreach ($capabilityHost in @($accounts | ForEach-Object { Get-CapabilityHost $_.id })) {
+        if ($capabilityHost.state -eq 'Deleting') { Write-Output "Already deleting: $($capabilityHost.id)"; continue }
+        Write-Output "Deleting capability host $($capabilityHost.id)"
+        Invoke-Az @('resource', 'delete', '--ids', $capabilityHost.id, '--api-version', '2025-06-01', '--no-wait') | Out-Null
+    }
+    $deadline = (Get-Date).AddMinutes(120)
+    while (($remaining = @($accounts | ForEach-Object { Get-CapabilityHost $_.id })).Count) {
+        if ((Get-Date) -gt $deadline) { throw "Capability hosts still present after 120 minutes: $($remaining.id -join ', ')" }
+        Write-Output "$(Get-Date -Format 'HH:mm:ss') waiting on $($remaining.Count) capability host(s): $(($remaining | ForEach-Object { "$(($_.id -split '/')[-1])=$($_.state)" }) -join ', ')"
+        Start-Sleep -Seconds $PollSeconds
     }
     & azd down --force --purge --no-prompt --environment $AzdEnvironment --cwd (Split-Path $PSScriptRoot -Parent)
     if ($LASTEXITCODE -ne 0 -or (Test-Group $WorkloadGroup)) {
