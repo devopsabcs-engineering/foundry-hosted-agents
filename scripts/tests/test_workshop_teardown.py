@@ -172,6 +172,10 @@ BOTH = 'rg-air-canada-threat-assessment-poc,rg-air-canada-threat-assessment-msi'
     (f'-Delete -ConfirmResourceGroups {BOTH} -Confirm:$false', True, True, [
         'project delete', 'caphost delete', 'azd down', 'purge',
         'group delete rg-air-canada-threat-assessment-msi True']),
+    ("-Delete -ConfirmResourceGroups 'rg-air-canada-threat-assessment-msi, rg-air-canada-threat-assessment-poc' "
+     '-Confirm:$false', True, True, [
+        'project delete', 'caphost delete', 'azd down', 'purge',
+        'group delete rg-air-canada-threat-assessment-msi True']),
     ('-KeepPipelineIdentity -Delete -ConfirmResourceGroups rg-air-canada-threat-assessment-poc -Confirm:$false',
      False, True, ['project delete', 'caphost delete', 'azd down', 'purge']),
 ])

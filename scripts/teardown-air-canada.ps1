@@ -17,7 +17,8 @@ $groups = @($WorkloadGroup) + @(if (-not $KeepPipelineIdentity) { $IdentityGroup
 $inCi = $env:GITHUB_ACTIONS -eq 'true'
 
 function Invoke-Az([string[]]$Arguments) {
-    $raw = & az @Arguments --subscription $SubscriptionId --output json --only-show-errors
+    $target = if ($Arguments -contains '--ids') { @() } else { @('--subscription', $SubscriptionId) }
+    $raw = & az @Arguments @target --output json --only-show-errors
     if ($LASTEXITCODE -ne 0) { throw "Azure command failed: az $($Arguments[0..2] -join ' ')" }
     if ($raw) { ($raw -join "`n") | ConvertFrom-Json }
 }
@@ -50,7 +51,8 @@ $inventory | ConvertTo-Json -Depth 8 | Set-Content (Join-Path $EvidenceDirectory
 
 if (-not $Delete) { Write-Output 'Preview only. Nothing was deleted.'; return }
 $expected = $groups -join ','
-if (($ConfirmResourceGroups -join ',') -cne $expected) { throw "Deletion requires -ConfirmResourceGroups '$expected'. Nothing was deleted." }
+$confirmed = @($ConfirmResourceGroups -split ',' | ForEach-Object { $_.Trim() } | Where-Object { $_ } | Sort-Object -Unique)
+if (($confirmed -join ',') -cne (($groups | Sort-Object) -join ',')) { throw "Deletion requires -ConfirmResourceGroups '$expected'. Nothing was deleted." }
 if (-not $PSCmdlet.ShouldProcess("$SubscriptionId/$expected", 'Permanently delete these resource groups')) { return }
 
 if ($inventory.groups.Contains($WorkloadGroup)) {
