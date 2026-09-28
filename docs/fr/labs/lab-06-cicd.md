@@ -52,7 +52,10 @@ bash scripts/test-production-version.sh
 python -m pytest eval/deterministic-tests/ scripts/tests/ -q
 ```
 
-Réussite : les quatre commandes se terminent sans erreur. Une réussite locale
+Réussite : les quatre commandes se terminent sans erreur. `test-agent-response.sh`
+affiche une ligne `jq: error` pour chaque flux malformé qu'il soumet volontairement
+au validateur ; ces rejets sont attendus. Sa dernière ligne `PASS: ... invalid streams
+rejected` donne le résultat. Une réussite locale
 ne vérifie ni OIDC GitHub, ni les approbations, ni la promotion ou la récupération
 en production ; notez ces éléments comme inspectés, pas exécutés.
 

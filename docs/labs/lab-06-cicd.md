@@ -51,7 +51,10 @@ bash scripts/test-production-version.sh
 python -m pytest eval/deterministic-tests/ scripts/tests/ -q
 ```
 
-Pass condition: all four commands succeed. A local pass does not verify GitHub
+Pass condition: all four commands succeed. `test-agent-response.sh` prints one
+`jq: error` line per malformed stream it intentionally feeds the validator; those
+are expected rejections. Its final `PASS: ... invalid streams rejected` line is the
+result. A local pass does not verify GitHub
 OIDC, approvals, production promotion or recovery; mark those as inspected, not
 executed, in your learner notes.
 
