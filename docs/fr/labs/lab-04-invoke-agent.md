@@ -56,14 +56,90 @@ prouve pas la réussite d'un flux SSE.
 
 ### Exercice 4.2 : Examiner trois scénarios
 
-L'atelier de base ne déploie pas d'application web. Exécutez ces trois cas sur
-votre agent avec le script d'évaluation du Lab 05. N'utilisez pas le pilote
-staging partagé d'un formateur ou d'un client pour terminer cet exercice.
+Le déploiement de l'agent du Lab 03 n'a pas d'interface utilisateur. Pour
+dialoguer avec **votre** agent, déployez le chat web authentifié dans votre
+propre groupe apprenant avec les étapes ci-dessous. N'utilisez pas le pilote
+staging partagé d'un formateur ou d'un client pour terminer cet exercice. Si vous
+ne pouvez pas créer d'objets Entra, exécutez plutôt ces trois cas avec le script
+d'évaluation du Lab 05.
 
-Si votre administrateur déploie séparément un chat authentifié connecté à
-**votre** projet, vous pouvez aussi suivre le parcours facultatif ci-dessous.
-L'API anonyme doit retourner 401. HTTPS public ne signifie ni API anonyme ni
-réseau privé.
+#### Déployer votre propre chat web
+
+Le chat web est une Container App dans votre environnement MCP. Il vous
+authentifie avec Microsoft Entra ID et appelle votre agent avec sa propre
+identité managée. Il vous faut :
+
+* L'autorisation de créer une inscription d'application et un groupe de sécurité
+  dans votre tenant.
+* Un rôle capable d'accorder le consentement administrateur pour tout le tenant,
+  par exemple Administrateur d'applications cloud. Sinon, demandez à votre
+  administrateur du tenant d'exécuter l'étape d'identité.
+* Les variables de session du Lab 02 : `$SubscriptionId`, `$Suffix`, `$WorkshopEnv`,
+  `$ResourceGroup`, `$Registry`, `$McpPrefix`, `$ImageTag` et `$LoginServer`.
+
+Créez un groupe de sécurité pour les utilisateurs du chat et ajoutez-vous :
+
+```powershell
+$TenantId = az account show --query tenantId -o tsv
+$ChatGroupName = "$WorkshopEnv-chat-users"
+$ChatGroupId = az ad group list --display-name $ChatGroupName --query '[0].id' -o tsv
+if (-not $ChatGroupId) {
+    $ChatGroupId = az ad group create --display-name $ChatGroupName --mail-nickname $ChatGroupName --query id -o tsv
+}
+$MyObjectId = az ad signed-in-user show --query id -o tsv
+if ((az ad group member check --group $ChatGroupId --member-id $MyObjectId --query value -o tsv) -ne 'true') {
+    az ad group member add --group $ChatGroupId --member-id $MyObjectId
+}
+```
+
+Inscrivez une application de connexion pour l'URL de votre chat. L'URL est connue
+avant le déploiement, car une Container App est servie à `<app>.<domaine de l'environnement>` :
+
+```powershell
+$ChatApp = "fha-chat-$Suffix"
+$ChatDomain = az resource show --subscription $SubscriptionId --resource-group $ResourceGroup `
+  --name "$McpPrefix-mcp-env" --resource-type Microsoft.App/managedEnvironments --query properties.defaultDomain -o tsv
+$ChatUrl = "https://$ChatApp.$ChatDomain"
+$ChatIdentity = ./scripts/setup-web-chat-identity.ps1 -TenantId $TenantId -PilotGroupId $ChatGroupId `
+  -RedirectUri $ChatUrl -DisplayName "$WorkshopEnv web chat" | ConvertFrom-Json
+```
+
+Construisez l'image dans votre registre et déployez l'application à côté de vos
+serveurs MCP :
+
+```powershell
+$ChatImage = "${LoginServer}/web-chat:$ImageTag"
+az acr build --subscription $SubscriptionId --registry $Registry `
+  --image "web-chat:$ImageTag" --build-arg APP_VERSION=0.0.0-workshop ./apps/web-chat
+$ProjectParts = (azd env get-value AZURE_AI_PROJECT_ID -e $WorkshopEnv) -split '/'
+$ChatParameters = @("appName=$ChatApp", "environmentName=$McpPrefix-mcp-env", "acrName=$Registry",
+  "image=$ChatImage", "tenantId=$TenantId", "clientId=$($ChatIdentity.clientId)", "pilotGroupId=$ChatGroupId",
+  "foundryAccountName=$($ProjectParts[8])", "foundryProjectName=$($ProjectParts[10])")
+az deployment group create --subscription $SubscriptionId --resource-group $ResourceGroup `
+  --name workshop-web-chat --template-file infra/web-chat.bicep --parameters @ChatParameters --output none
+```
+
+Vérifiez que l'application est saine et que les appels anonymes sont refusés :
+
+```powershell
+(Invoke-WebRequest "$ChatUrl/healthz").StatusCode
+$Anonymous = Invoke-WebRequest -Method Post "$ChatUrl/api/conversations" -SkipHttpErrorCheck
+if ($Anonymous.StatusCode -ne 401) { throw "Anonymous API access must return 401, got $($Anonymous.StatusCode)" }
+$ChatUrl
+```
+
+Ouvrez l'URL affichée et connectez-vous avec le compte ajouté au groupe. HTTPS
+public ne signifie ni API anonyme ni réseau privé.
+
+* Le rôle Foundry User de l'identité du chat peut prendre quelques minutes à
+  s'appliquer. Si le premier message échoue avec une erreur d'autorisation,
+  patientez puis renvoyez-le.
+* Si l'API indique que l'appartenance au pilote est requise, déconnectez-vous puis
+  reconnectez-vous pour que votre jeton contienne le nouveau groupe. Les comptes
+  membres de plus de 200 groupes ne reçoivent pas de revendication `groups` ;
+  utilisez un compte avec moins d'appartenances.
+* Le Lab 09 supprime l'application avec votre groupe de ressources. L'inscription
+  d'application et le groupe sont des objets du tenant : le Lab 09 les retire séparément.
 
 ![Écran de connexion du chat web aux couleurs Air Canada sur ordinateur](../../assets/images/web-chat-air-canada-desktop.png)
 

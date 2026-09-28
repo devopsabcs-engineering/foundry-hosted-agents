@@ -36,6 +36,18 @@ The script lists resources without deleting anything. It requires the name
 A mismatch stops the script. Never add tags to an existing customer group to
 bypass this guard. Missing tags require an ownership review with your instructor.
 
+## Remove the Web Chat Identity
+
+If you deployed the web chat in Lab 04, also delete its app registration and
+security group. They are tenant objects, so deleting the resource group leaves them behind:
+
+```powershell
+$ChatAppId = az ad app list --display-name "$WorkshopEnv web chat" --query '[0].appId' -o tsv
+if ($ChatAppId) { az ad app delete --id $ChatAppId }
+$ChatGroupId = az ad group list --display-name "$WorkshopEnv-chat-users" --query '[0].id' -o tsv
+if ($ChatGroupId) { az ad group delete --group $ChatGroupId }
+```
+
 ## Delete and Verify
 
 > [!CAUTION]
@@ -69,7 +81,8 @@ with your administrator rather than deleting dependencies used by another enviro
 
 Group deletion does not promise removal of tenant-level Entra agent identities,
 GitHub OIDC credentials or soft-deleted service records. The base workshop creates
-no GitHub environment or web-chat app registration. Have an authorized tenant
+no GitHub environment; the optional web chat's app registration and group are
+removed by the step above. Have an authorized tenant
 administrator inspect any service-created identity retained after deletion;
 do not delete shared identities or purge recoverable records without approval.
 Check Cost Management later because usage charges can arrive after cleanup.

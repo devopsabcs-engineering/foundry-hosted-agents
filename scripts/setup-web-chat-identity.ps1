@@ -1,11 +1,11 @@
 param(
     [string]$RedirectUri = 'http://localhost:8000',
     [string]$TenantId = 'aa93b9d9-037d-4f08-a26d-783cff0e2369',
-    [string]$PilotGroupId = '201b962a-8619-401e-a1f0-733bca2cd7b2'
+    [string]$PilotGroupId = '201b962a-8619-401e-a1f0-733bca2cd7b2',
+    [string]$DisplayName = 'Foundry Threat Assessment Web Chat'
 )
 
 $ErrorActionPreference = 'Stop'
-$displayName = 'Foundry Threat Assessment Web Chat'
 $scopeId = 'c975c04e-a028-42da-b365-6d9dd4e9085e'
 $roleId = 'ef52b0b1-2d8e-4a72-89ce-ac1212066351'
 

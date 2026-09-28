@@ -38,6 +38,19 @@ Une différence arrête le script. N'ajoutez jamais ces étiquettes à un groupe
 existant pour contourner le contrôle. Faites vérifier les étiquettes manquantes
 et la propriété du groupe avec votre formateur.
 
+## Retirer l'identité du chat web
+
+Si vous avez déployé le chat web au Lab 04, supprimez aussi son inscription
+d'application et son groupe de sécurité. Ce sont des objets du tenant : la
+suppression du groupe de ressources ne les retire pas.
+
+```powershell
+$ChatAppId = az ad app list --display-name "$WorkshopEnv web chat" --query '[0].appId' -o tsv
+if ($ChatAppId) { az ad app delete --id $ChatAppId }
+$ChatGroupId = az ad group list --display-name "$WorkshopEnv-chat-users" --query '[0].id' -o tsv
+if ($ChatGroupId) { az ad group delete --group $ChatGroupId }
+```
+
 ## Supprimer et vérifier
 
 > [!CAUTION]
@@ -72,8 +85,9 @@ examinez les échecs avec l'administrateur sans supprimer de dépendances partag
 
 Supprimer le groupe ne garantit pas la suppression des identités d'agent Entra
 du tenant, des identifiants OIDC GitHub ou des enregistrements de service conservés
-en suppression réversible. L'atelier de base ne crée ni environnement GitHub ni
-inscription d'application web. Faites examiner les identités conservées par un
+en suppression réversible. L'atelier de base ne crée pas d'environnement GitHub ;
+l'inscription d'application et le groupe du chat web facultatif sont retirés par
+l'étape ci-dessus. Faites examiner les identités conservées par un
 administrateur autorisé ; ne supprimez pas d'identités partagées et ne purgez pas
 d'enregistrements récupérables sans approbation. Consultez Cost Management plus
 tard : des frais d'utilisation peuvent apparaître après le nettoyage.
