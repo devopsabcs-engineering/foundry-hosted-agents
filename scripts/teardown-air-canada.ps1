@@ -76,7 +76,8 @@ if ($inventory.groups.Contains($WorkloadGroup)) {
     foreach ($capabilityHost in @($accounts | ForEach-Object { Get-CapabilityHost $_.id })) {
         if ($capabilityHost.state -eq 'Deleting') { Write-Output "Already deleting: $($capabilityHost.id)"; continue }
         Write-Output "Deleting capability host $($capabilityHost.id)"
-        Invoke-Az @('resource', 'delete', '--ids', $capabilityHost.id, '--api-version', '2025-06-01', '--no-wait') | Out-Null
+        & az rest --method delete --url "https://management.azure.com$($capabilityHost.id)?api-version=2025-06-01" --output none --only-show-errors
+        if ($LASTEXITCODE -ne 0) { throw "Could not start deleting $($capabilityHost.id)." }
     }
     $deadline = (Get-Date).AddMinutes(120)
     while (($remaining = @($accounts | ForEach-Object { Get-CapabilityHost $_.id })).Count) {

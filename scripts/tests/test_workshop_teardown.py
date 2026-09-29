@@ -150,14 +150,11 @@ function global:az {
             if ($args[3] -eq 'delete') { $global:Calls.Add('project delete'); return }
             '[{"name":"aif-a/proj-a"}]'
         }
-        'rest *' {
+        'rest --method delete' { $global:Calls.Add('caphost delete'); $global:Gone['caphost'] = $true }
+        'rest --method get' {
             if ($global:HostPolls++ -lt 1 -or -not $global:Gone['caphost']) {
                 '[{"id":"/accounts/aif-a/capabilityHosts/h","state":"Succeeded"}]'
             } else { '[]' }
-        }
-        'resource delete *' {
-            if ($args -notcontains '--no-wait') { throw 'Capability hosts must be deleted with --no-wait' }
-            $global:Calls.Add('caphost delete'); $global:Gone['caphost'] = $true
         }
         'cognitiveservices account list-deleted' {
             '[{"name":"aif-a","location":"eastus2","id":"/subscriptions/s/resourceGroups/rg-air-canada-threat-assessment-poc/deletedAccounts/aif-a"}]'
