@@ -33,6 +33,27 @@ function Get-CapabilityHost([string]$AccountId) {
     if ($LASTEXITCODE -ne 0) { throw "Could not list capability hosts for $AccountId." }
     if ($raw) { ($raw -join "`n") | ConvertFrom-Json }
 }
+# GitHub OIDC assertions expire after 5 minutes, so long CI runs must sign in again before new token requests.
+function Update-CiLogin {
+    if (-not ($inCi -and $env:ACTIONS_ID_TOKEN_REQUEST_URL -and $env:AZURE_CLIENT_ID)) { return }
+    $idToken = (Invoke-RestMethod -Uri "$($env:ACTIONS_ID_TOKEN_REQUEST_URL)&audience=api://AzureADTokenExchange" -Headers @{ Authorization = "Bearer $($env:ACTIONS_ID_TOKEN_REQUEST_TOKEN)" }).value
+    & az login --service-principal --username $env:AZURE_CLIENT_ID --tenant $env:AZURE_TENANT_ID --federated-token $idToken --output none --only-show-errors
+    if ($LASTEXITCODE -ne 0) { throw 'Could not refresh the GitHub OIDC Azure login.' }
+    & az account set --subscription $SubscriptionId --only-show-errors
+}
+function Wait-GroupAbsent([string]$Name) {
+    $deadline = (Get-Date).AddMinutes(150)
+    while ($true) {
+        Update-CiLogin
+        if (-not (Test-Group $Name)) { return }
+        if ((Get-Date) -gt $deadline) { throw "Teardown incomplete: $Name still exists after 150 minutes." }
+        $state = (Invoke-Az @('group', 'show', '--name', $Name)).properties.provisioningState
+        if ($state -ne 'Deleting') { Invoke-Az @('group', 'delete', '--name', $Name, '--yes', '--no-wait') | Out-Null }
+        $left = @(Invoke-Az @('resource', 'list', '--resource-group', $Name)).Count
+        Write-Output "$(Get-Date -Format 'HH:mm:ss') $Name is $state; $left resource(s) left"
+        Start-Sleep -Seconds $PollSeconds
+    }
+}
 
 $inventory = [ordered]@{
     subscriptionId = $SubscriptionId
@@ -62,6 +83,7 @@ if (($confirmed -join ',') -cne (($groups | Sort-Object) -join ',')) { throw "De
 if (-not $PSCmdlet.ShouldProcess("$SubscriptionId/$expected", 'Permanently delete these resource groups')) { return }
 
 if ($inventory.groups.Contains($WorkloadGroup)) {
+    Update-CiLogin
     $scope = @('--resource-group', $WorkloadGroup)
     # Foundry rejects account deletion while child projects exist, and capability hosts keep agent subnets linked.
     $accounts = @(Invoke-Az (@('cognitiveservices', 'account', 'list') + $scope))
@@ -84,13 +106,14 @@ if ($inventory.groups.Contains($WorkloadGroup)) {
         if ((Get-Date) -gt $deadline) { throw "Capability hosts still present after 120 minutes: $($remaining.id -join ', ')" }
         Write-Output "$(Get-Date -Format 'HH:mm:ss') waiting on $($remaining.Count) capability host(s): $(($remaining | ForEach-Object { "$(($_.id -split '/')[-1])=$($_.state)" }) -join ', ')"
         Start-Sleep -Seconds $PollSeconds
+        Update-CiLogin
     }
+    Update-CiLogin
     & azd down --force --purge --no-prompt --environment $AzdEnvironment --cwd (Split-Path $PSScriptRoot -Parent)
-    if ($LASTEXITCODE -ne 0 -or (Test-Group $WorkloadGroup)) {
-        Write-Warning "azd down did not remove $WorkloadGroup; falling back to az group delete."
-        Invoke-Az @('group', 'delete', '--name', $WorkloadGroup, '--yes') | Out-Null
-    }
-    if (Test-Group $WorkloadGroup) { throw "Teardown incomplete: $WorkloadGroup still exists." }
+    if ($LASTEXITCODE -ne 0) { Write-Warning "azd down did not finish; falling back to az group delete for $WorkloadGroup." }
+}
+if ($Delete) {
+    Wait-GroupAbsent $WorkloadGroup
     foreach ($account in @(Invoke-Az @('cognitiveservices', 'account', 'list-deleted'))) {
         if ($account.id -like "*/resourceGroups/$WorkloadGroup/*") {
             Invoke-Az @('cognitiveservices', 'account', 'purge', '--name', $account.name, '--location', $account.location, '--resource-group', $WorkloadGroup) | Out-Null
@@ -101,6 +124,7 @@ if ($inventory.groups.Contains($WorkloadGroup)) {
 }
 
 if ($inventory.groups.Contains($IdentityGroup)) {
+    Update-CiLogin
     if ($inCi) {
         # This run authenticates as the identity being deleted, so it cannot verify completion.
         Invoke-Az @('group', 'delete', '--name', $IdentityGroup, '--yes', '--no-wait') | Out-Null

@@ -127,7 +127,7 @@ def test_hybrid_migration_scope(tmp_path, case, success, deleted):
 
 
 AIR_CANADA_MOCK = r'''
-$global:Gone = @{}
+$global:Gone = @{ 'rg-air-canada-threat-assessment-poc' = [bool]$env:MOCK_POC_GONE }
 $global:HostPolls = 0
 $global:Calls = [System.Collections.Generic.List[string]]::new()
 function global:azd { $global:Calls.Add('azd down'); $global:Gone['rg-air-canada-threat-assessment-poc'] = $true; $global:LASTEXITCODE = 0 }
@@ -197,3 +197,18 @@ def test_air_canada_teardown(tmp_path, flags, ci, success, expected):
     if success:
         assert f"CALLS={'|'.join(expected)}" in result.stdout, result.stdout
     assert json.loads((tmp_path / 'inventory.json').read_text())['groups']
+
+
+def test_air_canada_teardown_resumes_purge_after_group_is_gone(tmp_path):
+    script = SCRIPT.parent / 'teardown-air-canada.ps1'
+    command = AIR_CANADA_MOCK + (
+        f"& '{script.as_posix()}' -EvidenceDirectory '{tmp_path.as_posix()}' -PollSeconds 0 -KeepPipelineIdentity "
+        "-Delete -ConfirmResourceGroups rg-air-canada-threat-assessment-poc -Confirm:$false; "
+        "Write-Output \"CALLS=$($global:Calls -join '|')\""
+    )
+    result = subprocess.run([PWSH, '-NoProfile', '-NonInteractive', '-Command', command],
+                            env={**os.environ, 'GITHUB_ACTIONS': 'false', 'MOCK_POC_GONE': '1'},
+                            capture_output=True, text=True, timeout=30, check=False)
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert 'CALLS=purge' in result.stdout
+    assert 'Verified absent: rg-air-canada-threat-assessment-poc' in result.stdout

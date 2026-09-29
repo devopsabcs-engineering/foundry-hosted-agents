@@ -62,6 +62,9 @@ jobs:
       - name: Delete and verify
         if: inputs.execute
         shell: pwsh
+        env:
+          AZURE_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+          AZURE_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
         run: ./scripts/teardown-air-canada.ps1 -KeepPipelineIdentity:([bool]::Parse($env:KEEP_IDENTITY)) -Delete -ConfirmResourceGroups $env:CONFIRM_RESOURCE_GROUPS -EvidenceDirectory teardown-execution -Confirm:$false
       - name: Record outcome
         if: always()
